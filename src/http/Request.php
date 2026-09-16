@@ -20,6 +20,7 @@ class Request
         private readonly array $headers,
         private readonly array $cookies = [],
         public readonly string $rawBody = '',
+        public readonly string $ip = '',
     ) {
     }
 
@@ -44,6 +45,7 @@ class Request
             headers: $headers,
             cookies: $_COOKIE,
             rawBody: $rawBody,
+            ip: self::resolveIp($headers),
         );
     }
 
@@ -155,6 +157,33 @@ class Request
         }
 
         return $headers;
+    }
+
+    /**
+     * 解析客户端 IP。
+     *
+     * 优先读取反向代理常用头（X-Real-IP / X-Forwarded-For），
+     * 其次回退到 REMOTE_ADDR。
+     *
+     * @param  array<string, string> $headers
+     */
+    private static function resolveIp(array $headers): string
+    {
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+
+        $map = [];
+        foreach ($headers as $name => $value) {
+            $map[strtolower($name)] = $value;
+        }
+
+        foreach (['x-real-ip', 'x-forwarded-for'] as $key) {
+            if (isset($map[$key]) && $map[$key] !== '') {
+                $ip = trim(explode(',', $map[$key])[0]);
+                break;
+            }
+        }
+
+        return $ip;
     }
 
     private static function parseBody(string $raw, string $contentType): array
