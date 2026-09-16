@@ -130,6 +130,7 @@ class Application
         $this->container->singleton(ConsoleApplication::class, function (): ConsoleApplication {
             $console = new ConsoleApplication($this->container);
             $console->addCommand(\Lychee\console\command\ServeCommand::class);
+            $console->addCommand(\Lychee\console\command\RouteListCommand::class);
 
             return $console;
         });
