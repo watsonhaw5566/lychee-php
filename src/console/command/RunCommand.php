@@ -48,7 +48,6 @@ class RunCommand extends Command
         );
 
         $output->writeln("<info>Lychee development server started:</info>");
-        $output->writeln("  <comment>http://{$host}:{$port}</comment>");
         $output->writeln("  Document root: {$public}");
         $output->writeln("  Press Ctrl+C to stop.");
 
