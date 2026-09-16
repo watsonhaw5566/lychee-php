@@ -73,7 +73,7 @@ export default defineConfig({
     ],
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/watsonhaw/lychee-php' },
+      { icon: 'github', link: 'https://github.com/watsonhaw5566/lychee-php' },
     ],
 
     footer: {
