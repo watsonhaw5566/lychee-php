@@ -11,7 +11,7 @@ use Overtrue\Flysystem\Cos\CosAdapter;
 /**
  * 腾讯云 COS 文件系统驱动。
  */
-class Cos extends Driver
+class Qcloud extends Driver
 {
     /** @var array<string, mixed> */
     protected array $config = [

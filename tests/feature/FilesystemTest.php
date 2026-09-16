@@ -72,12 +72,12 @@ class FilesystemTest extends TestCase
         ]);
     }
 
-    public function test_cos_driver_validates_required_config(): void
+    public function test_qcloud_driver_validates_required_config(): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage("Tencent COS driver requires 'app_id'");
 
-        new \Lychee\filesystem\driver\Cos([
+        new \Lychee\filesystem\driver\Qcloud([
             'secret_id'  => 'id',
             'secret_key' => 'key',
             'region'     => 'ap-guangzhou',
