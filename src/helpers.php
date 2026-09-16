@@ -182,6 +182,20 @@ if (!function_exists('satoken')) {
     }
 }
 
+if (!function_exists('ws')) {
+    /**
+     * 获取 WebSocket 服务实例。
+     *
+     * 用于在 HTTP 控制器等场景向在线连接推送消息：
+     *   ws()->broadcast('/chat', json_encode(['type' => 'message', ...]));
+     *   ws()->sendTo('/chat', 123, 'hello');
+     */
+    function ws(): \Lychee\websocket\WebSocketServer
+    {
+        return app('websocket');
+    }
+}
+
 if (!function_exists('request')) {
     /**
      * 获取当前请求对象。
