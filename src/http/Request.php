@@ -107,6 +107,23 @@ class Request
         return $this->header('X-Requested-With', '') === 'XMLHttpRequest';
     }
 
+    /**
+     * 判断是否为移动设备（基于 User-Agent）。
+     */
+    public function isMobile(): bool
+    {
+        $ua = $this->header('User-Agent', '');
+
+        if ($ua === '') {
+            return false;
+        }
+
+        return (bool) preg_match(
+            '/android|iphone|ipad|ipod|mobile|wap|webos|blackberry|windows phone|opera mini|iemobile/i',
+            $ua
+        );
+    }
+
     public function all(): array
     {
         return array_merge($this->query, $this->body, $this->routeParams);

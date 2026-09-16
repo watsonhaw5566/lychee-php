@@ -31,6 +31,9 @@ $request->isGet();
 $request->isPost();
 $request->isAjax();
 $request->isJson();
+
+// 判断是否为移动设备（基于 User-Agent）
+$request->isMobile();
 ```
 
 ## 响应 Response
