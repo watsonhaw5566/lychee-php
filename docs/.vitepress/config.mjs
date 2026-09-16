@@ -5,6 +5,11 @@ export default defineConfig({
   description: '轻量级、IDE 友好的 PHP Web 框架',
   lang: 'zh-CN',
 
+  head: [
+    ['link', { rel: 'icon', href: '/favicon.png', type: 'image/png' }],
+    ['link', { rel: 'shortcut icon', href: '/favicon.png', type: 'image/png' }],
+  ],
+
   themeConfig: {
     nav: [
       { text: '首页', link: '/' },
@@ -24,6 +29,7 @@ export default defineConfig({
         items: [
           { text: '会话', link: '/session' },
           { text: '模板引擎', link: '/view' },
+          { text: '数据验证', link: '/validation' },
           { text: '数据库', link: '/orm' },
           { text: '数据迁移', link: '/migration' },
           { text: '文件系统', link: '/filesystem' },
@@ -52,6 +58,7 @@ export default defineConfig({
           { text: '路由 Routing', link: '/routing' },
           { text: '中间件 Middleware', link: '/middleware' },
           { text: 'HTTP 请求与响应', link: '/http' },
+          { text: '数据验证 Validation', link: '/validation' },
         ],
       },
       {
@@ -59,6 +66,7 @@ export default defineConfig({
         items: [
           { text: '会话 Session', link: '/session' },
           { text: '模板引擎 View', link: '/view' },
+          { text: '数据验证 Validation', link: '/validation' },
           { text: '数据库 ORM', link: '/orm' },
           { text: '数据迁移 Migration', link: '/migration' },
           { text: '文件系统 Filesystem', link: '/filesystem' },

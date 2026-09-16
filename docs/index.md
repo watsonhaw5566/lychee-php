@@ -5,13 +5,16 @@ hero:
   name: Lychee PHP
   text: 轻量级 PHP Web 框架
   tagline: IDE 友好 · 按需加载 · 开箱即用
+  image:
+    src: /favicon.png
+    alt: Lychee PHP
   actions:
     - theme: brand
       text: 快速开始
       link: /guide/quickstart
     - theme: alt
       text: GitHub
-      link: https://github.com/watsonhaw/lychee-php
+      link: https://github.com/watsonhaw5566/lychee-php
 
 features:
   - title: 轻量容器
