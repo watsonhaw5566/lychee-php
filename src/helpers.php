@@ -74,6 +74,18 @@ if (!function_exists('base_path')) {
     }
 }
 
+if (!function_exists('app_path')) {
+    /**
+     * 获取应用目录（basePath/app）。
+     */
+    function app_path(string $path = ''): string
+    {
+        $app = app('path.app');
+
+        return $app . ($path ? ltrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR : '');
+    }
+}
+
 if (!function_exists('runtime_path')) {
     /**
      * 获取应用运行时目录。
@@ -272,7 +284,7 @@ if (!function_exists('view')) {
     /**
      * 渲染 Twig 模板。
      *
-     * @param  string               $template 模板路径（相对 app/view，如 'user/index.html'）
+     * @param  string               $template 模板路径（相对 app/view，如 'user/index'、'user/index.twig' 或 'user/index.html'）
      * @param  array<string, mixed> $data     传递给模板的数据
      */
     function view(string $template, array $data = []): string
