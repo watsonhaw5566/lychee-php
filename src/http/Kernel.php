@@ -6,7 +6,9 @@ namespace Lychee\http;
 
 use Lychee\container\Container;
 use Lychee\routing\RouteMatch;
+use Lychee\routing\RouteNotFoundException;
 use Lychee\routing\Router;
+use Lychee\view\ExceptionRenderer;
 use think\Validate as Validator;
 use ReflectionClass;
 use ReflectionMethod;
@@ -203,16 +205,80 @@ class Kernel
         }
 
         $status = 500;
-        if ($e instanceof \Lychee\routing\RouteNotFoundException) {
+        if ($e instanceof RouteNotFoundException) {
             $status = 404;
-        } elseif ($e instanceof \Lychee\http\HttpException) {
+        } elseif ($e instanceof HttpException) {
             $status = $e->getStatusCode();
         }
 
-        $data = [
-            'message' => $e->getMessage(),
-        ];
+        $debug = (bool) config('app.debug', env('APP_DEBUG', false));
 
-        return new JsonResponse($data, $status);
+        // 浏览器请求渲染异常页；JSON 请求返回结构化错误
+        if ($this->wantsHtml($request)) {
+            if ($debug) {
+                $renderer = new ExceptionRenderer(
+                    cachePath: (string) app('path.runtime') . 'twig'
+                );
+
+                $html = $renderer->render(
+                    status: $status,
+                    e: $e,
+                    method: $request->method,
+                    url: $request->path,
+                );
+
+                return new Response($html, $status, ['Content-Type' => 'text/html; charset=utf-8']);
+            }
+
+            // 非调试模式返回空白页
+            return new Response('', $status, ['Content-Type' => 'text/html; charset=utf-8']);
+        }
+
+        // JSON 请求
+        if ($debug) {
+            return new JsonResponse([
+                'code'  => $status,
+                'msg'   => $e->getMessage(),
+                'type'  => $e::class,
+                'file'  => $e->getFile(),
+                'line'  => $e->getLine(),
+                'trace' => explode("\n", $e->getTraceAsString()),
+            ], $status);
+        }
+
+        return new JsonResponse([
+            'code' => $status,
+            'msg'  => $this->statusText($status),
+        ], $status);
+    }
+
+    /**
+     * 判断请求是否期望 HTML 响应（浏览器访问）。
+     */
+    private function wantsHtml(Request $request): bool
+    {
+        $accept = $request->header('Accept', '');
+
+        // 显式请求 JSON 时不返回 HTML
+        if (str_contains($accept, 'application/json')) {
+            return false;
+        }
+
+        return str_contains($accept, 'text/html') || $accept === '' || str_contains($accept, '*/*');
+    }
+
+    /**
+     * 根据状态码返回通用错误描述。
+     */
+    private function statusText(int $status): string
+    {
+        return match ($status) {
+            404     => 'Not Found',
+            403     => 'Forbidden',
+            401     => 'Unauthorized',
+            405     => 'Method Not Allowed',
+            422     => 'Unprocessable Entity',
+            default => 'Server Error',
+        };
     }
 }
