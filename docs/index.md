@@ -6,7 +6,7 @@ hero:
   text: 轻量级 PHP Web 框架
   tagline: IDE 友好 · 按需加载 · 开箱即用
   image:
-    src: /favicon.png
+    src: /pure-logo.png
     alt: Lychee PHP
   actions:
     - theme: brand

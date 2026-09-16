@@ -73,4 +73,4 @@ php lee queue:work        # 队列消费
 
 ## 文档
 
-各模块使用说明见 [docs/](docs/) 目录。
+完整文档请访问 [lychee-php](https://lychee-php.watsonhaw.top)
