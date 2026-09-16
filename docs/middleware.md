@@ -8,13 +8,14 @@
 // app/middleware/AuthMiddleware.php
 namespace App\middleware;
 
+use Closure;
 use Lychee\http\MiddlewareInterface;
 use Lychee\http\Request;
 use Lychee\http\Response;
 
 class AuthMiddleware implements MiddlewareInterface
 {
-    public function process(Request $request, callable $next): Response
+    public function handle(Request $request, Closure $next): Response
     {
         // 前置处理
         if (!session('user_id')) {
@@ -55,4 +56,18 @@ class AdminController
 
 ## 全局中间件
 
-在 `config/app.php` 中配置全局中间件列表（需创建该配置文件）。
+在 `config/middleware.php` 中配置全局中间件列表，其中间件会在**所有路由**的控制器级 / 路由级中间件**之前**执行。
+
+```php
+// config/middleware.php
+return [
+    // 按数组顺序依次执行
+    \App\middleware\SessionMiddleware::class,
+    \App\middleware\I18nMiddleware::class,
+    \App\middleware\LogMiddleware::class,
+];
+```
+
+执行顺序为：**全局中间件 → 控制器级中间件 → 路由级中间件 → 控制器方法**。
+
+若未创建 `config/middleware.php`，则不会加载任何全局中间件。
