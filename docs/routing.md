@@ -57,15 +57,32 @@ public function admin()
 
 ## 资源路由
 
+标注 `#[Resource]` 的控制器会自动注册资源动作路由，无需再为每个方法声明 `#[Route]`。
+仅当方法存在且为 `public` 时才会注册。
+
+| 方法 | 路由 | 说明 |
+| --- | --- | --- |
+| `index()` | `GET /path` | 列表 |
+| `save()` | `POST /path` | 新建 |
+| `read($id)` | `GET /path/{id}` | 详情 |
+| `update($id)` | `PUT /path/{id}`（同时支持 `PATCH`） | 更新 |
+| `delete($id)` | `DELETE /path/{id}` | 删除单条 |
+| `batch_delete()` | `DELETE /path` | 批量删除 |
+
 ```php
-// 自动注册 index/show/store/update/destroy 五个路由
+use Lychee\routing\Resource;
+
 #[Resource('/users')]
 class UserController
 {
-    public function index() {}
-    public function show($id) {}
-    public function store() {}
-    public function update($id) {}
-    public function destroy($id) {}
+    public function index() {}           // GET    /users
+    public function save() {}            // POST   /users
+    public function read($id) {}         // GET    /users/{id}
+    public function update($id) {}       // PUT    /users/{id}
+    public function delete($id) {}       // DELETE /users/{id}
+    public function batch_delete() {}    // DELETE /users
 }
 ```
+
+若某个资源方法已显式声明 `#[Route]`，则以显式声明为准，自动注册会跳过该方法。
+`#[Resource]` 同样作为路径前缀作用于控制器内所有显式 `#[Route]` 方法。

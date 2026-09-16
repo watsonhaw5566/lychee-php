@@ -19,7 +19,7 @@ use Lychee\http\Request;
 use Lychee\validation\ValidationException;
 use think\Validate;
 
-public function store(Request $request): JsonResponse
+public function save(Request $request): JsonResponse
 {
     $data = $request->all();
 
