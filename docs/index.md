@@ -11,7 +11,7 @@ hero:
       link: /guide/quickstart
     - theme: alt
       text: GitHub
-      link: https://github.com/watsonhaw/lychee-php
+      link: https://github.com/watsonhaw5566/lychee-php
 
 features:
   - title: 轻量容器
