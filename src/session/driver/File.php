@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Lychee\session\driver;
 
 use Lychee\session\SessionDriverInterface;
-use RuntimeException;
 
 /**
  * 文件 Session 驱动。
@@ -20,15 +19,8 @@ class File implements SessionDriverInterface
         private readonly int $gcDivisor = 100,
         private readonly int $expireMinutes = 120,
     ) {
-        if ($this->path === '' || $this->path === '/') {
-            throw new RuntimeException(
-                'Session path must not be empty or the root directory. ' .
-                'Please configure session.path to a writable directory (e.g. runtime_path("session")).'
-            );
-        }
-
-        if (!is_dir($this->path) && !mkdir($this->path, 0777, true) && !is_dir($this->path)) {
-            throw new RuntimeException("Session directory [{$this->path}] could not be created.");
+        if (!is_dir($this->path)) {
+            mkdir($this->path, 0777, true);
         }
     }
 
