@@ -9,6 +9,18 @@ namespace Lychee\http;
  */
 class Response
 {
+    /** @var Cookie[] */
+    protected array $cookies = [];
+
+    /**
+     * @param array<string, string> $headers
+     */
+    public function __construct(
+        public string $content = '',
+        public int $status = 200,
+        public array $headers = [],
+    ) {
+    }
     /**
      * 创建一个文件下载响应。
      *
@@ -82,19 +94,6 @@ class Response
         }
 
         return str_starts_with($path, '/') || str_starts_with($path, DIRECTORY_SEPARATOR);
-    }
-
-    /** @var Cookie[] */
-    protected array $cookies = [];
-
-    /**
-     * @param array<string, string> $headers
-     */
-    public function __construct(
-        public string $content = '',
-        public int $status = 200,
-        public array $headers = [],
-    ) {
     }
 
     /**

@@ -84,6 +84,7 @@ class ResponseTest extends TestCase
             Response::download('does-not-exist.txt');
         } catch (HttpException $e) {
             $this->assertSame(404, $e->getStatusCode());
+
             throw $e;
         }
     }
