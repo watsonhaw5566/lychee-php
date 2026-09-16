@@ -251,6 +251,23 @@ if (!function_exists('response')) {
     }
 }
 
+if (!function_exists('lang')) {
+    /**
+     * 翻译指定键。
+     *
+     * @param  string               $key     翻译键（分组.键名，支持点号嵌套）
+     * @param  array<string, mixed> $replace 占位符替换值
+     * @param  string|null          $locale  指定语言，为 null 时使用当前语言
+     */
+    function lang(string $key, array $replace = [], ?string $locale = null): string
+    {
+        /** @var \Lychee\i18n\I18n $i18n */
+        $i18n = app('i18n');
+
+        return $i18n->lang($key, $replace, $locale);
+    }
+}
+
 if (!function_exists('view')) {
     /**
      * 渲染 Twig 模板。
