@@ -26,6 +26,8 @@ use Lychee\routing\Router;
 use Lychee\session\driver\File as SessionFileDriver;
 use Lychee\session\Session;
 use Lychee\view\View;
+use Lychee\websocket\command\ServerCommand;
+use Lychee\websocket\WebSocketServer;
 use Psr\Log\LoggerInterface;
 use think\CacheManager;
 use think\DbManager;
@@ -84,6 +86,7 @@ class Application
             'queue'      => $this->bootQueue(...),
             'session'    => $this->bootSession(...),
             'i18n'       => $this->bootI18n(...),
+            'websocket'  => $this->bootWebSocket(...),
         ];
 
         foreach ($modules as $key => $boot) {
@@ -299,6 +302,22 @@ class Application
 
         $this->container->instance(I18n::class, $i18n);
         $this->container->instance('i18n', $i18n);
+    }
+
+    private function bootWebSocket(): void
+    {
+        /** @var Config $config */
+        $config          = $this->container->get('config');
+        $websocketConfig = $config->get('websocket', []);
+
+        $server = new WebSocketServer($this->container, $websocketConfig);
+
+        $this->container->instance(WebSocketServer::class, $server);
+        $this->container->instance('websocket', $server);
+
+        /** @var ConsoleApplication $console */
+        $console = $this->container->get(ConsoleApplication::class);
+        $console->addCommand(ServerCommand::class);
     }
 
     private function bootMigration(): void
