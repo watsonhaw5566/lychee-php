@@ -295,6 +295,31 @@ abstract class ResourceController
         return $query;
     }
 
+    // ── 多租户（由 HasTenant trait 覆盖）─────────────────────────────
+
+    /**
+     * 应用租户隔离过滤（默认不做过滤）。
+     *
+     * use HasTenant 后此方法会被覆盖，按当前租户 ID 过滤查询。
+     */
+    protected function applyTenantScope(Model|Query $query): Model|Query
+    {
+        return $query;
+    }
+
+    /**
+     * 新建/更新时自动填充租户 ID（默认不修改数据）。
+     *
+     * use HasTenant 后此方法会被覆盖，自动写入 tenant_id 字段。
+     *
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    protected function fillTenantId(array $data): array
+    {
+        return $data;
+    }
+
     // ── CRUD ────────────────────────────────────────────────────────
 
     /**
@@ -350,6 +375,7 @@ abstract class ResourceController
             $model->order($order);
 
             $query = $this->applyDataPermission($model);
+            $query = $this->applyTenantScope($query);
 
             return $this->paginate($query, $current, $pageSize);
         } catch (Throwable $e) {
@@ -385,6 +411,8 @@ abstract class ResourceController
                 }
             }
 
+            $postData = $this->fillTenantId($postData);
+
             $ret = $model->create($postData);
 
             return $this->success($ret);
@@ -411,6 +439,7 @@ abstract class ResourceController
         try {
             $model = $this->getModel();
             $query = $this->applyDataPermission($model);
+            $query = $this->applyTenantScope($query);
             $data  = $query->find($id);
 
             if (!$data) {
@@ -449,6 +478,7 @@ abstract class ResourceController
             }
 
             $query = $this->applyDataPermission($model);
+            $query = $this->applyTenantScope($query);
             $info  = $query->find($id);
 
             if (!$info) {
@@ -462,6 +492,8 @@ abstract class ResourceController
                     return $this->fail($error);
                 }
             }
+
+            $postData = $this->fillTenantId($postData);
 
             $info->save($postData);
 
@@ -486,6 +518,7 @@ abstract class ResourceController
         try {
             $model = $this->getModel();
             $query = $this->applyDataPermission($model);
+            $query = $this->applyTenantScope($query);
             $data  = $query->find($id);
 
             if (!$data) {
@@ -519,6 +552,7 @@ abstract class ResourceController
 
             $model = $this->getModel();
             $query = $this->applyDataPermission($model);
+            $query = $this->applyTenantScope($query);
             $list  = $query->whereIn('id', $ids)->select();
 
             if ($list->isEmpty()) {
