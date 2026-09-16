@@ -64,12 +64,17 @@ $auth->kickoutByToken($token);
 use Lychee\auth\SatokenMiddleware;
 use Lychee\routing\Middleware;
 use Lychee\routing\Resource;
+use Lychee\routing\WithoutMiddleware;
 
 // 整个控制器需要登录
 #[Resource('/users')]
 #[Middleware(SatokenMiddleware::class)]
 class UserController
 {
+    // 登录接口无需鉴权，排除类级中间件
+    #[WithoutMiddleware]
+    public function login() {}
+
     public function index() {}
     public function read($id) {}
 }

@@ -58,14 +58,14 @@ class Router
 
             $route             = $routeAttrs[0]->newInstance();
             $path              = $this->joinPath($prefix, $route->path);
-            $methodMiddlewares = $this->collectMiddlewares($method);
+            $methodMiddlewares = $this->resolveMethodMiddlewares($method, $classMiddlewares);
 
             $this->routes[] = [
                 'method'      => strtoupper($route->method),
                 'pattern'     => $this->compilePattern($path),
                 'controller'  => $controllerClass,
                 'action'      => $method->getName(),
-                'middlewares' => array_merge($classMiddlewares, $methodMiddlewares),
+                'middlewares' => $methodMiddlewares,
             ];
 
             if ($route->name !== '') {
@@ -107,9 +107,8 @@ class Router
                 continue;
             }
 
-            $path              = $this->joinPath($prefix, $definition['path']);
-            $methodMiddlewares = $this->collectMiddlewares($method);
-            $middlewares       = array_merge($classMiddlewares, $methodMiddlewares);
+            $path        = $this->joinPath($prefix, $definition['path']);
+            $middlewares = $this->resolveMethodMiddlewares($method, $classMiddlewares);
 
             foreach ($definition['methods'] as $httpMethod) {
                 $this->routes[] = [
@@ -214,9 +213,47 @@ class Router
     {
         $middlewares = [];
         foreach ($reflector->getAttributes(Middleware::class) as $attr) {
-            $middlewares[] = $attr->newInstance()->middleware;
+            $value = $attr->newInstance()->middleware;
+
+            if (is_array($value)) {
+                foreach ($value as $m) {
+                    $middlewares[] = $m;
+                }
+            } else {
+                $middlewares[] = $value;
+            }
         }
 
         return $middlewares;
+    }
+
+    /**
+     * 解析方法最终生效的中间件列表。
+     *
+     * 合并类级与方法级中间件；若方法标注 #[WithoutMiddleware]，
+     * 则从类级中间件中排除指定（或全部）中间件。
+     *
+     * @param array<class-string> $classMiddlewares
+     * @return array<class-string>
+     */
+    private function resolveMethodMiddlewares(ReflectionMethod $method, array $classMiddlewares): array
+    {
+        $methodMiddlewares = $this->collectMiddlewares($method);
+
+        $excludeAttrs = $method->getAttributes(WithoutMiddleware::class);
+        if (!empty($excludeAttrs)) {
+            $exclude = $excludeAttrs[0]->newInstance()->middleware;
+            if (is_string($exclude)) {
+                $exclude = [$exclude];
+            }
+
+            if (empty($exclude)) {
+                $classMiddlewares = [];
+            } else {
+                $classMiddlewares = array_values(array_diff($classMiddlewares, $exclude));
+            }
+        }
+
+        return array_merge($classMiddlewares, $methodMiddlewares);
     }
 }
