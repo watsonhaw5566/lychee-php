@@ -9,7 +9,7 @@
 ```php
 return [
     'token_name'  => 'satoken',       // Token 名称
-    'timeout'     => 2592000,         // 过期时间（秒），默认 30 天
+    'timeout'     => 86400 * 7,       // 过期时间（秒），默认 7 天
     'active_timeout' => 0,            // 活跃超时，0 表示不限制
     'is_concurrent' => true,          // 是否允许同一账号多端登录
     'is_share'     => false,          // 多端是否共享 Token
