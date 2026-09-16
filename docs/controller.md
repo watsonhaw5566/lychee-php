@@ -403,3 +403,111 @@ if (!$this->canAccessData($order->user_id)) {
     return $this->fail('无权操作', 403);
 }
 ```
+
+## 多租户 HasTenant
+
+`Lychee\routing\HasTenant` 是一个可选 Trait，基于表字段 `tenant_id` 实现共享数据库 + 共享表的多租户隔离。
+`use` 后会覆盖 `applyTenantScope()` 与 `fillTenantId()`，自动在查询时过滤当前租户数据、在新建/更新时写入 `tenant_id`。
+
+```php
+namespace App\controller;
+
+use App\model\Order;
+use Lychee\routing\HasTenant;
+use Lychee\routing\Resource;
+use Lychee\routing\ResourceController;
+
+#[Resource('/orders')]
+class OrderController extends ResourceController
+{
+    use HasTenant;
+
+    protected string $model = Order::class;
+
+    protected array $tenantConfig = [
+        'enabled'        => true,
+        'tenantIdField'  => 'tenant_id',
+        'autoFill'       => true,
+        'bypassForAdmin' => true,
+    ];
+
+    protected function getTenantId(): ?int
+    {
+        // 从当前登录用户获取租户 ID
+        return User::find(request()->loginId())?->tenant_id;
+    }
+}
+```
+
+### 工作原理
+
+- **查询隔离**：`baseIndex` / `baseRead` / `baseUpdate` / `baseDelete` / `baseBatchDelete` 中的查询会自动附加 `where(tenant_id, 当前租户ID)`
+- **写入填充**：`baseSave` / `baseUpdate` 会自动在数据中填入 `tenant_id`（若未显式指定）
+- 从 `getTenantId()` 获取当前租户 ID（需子类覆盖）
+- 平台管理员可通过 `isAdmin()` 判断跳过隔离（由 `bypassForAdmin` 控制）
+
+### 配置项
+
+| 配置 | 默认值 | 说明 |
+| --- | --- | --- |
+| `enabled` | `true` | 是否开启租户隔离 |
+| `tenantIdField` | `'tenant_id'` | 租户 ID 字段名 |
+| `autoFill` | `true` | 新建/更新时是否自动填充 `tenant_id` |
+| `bypassForAdmin` | `true` | 平台管理员是否跳过租户隔离 |
+
+### 覆盖管理员逻辑
+
+`isAdmin(int $userId)` 默认返回 `false`，实际项目中需覆盖：
+
+```php
+class OrderController extends ResourceController
+{
+    use HasTenant;
+
+    protected function getTenantId(): ?int
+    {
+        return User::find(request()->loginId())?->tenant_id;
+    }
+
+    protected function isAdmin(int $userId): bool
+    {
+        return User::find($userId)?->is_platform_admin ?? false;
+    }
+}
+```
+
+### 单条数据归属检查
+
+`isTenantData($dataTenantId)` 用于判断某条数据是否属于当前租户：
+
+```php
+if (!$this->isTenantData($order->tenant_id)) {
+    return $this->fail('无权操作', 403);
+}
+```
+
+### 与 HasDataPermission 同时使用
+
+`HasTenant` 与 `HasDataPermission` 可以同时 `use`，两者分别覆盖不同的钩子，互不冲突。
+
+但两者都定义了 `isAdmin(int $userId): bool` 方法，同时使用时需在控制器类中覆盖 `isAdmin()` 以解决 trait 方法冲突（类方法优先于 trait 方法）：
+
+```php
+class OrderController extends ResourceController
+{
+    use HasDataPermission, HasTenant;
+
+    protected string $model = Order::class;
+
+    protected function getTenantId(): ?int
+    {
+        return User::find(request()->loginId())?->tenant_id;
+    }
+
+    // 覆盖 isAdmin，同时满足两个 trait 的需求
+    protected function isAdmin(int $userId): bool
+    {
+        return User::find($userId)?->is_platform_admin ?? false;
+    }
+}
+```
