@@ -7,7 +7,6 @@ namespace Tests\stub\app\controller;
 use Lychee\http\JsonResponse;
 use Lychee\http\Request;
 use Lychee\routing\Resource;
-use Lychee\routing\Route;
 use Lychee\validation\ValidationException;
 use Tests\stub\app\model\User;
 use think\Validate;
@@ -23,7 +22,6 @@ class UserController
     ) {
     }
 
-    #[Route('/')]
     public function index(): JsonResponse
     {
         $list = $this->user->select();
@@ -33,8 +31,7 @@ class UserController
         ]);
     }
 
-    #[Route('/{id}')]
-    public function show(int $id): JsonResponse
+    public function read(int $id): JsonResponse
     {
         $user = $this->user->find($id);
 
@@ -45,8 +42,7 @@ class UserController
         return new JsonResponse(['data' => $user]);
     }
 
-    #[Route('/', 'POST')]
-    public function store(Request $request): JsonResponse
+    public function save(Request $request): JsonResponse
     {
         $data = $request->all();
 
@@ -76,5 +72,43 @@ class UserController
         ]);
 
         return new JsonResponse(['data' => $user], 201);
+    }
+
+    public function update(int $id, Request $request): JsonResponse
+    {
+        $user = $this->user->find($id);
+
+        if ($user === null) {
+            return new JsonResponse(['message' => 'User not found.'], 404);
+        }
+
+        $data = $request->all();
+        $user->save($data);
+
+        return new JsonResponse(['data' => $user->refresh()]);
+    }
+
+    public function delete(int $id): JsonResponse
+    {
+        $user = $this->user->find($id);
+
+        if ($user === null) {
+            return new JsonResponse(['message' => 'User not found.'], 404);
+        }
+
+        $user->delete();
+
+        return new JsonResponse(['message' => 'ok']);
+    }
+
+    public function batch_delete(Request $request): JsonResponse
+    {
+        $ids = (array) ($request->all()['ids'] ?? []);
+
+        if (!empty($ids)) {
+            $this->user->whereIn('id', $ids)->delete();
+        }
+
+        return new JsonResponse(['message' => 'ok']);
     }
 }

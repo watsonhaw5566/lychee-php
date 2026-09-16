@@ -23,13 +23,31 @@ class Router
     private array $namedRoutes = [];
 
     /**
+     * 资源路由默认动作映射。
+     *
+     * 当控制器标注 #[Resource] 时，以下方法（若存在且为 public）
+     * 将被自动注册为路由，无需再为每个方法添加 #[Route]。
+     *
+     * @var array<string, array{methods: list<string>, path: string}>
+     */
+    private const RESOURCE_ACTIONS = [
+        'index'        => ['methods' => ['GET'],             'path' => '/'],
+        'save'         => ['methods' => ['POST'],            'path' => '/'],
+        'read'         => ['methods' => ['GET'],             'path' => '/{id}'],
+        'update'       => ['methods' => ['PUT', 'PATCH'],    'path' => '/{id}'],
+        'delete'       => ['methods' => ['DELETE'],          'path' => '/{id}'],
+        'batch_delete' => ['methods' => ['DELETE'],          'path' => '/'],
+    ];
+
+    /**
      * @param class-string $controllerClass
      */
     public function registerController(string $controllerClass): void
     {
         $ref = new ReflectionClass($controllerClass);
 
-        $prefix = $this->resolvePrefix($ref);
+        $prefix     = $this->resolvePrefix($ref);
+        $isResource = !empty($ref->getAttributes(Resource::class));
 
         $classMiddlewares = $this->collectMiddlewares($ref);
 
@@ -53,6 +71,55 @@ class Router
 
             if ($route->name !== '') {
                 $this->namedRoutes[$route->name] = $path;
+            }
+        }
+
+        if ($isResource) {
+            $this->registerResourceRoutes($ref, $controllerClass, $prefix, $classMiddlewares);
+        }
+    }
+
+    /**
+     * 为标注 #[Resource] 的控制器自动注册资源路由。
+     *
+     * 仅处理未显式声明 #[Route] 的方法，显式声明优先。
+     *
+     * @param class-string $controllerClass
+     * @param array<class-string> $classMiddlewares
+     */
+    private function registerResourceRoutes(
+        ReflectionClass $ref,
+        string $controllerClass,
+        string $prefix,
+        array $classMiddlewares,
+    ): void {
+        foreach (self::RESOURCE_ACTIONS as $action => $definition) {
+            if (!$ref->hasMethod($action)) {
+                continue;
+            }
+
+            $method = $ref->getMethod($action);
+            if (!$method->isPublic()) {
+                continue;
+            }
+
+            // 已显式声明 #[Route] 的方法优先，跳过自动注册
+            if (!empty($method->getAttributes(Route::class))) {
+                continue;
+            }
+
+            $path              = $this->joinPath($prefix, $definition['path']);
+            $methodMiddlewares = $this->collectMiddlewares($method);
+            $middlewares       = array_merge($classMiddlewares, $methodMiddlewares);
+
+            foreach ($definition['methods'] as $httpMethod) {
+                $this->routes[] = [
+                    'method'      => $httpMethod,
+                    'pattern'     => $this->compilePattern($path),
+                    'controller'  => $controllerClass,
+                    'action'      => $action,
+                    'middlewares' => $middlewares,
+                ];
             }
         }
     }
