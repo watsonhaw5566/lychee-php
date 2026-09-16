@@ -6,11 +6,13 @@ export default defineConfig({
   lang: 'zh-CN',
 
   head: [
-    ['link', { rel: 'icon', href: '/favicon.png', type: 'image/png' }],
-    ['link', { rel: 'shortcut icon', href: '/favicon.png', type: 'image/png' }],
+    ['link', { rel: 'icon', href: '/pure-logo.png', type: 'image/png' }],
+    ['link', { rel: 'shortcut icon', href: '/pure-logo.png', type: 'image/png' }],
   ],
 
   themeConfig: {
+    logo: '/pure-logo.png',
+
     nav: [
       { text: '首页', link: '/' },
       { text: '快速开始', link: '/guide/quickstart' },
