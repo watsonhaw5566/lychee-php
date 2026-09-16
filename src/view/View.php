@@ -44,7 +44,7 @@ class View
         $loader = new FilesystemLoader($this->viewPath);
 
         $this->twig = new Environment($loader, [
-            'cache'            => $this->cachePath,
+            'cache'            => $this->resolveCachePath($this->cachePath),
             'debug'            => $this->debug,
             'auto_reload'      => true,
             'strict_variables' => false,
@@ -52,6 +52,48 @@ class View
         ]);
 
         $this->registerDefaults();
+    }
+
+    /**
+     * 解析并确保 Twig 缓存目录可用。
+     *
+     * 处理流程：
+     *   1. 空路径返回 false（禁用缓存）；
+     *   2. 尝试创建并写入配置的缓存目录，成功则使用；
+     *   3. 失败时降级到系统临时目录下的 lychee-twig；
+     *   4. 仍失败则禁用缓存（返回 false），保证模板渲染不中断。
+     *
+     * @return string|false 可用的缓存目录路径，或 false 表示禁用缓存
+     */
+    protected function resolveCachePath(string $path): string|false
+    {
+        if ($path === '') {
+            return false;
+        }
+
+        if ($this->ensureWritableDir($path)) {
+            return $path;
+        }
+
+        // 降级到系统临时目录
+        $fallback = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'lychee-twig';
+        if ($this->ensureWritableDir($fallback)) {
+            return $fallback;
+        }
+
+        return false;
+    }
+
+    /**
+     * 确保目录存在且可写。
+     */
+    private function ensureWritableDir(string $dir): bool
+    {
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0777, true);
+        }
+
+        return is_dir($dir) && is_writable($dir);
     }
 
     /**
