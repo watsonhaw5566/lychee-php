@@ -61,6 +61,41 @@ class QueueTest extends TestCase
         $this->assertSame(['value' => 123], TestJob::$lastData);
     }
 
+    public function test_later_helper_dispatches_delayed_job(): void
+    {
+        // 链式调用 delay(0) 走 push 路径，任务立即执行
+        queue(TestJob::class, ['delayed' => true])->delay(0);
+
+        $this->assertSame(1, TestJob::$fireCount);
+        $this->assertSame(['delayed' => true], TestJob::$lastData);
+    }
+
+    public function test_queue_helper_returns_pending_dispatch(): void
+    {
+        $pending = queue(TestJob::class, ['value' => 1]);
+
+        $this->assertInstanceOf(\Lychee\queue\PendingDispatch::class, $pending);
+    }
+
+    public function test_delay_method_is_chainable(): void
+    {
+        $pending = queue(TestJob::class, ['value' => 1]);
+
+        // delay(0) 避免析构时触发 Sync 的 sleep
+        $this->assertSame($pending, $pending->delay(0));
+    }
+
+    public function test_sync_connector_later_executes_job(): void
+    {
+        $sync = $this->app->container->get(QueueManager::class)->connection('sync');
+
+        // delay 为 0 时不 sleep，直接执行
+        $sync->later(0, TestJob::class, ['via' => 'later']);
+
+        $this->assertSame(1, TestJob::$fireCount);
+        $this->assertSame(['via' => 'later'], TestJob::$lastData);
+    }
+
     public function test_queue_helper_returns_connector_when_no_job(): void
     {
         $connector = queue();
