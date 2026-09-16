@@ -6,6 +6,7 @@ namespace Lychee;
 
 use Lychee\auth\SaToken;
 use Lychee\config\Config;
+use Lychee\config\Env;
 use Lychee\console\Application as ConsoleApplication;
 use Lychee\container\Container;
 use Lychee\cron\command\CronRunCommand;
@@ -25,6 +26,7 @@ use Lychee\queue\QueueManager;
 use Lychee\routing\Router;
 use Lychee\session\driver\File as SessionFileDriver;
 use Lychee\session\Session;
+use Lychee\view\ExceptionRenderer;
 use Lychee\view\View;
 use Lychee\websocket\command\ServerCommand;
 use Lychee\websocket\WebSocketServer;
@@ -33,6 +35,7 @@ use think\CacheManager;
 use think\DbManager;
 use think\Model as ThinkModel;
 use think\Validate;
+use ErrorException;
 use PDO;
 use Throwable;
 
@@ -60,6 +63,7 @@ class Application
         $appNamespace = rtrim(str_replace('\\controller', '', $this->controllerNamespace), '\\');
         $this->container->setNamespace($appNamespace);
 
+        $this->loadEnvironment();
         $this->registerBindings();
         $this->bootConfig();
         $this->bootOptionalModules();
@@ -102,6 +106,17 @@ class Application
 
         // 迁移模块：始终注册命令，数据库连接可用时创建管理器
         $this->bootMigration();
+    }
+
+    /**
+     * 加载项目根目录下的 .env 文件。
+     *
+     * 必须在 registerBindings / bootConfig 之前执行，
+     * 以便配置文件与 env() 辅助函数能读取到环境变量。
+     */
+    private function loadEnvironment(): void
+    {
+        Env::load($this->basePath . '/.env');
     }
 
     private function registerBindings(): void
@@ -418,9 +433,97 @@ class Application
 
     public function run(): void
     {
+        $this->registerErrorHandling();
+
         $request  = Request::capture();
         $kernel   = $this->container->get(Kernel::class);
         $response = $kernel->handle($request);
         $response->send();
+    }
+
+    /**
+     * 注册全局错误处理：将 PHP Warning/Notice 等转为 ErrorException，
+     * 使其能被 Kernel 的 try/catch 捕获并渲染统一异常页；
+     * 致命错误通过 shutdown 函数兜底渲染。
+     */
+    private function registerErrorHandling(): void
+    {
+        // 禁止 PHP 直接输出错误，交由框架统一处理
+        ini_set('display_errors', '0');
+
+        set_error_handler(function (int $severity, string $message, string $file, int $line): bool {
+            // 被 @ 抑制的错误不抛出
+            if (!(error_reporting() & $severity)) {
+                return false;
+            }
+
+            throw new ErrorException($message, 0, $severity, $file, $line);
+        });
+
+        register_shutdown_function(function (): void {
+            $error = error_get_last();
+
+            if ($error === null) {
+                return;
+            }
+
+            $fatal = E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR;
+            if (($error['type'] & $fatal) === 0) {
+                return;
+            }
+
+            // 致命错误无法抛出，直接渲染异常页
+            $this->renderFatalError($error);
+        });
+    }
+
+    /**
+     * 渲染致命错误页面。
+     *
+     * @param array{type:int, message:string, file:string, line:int} $error
+     */
+    private function renderFatalError(array $error): void
+    {
+        if (PHP_SAPI === 'cli') {
+            return;
+        }
+
+        // 若已有输出（headers 已发送），则无法再发送完整响应
+        if (headers_sent()) {
+            return;
+        }
+
+        $debug = (bool) config('app.debug', env('APP_DEBUG', false));
+
+        if (!$debug) {
+            http_response_code(500);
+            echo '';
+
+            return;
+        }
+
+        $e = new ErrorException($error['message'], 0, $error['type'], $error['file'], $error['line']);
+
+        try {
+            $renderer = new ExceptionRenderer(
+                cachePath: (string) $this->container->runtimePath . 'twig'
+            );
+
+            $html = $renderer->render(
+                status: 500,
+                e: $e,
+                method: $_SERVER['REQUEST_METHOD'] ?? 'GET',
+                url: $_SERVER['REQUEST_URI']       ?? '/',
+            );
+
+            http_response_code(500);
+            header('Content-Type: text/html; charset=utf-8');
+            echo $html;
+        } catch (Throwable) {
+            // 渲染失败时输出最小化错误信息
+            http_response_code(500);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Server Error';
+        }
     }
 }

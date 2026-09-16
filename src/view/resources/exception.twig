@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ status }} · {{ message|e }}</title>
+    <script>
+        // 防闪烁：在 CSS 渲染前确定主题
+        // 优先级：localStorage 手动选择 > 按时间自动判断 > 浅色
+        (function () {
+            try {
+                var saved = localStorage.getItem('lychee-theme');
+                if (saved === 'light' || saved === 'dark') {
+                    document.documentElement.setAttribute('data-theme', saved);
+                    return;
+                }
+            } catch (e) {}
+            var h = new Date().getHours();
+            // 19:00 ~ 07:00 自动切换为夜间模式
+            if (h >= 19 || h < 7) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
+    <style>
+        :root {
+            /* 荔枝品牌主色：取自 lychee-php Logo 文字色 */
+            --lychee: #D6336C;
+            --lychee-deep: #B8285A;
+            --lychee-mid: #E8878A;
+            --lychee-light: #F5C6C6;
+            --lychee-soft: #FDEEF0;
+            /* 叶子绿 */
+            --leaf: #7CB342;
+            --leaf-deep: #5A9A2E;
+            /* 果蒂棕 */
+            --stem: #C19A6B;
+            /* 背景与表面 */
+            --bg: #FAF7F4;
+            --surface: #FFFFFF;
+            --surface-2: #FDF5F2;
+            /* 文字 */
+            --text: #3D2B2E;
+            --text-muted: #9A8A8A;
+            /* 边框与代码 */
+            --border: #F5E3E0;
+            --code-bg: #FBF1ED;
+            --code-text: #5A3E3A;
+            --shadow: 0 10px 40px rgba(214, 51, 108, 0.10);
+        }
+
+        [data-theme="dark"] {
+            --lychee: #E8508A;
+            --lychee-deep: #F06292;
+            --lychee-mid: #E8878A;
+            --lychee-light: #C97A82;
+            --lychee-soft: rgba(232, 80, 138, 0.10);
+            --leaf: #8BC34A;
+            --leaf-deep: #7CB342;
+            --stem: #C19A6B;
+            --bg: #1A1416;
+            --surface: #241B1E;
+            --surface-2: #2C2024;
+            --text: #F5E8EA;
+            --text-muted: #9A8A8A;
+            --border: #3D2B2E;
+            --code-bg: #251C1F;
+            --code-text: #D8C5C0;
+            --shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        .card {
+            width: 100%;
+            max-width: 1200px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .card__head {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 28px 32px 20px;
+            background: linear-gradient(135deg, var(--lychee-soft) 0%, var(--surface) 100%);
+            border-bottom: 1px solid var(--border);
+        }
+
+        [data-theme="dark"] .card__head {
+            background: linear-gradient(135deg, rgba(232, 80, 138, 0.14) 0%, var(--surface) 100%);
+        }
+
+        .logo {
+            width: 56px;
+            height: 56px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--surface);
+            border-radius: 14px;
+            box-shadow: 0 4px 12px rgba(214, 51, 108, 0.20);
+            overflow: hidden;
+        }
+
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        .head__meta {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .badge {
+            display: inline-block;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: #fff;
+            background: var(--lychee);
+            padding: 2px 10px;
+            border-radius: 999px;
+            margin-bottom: 6px;
+        }
+
+        .head__title {
+            font-size: 15px;
+            color: var(--text-muted);
+            word-break: break-word;
+        }
+
+        .theme-toggle {
+            flex-shrink: 0;
+            height: 32px;
+            padding: 0 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--lychee);
+            font-family: inherit;
+            white-space: nowrap;
+            transition: background 0.2s, transform 0.2s;
+        }
+
+        .theme-toggle:hover {
+            background: var(--lychee-soft);
+            transform: scale(1.05);
+        }
+
+        .theme-toggle .icon-sun { display: none; }
+        .theme-toggle .icon-moon { display: inline; }
+        [data-theme="dark"] .theme-toggle .icon-sun { display: inline; }
+        [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+
+        .card__body {
+            padding: 28px 32px 32px;
+        }
+
+        .status {
+            font-size: 72px;
+            font-weight: 800;
+            line-height: 1;
+            color: var(--lychee);
+            letter-spacing: -2px;
+            margin-bottom: 8px;
+        }
+
+        .status small {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-muted);
+            letter-spacing: 0;
+            vertical-align: middle;
+            margin-left: 10px;
+        }
+
+        .message {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 6px;
+            word-break: break-word;
+        }
+
+        .meta {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            font-family: "SF Mono", "JetBrains Mono", Consolas, monospace;
+        }
+
+        .meta code {
+            color: var(--lychee-deep);
+        }
+
+        [data-theme="dark"] .meta code {
+            color: var(--lychee);
+        }
+
+        .details {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .details__toggle {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: var(--surface-2);
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+
+        .details__toggle:hover {
+            background: var(--code-bg);
+        }
+
+        .details__toggle .arrow {
+            transition: transform 0.2s;
+            color: var(--lychee);
+            font-size: 16px;
+        }
+
+        .details[open] .details__toggle .arrow {
+            transform: rotate(90deg);
+        }
+
+        .details__body {
+            padding: 16px;
+            border-top: 1px solid var(--border);
+            max-height: 360px;
+            overflow-y: auto;
+        }
+
+        .trace {
+            list-style: none;
+            counter-reset: trace-counter;
+            font-family: "SF Mono", "JetBrains Mono", Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .trace__item {
+            counter-increment: trace-counter;
+            display: flex;
+            gap: 12px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            transition: background 0.15s;
+        }
+
+        .trace__item:hover {
+            background: var(--code-bg);
+        }
+
+        .trace__item + .trace__item {
+            border-top: 1px solid var(--border);
+        }
+
+        .trace__num {
+            flex-shrink: 0;
+            width: 28px;
+            text-align: right;
+            color: var(--lychee);
+            font-weight: 700;
+            opacity: 0.7;
+        }
+
+        .trace__num::before {
+            content: counter(trace-counter);
+        }
+
+        .trace__content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .trace__call {
+            color: var(--text);
+            font-weight: 600;
+            word-break: break-word;
+        }
+
+        .trace__item:first-child .trace__call {
+            color: var(--lychee-deep);
+        }
+
+        [data-theme="dark"] .trace__item:first-child .trace__call {
+            color: var(--lychee);
+        }
+
+        .trace__location {
+            display: block;
+            color: var(--text-muted);
+            margin-top: 2px;
+            word-break: break-all;
+        }
+
+        .card__foot {
+            padding: 14px 32px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .card__foot .dot {
+            color: var(--leaf);
+            font-weight: 700;
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 12px; }
+            .card__head, .card__body { padding-left: 20px; padding-right: 20px; }
+            .status { font-size: 56px; }
+            .message { font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <header class="card__head">
+            <div class="logo" aria-hidden="true">
+                {% if logo %}<img src="{{ logo }}" alt="Lychee PHP">{% endif %}
+            </div>
+            <div class="head__meta">
+                <span class="badge">{{ method|e }} {{ url|e }}</span>
+                <div class="head__title">{{ exception|e }}</div>
+            </div>
+            <button type="button" class="theme-toggle" id="themeToggle" aria-label="切换主题" title="切换日间/夜间模式">
+                <span class="icon-moon">切换夜间</span>
+                <span class="icon-sun">切换白天</span>
+            </button>
+        </header>
+
+        <section class="card__body">
+            <div class="status">{{ status }}<small>HTTP</small></div>
+            <p class="message">{{ message|e }}</p>
+            <p class="meta">
+                at <code>{{ file|e }}:{{ line }}</code>
+            </p>
+
+            {% if trace is not empty %}
+            <details class="details" open>
+                <summary class="details__toggle">
+                    <span>堆栈跟踪（{{ trace|length }} 帧）</span>
+                    <span class="arrow">›</span>
+                </summary>
+                <div class="details__body">
+                    <ol class="trace">
+                        {% for frame in trace %}
+                            <li class="trace__item">
+                                <span class="trace__num"></span>
+                                <div class="trace__content">
+                                    <span class="trace__call">{{ frame.call|e }}</span>
+                                    <span class="trace__location">{{ frame.location|e }}</span>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                </div>
+            </details>
+            {% endif %}
+        </section>
+
+        <footer class="card__foot">
+            <span>Lychee PHP <span class="dot">●</span> Debug Mode</span>
+            <span>请在生产环境关闭 APP_DEBUG</span>
+        </footer>
+    </main>
+    <script>
+        (function () {
+            var btn = document.getElementById('themeToggle');
+            if (!btn) return;
+            btn.addEventListener('click', function () {
+                var html = document.documentElement;
+                var current = html.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+                var next = current === 'dark' ? 'light' : 'dark';
+                html.setAttribute('data-theme', next);
+                try { localStorage.setItem('lychee-theme', next); } catch (e) {}
+            });
+        })();
+    </script>
+</body>
+</html>

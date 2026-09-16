@@ -12,9 +12,10 @@ if (!function_exists('env')) {
      */
     function env(string $key, mixed $default = null): mixed
     {
-        $value = getenv($key);
+        // 优先从超全局变量读取（由 Env::load 写入），再回退到 getenv()
+        $value = $_ENV[$key] ?? $_SERVER[$key] ?? getenv($key);
 
-        if ($value === false) {
+        if ($value === false || $value === null) {
             return $default;
         }
 
