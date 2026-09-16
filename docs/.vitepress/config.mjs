@@ -16,6 +16,7 @@ export default defineConfig({
     nav: [
       { text: '首页', link: '/' },
       { text: '快速开始', link: '/guide/quickstart' },
+      { text: '部署', link: '/deploy' },
       {
         text: '核心模块',
         items: [
@@ -54,6 +55,7 @@ export default defineConfig({
         text: '入门',
         items: [
           { text: '快速开始', link: '/guide/quickstart' },
+          { text: '宝塔部署', link: '/deploy' },
         ],
       },
       {
