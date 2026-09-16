@@ -48,6 +48,40 @@ return new JsonResponse(['code' => 0, 'data' => $data]);
 return response('content', 200);
 ```
 
+## 文件下载 Download
+
+下载 public 目录下的文件（相对路径自动基于 public 目录解析，也支持绝对路径）：
+
+```php
+use Lychee\http\Response;
+
+// 下载 public/report.pdf
+return Response::download('report.pdf');
+
+// 自定义下载文件名
+return Response::download('report.pdf', '年度报告.pdf');
+
+// 辅助函数
+return download('report.pdf', '年度报告.pdf');
+```
+
+文件不存在时抛出 `HttpException`（404）。响应自动设置 `Content-Type`、`Content-Length`、`Content-Disposition: attachment` 等头。
+
+## 重定向 Redirect
+
+```php
+use Lychee\http\Response;
+
+// 302 临时重定向
+return Response::redirect('/login');
+
+// 301 永久重定向
+return Response::redirect('/new-url', 301);
+
+// 辅助函数
+return redirect('/login');
+```
+
 ## Cookie
 
 ```php
