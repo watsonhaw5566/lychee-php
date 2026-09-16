@@ -54,7 +54,7 @@ class CreateUsersTable extends Migration
 $table = $this->table('table_name');
 
 // 字段
-$table->addColumn('name', 'string', ['length' => 100]);
+$table->addColumn('name', 'varchar', ['length' => 100]);
 $table->addColumn('age', 'integer', ['unsigned' => true]);
 $table->addColumn('price', 'decimal', ['precision' => 10, 'scale' => 2]);
 $table->addColumn('status', 'boolean');
@@ -73,7 +73,7 @@ $table->create();               // 建表
 $table->drop();                 // 删表
 $table->update();               // 应用改表变更
 $table->removeColumn('field');
-$table->changeColumn('field', 'string', ['length' => 200]);
+$table->changeColumn('field', 'varchar', ['length' => 200]);
 ```
 
 ## 数据填充
