@@ -55,6 +55,33 @@ public function admin()
 }
 ```
 
+中间件可标注在类上（对所有方法生效）或方法上（追加）。
+
+### 排除中间件
+
+当类标注了中间件，个别方法（如登录、注册）无需鉴权时，
+可在方法上使用 `#[WithoutMiddleware]` 排除类级中间件：
+
+```php
+use Lychee\routing\Middleware;
+use Lychee\routing\WithoutMiddleware;
+
+#[Middleware(AuthMiddleware::class)]
+class UserController
+{
+    // 排除所有类级中间件
+    #[WithoutMiddleware]
+    public function login() {}
+
+    // 排除指定中间件（可传多个）
+    #[WithoutMiddleware(AuthMiddleware::class)]
+    public function register() {}
+
+    // 继承类级中间件，需要鉴权
+    public function index() {}
+}
+```
+
 ## 资源路由
 
 标注 `#[Resource]` 的控制器会自动注册资源动作路由，无需再为每个方法声明 `#[Route]`。
