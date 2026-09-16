@@ -57,6 +57,25 @@ public function admin()
 
 中间件可标注在类上（对所有方法生效）或方法上（追加）。
 
+### 挂载多个中间件
+
+支持三种写法，效果相同：
+
+```php
+// 写法一：数组形式（推荐）
+#[Middleware([AuthMiddleware::class, LogMiddleware::class])]
+class UserController {}
+
+// 写法二：重复注解
+#[Middleware(AuthMiddleware::class)]
+#[Middleware(LogMiddleware::class)]
+class UserController {}
+
+// 写法三：单个
+#[Middleware(AuthMiddleware::class)]
+class UserController {}
+```
+
 ### 排除中间件
 
 当类标注了中间件，个别方法（如登录、注册）无需鉴权时，
@@ -66,16 +85,20 @@ public function admin()
 use Lychee\routing\Middleware;
 use Lychee\routing\WithoutMiddleware;
 
-#[Middleware(AuthMiddleware::class)]
+#[Middleware([AuthMiddleware::class, LogMiddleware::class])]
 class UserController
 {
     // 排除所有类级中间件
     #[WithoutMiddleware]
     public function login() {}
 
-    // 排除指定中间件（可传多个）
+    // 排除指定的一个中间件
     #[WithoutMiddleware(AuthMiddleware::class)]
     public function register() {}
+
+    // 排除指定的多个中间件
+    #[WithoutMiddleware([AuthMiddleware::class, LogMiddleware::class])]
+    public function guest() {}
 
     // 继承类级中间件，需要鉴权
     public function index() {}

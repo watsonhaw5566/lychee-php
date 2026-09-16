@@ -213,7 +213,15 @@ class Router
     {
         $middlewares = [];
         foreach ($reflector->getAttributes(Middleware::class) as $attr) {
-            $middlewares[] = $attr->newInstance()->middleware;
+            $value = $attr->newInstance()->middleware;
+
+            if (is_array($value)) {
+                foreach ($value as $m) {
+                    $middlewares[] = $m;
+                }
+            } else {
+                $middlewares[] = $value;
+            }
         }
 
         return $middlewares;
@@ -235,6 +243,10 @@ class Router
         $excludeAttrs = $method->getAttributes(WithoutMiddleware::class);
         if (!empty($excludeAttrs)) {
             $exclude = $excludeAttrs[0]->newInstance()->middleware;
+            if (is_string($exclude)) {
+                $exclude = [$exclude];
+            }
+
             if (empty($exclude)) {
                 $classMiddlewares = [];
             } else {
