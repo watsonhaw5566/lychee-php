@@ -5,6 +5,11 @@ export default defineConfig({
   description: '轻量级、IDE 友好的 PHP Web 框架',
   lang: 'zh-CN',
 
+  head: [
+    ['link', { rel: 'icon', href: '/favicon.png', type: 'image/png' }],
+    ['link', { rel: 'shortcut icon', href: '/favicon.png', type: 'image/png' }],
+  ],
+
   themeConfig: {
     nav: [
       { text: '首页', link: '/' },
