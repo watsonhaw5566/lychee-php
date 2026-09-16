@@ -32,7 +32,7 @@ class Response
      *
      * @throws HttpException 文件不存在时抛出 404
      */
-    public static function download(string $file, ?string $name = null, array $headers = []): static
+    public static function download(string $file, ?string $name = null, array $headers = []): self
     {
         $path = self::resolveDownloadPath($file);
 
@@ -50,7 +50,7 @@ class Response
         $headers['Cache-Control']             = 'must-revalidate';
         $headers['Pragma']                    = 'public';
 
-        return new static($content, 200, $headers);
+        return new self($content, 200, $headers);
     }
 
     /**
@@ -60,11 +60,11 @@ class Response
      * @param  int                  $status  HTTP 状态码（默认 302）
      * @param  array<string,string> $headers 额外响应头
      */
-    public static function redirect(string $url, int $status = 302, array $headers = []): static
+    public static function redirect(string $url, int $status = 302, array $headers = []): self
     {
         $headers['Location'] = $url;
 
-        return new static('', $status, $headers);
+        return new self('', $status, $headers);
     }
 
     /**
