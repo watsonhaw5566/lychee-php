@@ -32,7 +32,7 @@ class Router
         'delete'       => ['methods' => ['DELETE'],          'path' => '/{id}'],
         'batch_delete' => ['methods' => ['DELETE'],          'path' => '/'],
     ];
-    /** @var array<int, array{method:string, pattern:string, controller:class-string, action:string, middlewares:array<class-string>}> */
+    /** @var array<int, array{method:string, path:string, pattern:string, controller:class-string, action:string, middlewares:array<class-string>}> */
     private array $routes = [];
 
     /** @var array<string, string> */
@@ -62,6 +62,7 @@ class Router
 
             $this->routes[] = [
                 'method'      => strtoupper($route->method),
+                'path'        => $path,
                 'pattern'     => $this->compilePattern($path),
                 'controller'  => $controllerClass,
                 'action'      => $method->getName(),
@@ -113,6 +114,7 @@ class Router
             foreach ($definition['methods'] as $httpMethod) {
                 $this->routes[] = [
                     'method'      => $httpMethod,
+                    'path'        => $path,
                     'pattern'     => $this->compilePattern($path),
                     'controller'  => $controllerClass,
                     'action'      => $action,
@@ -171,6 +173,16 @@ class Router
         }
 
         throw new RouteNotFoundException("No route found for [{$method}] {$path}");
+    }
+
+    /**
+     * 获取所有已注册的路由。
+     *
+     * @return array<int, array{method:string, path:string, pattern:string, controller:class-string, action:string, middlewares:array<class-string>}>
+     */
+    public function getRoutes(): array
+    {
+        return $this->routes;
     }
 
     /**

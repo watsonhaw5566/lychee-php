@@ -19,6 +19,7 @@ php lee run --host=0.0.0.0      # 指定监听地址
 |------|------|
 | `list` | 列出所有可用命令 |
 | `run` | 启动 PHP 内置开发服务器（自动处理 public/ 静态文件） |
+| `route:list` | 列出所有已注册的路由 |
 | `migrate:run` | 执行数据库迁移 |
 | `migrate:rollback` | 回滚迁移 |
 | `seed:run` | 执行数据填充 |
@@ -36,6 +37,29 @@ php lee run --host=0.0.0.0      # 指定监听地址
 php lee run                          # http://127.0.0.1:8000
 php lee run --port=9000              # http://127.0.0.1:9000
 php lee run --host=0.0.0.0 --port=80 # 监听所有网卡
+```
+
+### route:list 路由列表
+
+`route:list` 命令列出所有已注册的路由，包括 HTTP 方法、路径和对应的控制器方法：
+
+```bash
+php lee route:list
+```
+
+输出示例：
+
+```
+Registered routes: (8)
+
+  GET     /users       App\controller\UserController@index
+  POST    /users       App\controller\UserController@save
+  GET     /users/{id}  App\controller\UserController@read
+  PUT     /users/{id}  App\controller\UserController@update
+  PATCH   /users/{id}  App\controller\UserController@update
+  DELETE  /users/{id}  App\controller\UserController@delete
+  DELETE  /users       App\controller\UserController@batch_delete
+  GET     /            App\controller\IndexController@index
 ```
 
 ## 自定义命令
