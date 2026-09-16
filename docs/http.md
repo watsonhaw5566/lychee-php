@@ -34,6 +34,11 @@ $request->isJson();
 
 // 判断是否为移动设备（基于 User-Agent）
 $request->isMobile();
+
+// 域名与协议（反向代理场景自动识别 X-Forwarded-Host / X-Forwarded-Proto）
+$scheme = $request->scheme();   // http | https
+$host   = $request->host();     // example.com:8080
+$domain = $request->domain();   // https://example.com:8080
 ```
 
 ## 响应 Response
