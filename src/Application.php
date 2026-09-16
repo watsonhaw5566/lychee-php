@@ -17,8 +17,10 @@ use Lychee\http\MiddlewarePipeline;
 use Lychee\http\Request;
 use Lychee\i18n\I18n;
 use Lychee\log\LogManager;
+use Lychee\migration\command\MigrateCreateCommand;
 use Lychee\migration\command\MigrateRollbackCommand;
 use Lychee\migration\command\MigrateRunCommand;
+use Lychee\migration\command\SeedCreateCommand;
 use Lychee\migration\command\SeedRunCommand;
 use Lychee\migration\MigrationManager;
 use Lychee\queue\command\WorkCommand;
@@ -357,7 +359,9 @@ class Application
         $console = $this->container->get(ConsoleApplication::class);
         $console->addCommand(MigrateRunCommand::class);
         $console->addCommand(MigrateRollbackCommand::class);
+        $console->addCommand(MigrateCreateCommand::class);
         $console->addCommand(SeedRunCommand::class);
+        $console->addCommand(SeedCreateCommand::class);
     }
 
     /**
