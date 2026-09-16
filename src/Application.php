@@ -286,6 +286,12 @@ class Application
 
         $path = $sessionConfig['path'] ?? runtime_path('session');
 
+        // 避免把会话存储目录误配为 "/"（通常是和 cookie_path 混淆），
+        // 落到 open_basedir 之外导致 is_dir/mkdir 告警。
+        if ($path === '' || $path === '/') {
+            $path = runtime_path('session');
+        }
+
         $sessionDriver = new SessionFileDriver(
             path: $path,
             expireMinutes: (int) ($sessionConfig['expire'] ?? 120),

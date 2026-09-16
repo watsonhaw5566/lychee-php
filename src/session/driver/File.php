@@ -13,14 +13,26 @@ use Lychee\session\SessionDriverInterface;
  */
 class File implements SessionDriverInterface
 {
+    private readonly string $path;
+
     public function __construct(
-        private readonly string $path,
+        string $path,
         private readonly int $gcProbability = 1,
         private readonly int $gcDivisor = 100,
         private readonly int $expireMinutes = 120,
     ) {
-        if (!is_dir($this->path)) {
-            mkdir($this->path, 0777, true);
+        $path = trim($path);
+
+        // 路径为空或为根目录时，通常是配置错误（把会话存储目录 path 误设为 cookie_path 的 "/"）。
+        // 回退到系统临时目录，避免触碰 open_basedir 限制。
+        if ($path === '' || $path === DIRECTORY_SEPARATOR) {
+            $path = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'lychee-session';
+        }
+
+        $this->path = rtrim($path, DIRECTORY_SEPARATOR);
+
+        if (!@is_dir($this->path)) {
+            @mkdir($this->path, 0777, true);
         }
     }
 
