@@ -143,11 +143,12 @@ if (!function_exists('logger')) {
 
 if (!function_exists('queue')) {
     /**
-     * 获取队列连接器，或推送一个任务到队列。
+     * 获取队列连接器，或创建一个待分发任务（支持链式 delay()）。
      *
      * @param  string|null $job   任务类名或 "Class@method"，为 null 时返回连接器
      * @param  mixed       $data  任务数据
      * @param  string|null $queue 队列名
+     * @return \Lychee\queue\Connector|\Lychee\queue\PendingDispatch
      */
     function queue(?string $job = null, mixed $data = '', ?string $queue = null): mixed
     {
@@ -157,7 +158,7 @@ if (!function_exists('queue')) {
             return $manager->connection();
         }
 
-        return $manager->connection()->push($job, $data, $queue);
+        return new \Lychee\queue\PendingDispatch($manager->connection(), $job, $data, $queue);
     }
 }
 

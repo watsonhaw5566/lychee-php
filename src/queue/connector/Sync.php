@@ -32,6 +32,23 @@ class Sync extends Connector
         return null;
     }
 
+    /**
+     * 延迟推送：Sync 驱动下 sleep 后立即执行。
+     *
+     * @param  int           $delay 延迟秒数
+     * @param  object|string $job   任务类名
+     * @param  mixed         $data  任务数据
+     * @param  string|null   $queue 队列名
+     */
+    public function later(int $delay, object|string $job, mixed $data = '', ?string $queue = null): mixed
+    {
+        if ($delay > 0) {
+            sleep($delay);
+        }
+
+        return $this->push($job, $data, $queue);
+    }
+
     public function pushRaw(string $payload, ?string $queue = null, array $options = []): mixed
     {
         $queue = $queue ?? 'sync';
