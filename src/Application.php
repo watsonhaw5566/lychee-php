@@ -14,6 +14,7 @@ use Lychee\filesystem\FilesystemManager;
 use Lychee\http\Kernel;
 use Lychee\http\MiddlewarePipeline;
 use Lychee\http\Request;
+use Lychee\i18n\I18n;
 use Lychee\log\LogManager;
 use Lychee\migration\command\MigrateRollbackCommand;
 use Lychee\migration\command\MigrateRunCommand;
@@ -82,6 +83,7 @@ class Application
             'cron'       => $this->bootCron(...),
             'queue'      => $this->bootQueue(...),
             'session'    => $this->bootSession(...),
+            'i18n'       => $this->bootI18n(...),
         ];
 
         foreach ($modules as $key => $boot) {
@@ -278,6 +280,23 @@ class Application
 
         $this->container->instance(Session::class, $session);
         $this->container->instance('session', $session);
+    }
+
+    private function bootI18n(): void
+    {
+        /** @var Config $config */
+        $config     = $this->container->get('config');
+        $i18nConfig = $config->get('i18n', []);
+
+        // 翻译文件目录默认为 basePath/app/lang
+        if (!isset($i18nConfig['path']) || $i18nConfig['path'] === '') {
+            $i18nConfig['path'] = $this->basePath . '/app/lang';
+        }
+
+        $i18n = new I18n($i18nConfig);
+
+        $this->container->instance(I18n::class, $i18n);
+        $this->container->instance('i18n', $i18n);
     }
 
     private function bootMigration(): void

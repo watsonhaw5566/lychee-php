@@ -22,14 +22,15 @@ export default defineConfig({
           { text: '路由', link: '/routing' },
           { text: '中间件', link: '/middleware' },
           { text: 'HTTP', link: '/http' },
+          { text: '数据验证', link: '/validation' },
         ],
       },
       {
         text: '进阶',
         items: [
           { text: '会话', link: '/session' },
+          { text: '国际化', link: '/i18n' },
           { text: '模板引擎', link: '/view' },
-          { text: '数据验证', link: '/validation' },
           { text: '数据库', link: '/orm' },
           { text: '数据迁移', link: '/migration' },
           { text: '文件系统', link: '/filesystem' },
@@ -65,8 +66,8 @@ export default defineConfig({
         text: '功能模块',
         items: [
           { text: '会话 Session', link: '/session' },
+          { text: '国际化 i18n', link: '/i18n' },
           { text: '模板引擎 View', link: '/view' },
-          { text: '数据验证 Validation', link: '/validation' },
           { text: '数据库 ORM', link: '/orm' },
           { text: '数据迁移 Migration', link: '/migration' },
           { text: '文件系统 Filesystem', link: '/filesystem' },
