@@ -8,12 +8,15 @@
 
 ```php
 return [
-    'driver' => 'file',
-    'path'   => runtime_path('session'),
-    'expire' => 120,          // 过期分钟数
-    'name'   => 'PHPSESSID',  // Cookie 名称
+    'driver'      => 'file',
+    'path'        => runtime_path('session'),  // 文件存储目录，缺省为 runtime/session
+    'expire'      => 120,                      // 过期分钟数
+    'name'        => 'PHPSESSID',              // Cookie 名称
+    'cookie_path' => '/',                      // Cookie 生效路径，缺省为 /
 ];
 ```
+
+> **注意**：`path` 是会话文件的存储目录，`cookie_path` 是 Session Cookie 的生效路径，二者用途不同。`cookie_path` 缺省为 `/`（整个站点生效），通常无需修改。
 
 ## 使用
 

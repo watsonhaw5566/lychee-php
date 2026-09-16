@@ -287,14 +287,14 @@ class Application
         $driver = $sessionConfig['driver'] ?? 'file';
 
         if ($driver === 'file') {
-            $path          = $sessionConfig['path'] ?? ($this->container->runtimePath . 'session');
+            $path          = $this->resolveSessionPath($sessionConfig['path'] ?? null);
             $sessionDriver = new SessionFileDriver(
-                path: (string) $path,
+                path: $path,
                 expireMinutes: (int) ($sessionConfig['expire'] ?? 120),
             );
         } else {
             $sessionDriver = new SessionFileDriver(
-                path: $this->container->runtimePath . 'session',
+                path: $this->resolveSessionPath(null),
             );
         }
 
@@ -302,6 +302,28 @@ class Application
 
         $this->container->instance(Session::class, $session);
         $this->container->instance('session', $session);
+    }
+
+    /**
+     * 解析 Session 文件存储路径。
+     *
+     * - 未配置、为空或为根目录 "/" 时，使用 runtime/session 目录
+     * - 相对路径基于 basePath 解析为绝对路径
+     */
+    private function resolveSessionPath(?string $path): string
+    {
+        $default = $this->container->runtimePath . 'session';
+
+        if ($path === null || $path === '' || $path === '/') {
+            return $default;
+        }
+
+        // 相对路径基于 basePath 解析
+        if (!str_starts_with($path, '/')) {
+            return rtrim($this->basePath, '/') . '/' . ltrim($path, '/');
+        }
+
+        return $path;
     }
 
     private function bootI18n(): void

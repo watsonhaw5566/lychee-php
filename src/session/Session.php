@@ -30,13 +30,13 @@ class Session
         array $config = [],
     ) {
         $this->config = array_merge([
-            'name'      => 'LYCHEE_SESSION',
-            'expire'    => 120,
-            'path'      => '/',
-            'domain'    => null,
-            'secure'    => false,
-            'http_only' => true,
-            'same_site' => Cookie::SAME_SITE_LAX,
+            'name'        => 'LYCHEE_SESSION',
+            'expire'      => 120,
+            'cookie_path' => '/',
+            'domain'      => null,
+            'secure'      => false,
+            'http_only'   => true,
+            'same_site'   => Cookie::SAME_SITE_LAX,
         ], $config);
     }
 
@@ -76,7 +76,7 @@ class Session
             name: (string) $this->config['name'],
             value: $this->id,
             minutes: (int) $this->config['expire'],
-            path: (string) $this->config['path'],
+            path: (string) $this->config['cookie_path'],
             domain: $this->config['domain'],
             secure: (bool) $this->config['secure'],
             httpOnly: (bool) $this->config['http_only'],
@@ -165,7 +165,7 @@ class Session
 
         $response->withoutCookie(
             name: (string) $this->config['name'],
-            path: (string) $this->config['path'],
+            path: (string) $this->config['cookie_path'],
             domain: $this->config['domain'],
         );
     }
