@@ -84,7 +84,7 @@ class UserControllerTest extends TestCase
         $this->assertSame('charlie@example.com', $data['data']['email']);
     }
 
-    public function test_store_returns_422_when_validation_fails(): void
+    public function test_store_returns_400_when_validation_fails(): void
     {
         $response = $this->kernel->handle(new Request(
             method: 'POST',
@@ -94,8 +94,9 @@ class UserControllerTest extends TestCase
             headers: [],
         ));
 
-        $this->assertSame(422, $response->status);
+        $this->assertSame(400, $response->status);
         $data = json_decode($response->content, true);
-        $this->assertArrayHasKey('errors', $data);
+        $this->assertSame(400, $data['code']);
+        $this->assertArrayHasKey('msg', $data);
     }
 }

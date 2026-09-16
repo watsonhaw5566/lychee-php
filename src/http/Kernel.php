@@ -193,11 +193,18 @@ class Kernel
 
     private function exceptionResponse(Request $request, Throwable $e): Response
     {
+        if ($e instanceof \Lychee\validation\ValidationException) {
+            $status = $e->getCode() ?: 400;
+
+            return json([
+                'code' => $status,
+                'msg'  => $e->getMessage(),
+            ], $status);
+        }
+
         $status = 500;
         if ($e instanceof \Lychee\routing\RouteNotFoundException) {
             $status = 404;
-        } elseif ($e instanceof \Lychee\validation\ValidationException) {
-            $status = 422;
         } elseif ($e instanceof \Lychee\http\HttpException) {
             $status = $e->getStatusCode();
         }
@@ -205,10 +212,6 @@ class Kernel
         $data = [
             'message' => $e->getMessage(),
         ];
-
-        if ($e instanceof \Lychee\validation\ValidationException) {
-            $data['errors'] = $e->errors;
-        }
 
         return new JsonResponse($data, $status);
     }
