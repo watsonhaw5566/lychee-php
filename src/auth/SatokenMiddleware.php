@@ -29,6 +29,8 @@ class SatokenMiddleware implements MiddlewareInterface
     {
         try {
             $this->saToken->checkLogin();
+            // 将当前登录 ID 挂载到请求，供控制器 / 数据权限 trait 使用
+            $request->setLoginId($this->saToken->getCurrentLoginId());
         } catch (NotLoginException | TokenInvalidException $e) {
             return new JsonResponse([
                 'code'    => 401,

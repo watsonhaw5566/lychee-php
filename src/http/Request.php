@@ -12,6 +12,9 @@ class Request
     /** @var array<string, string> */
     private array $routeParams = [];
 
+    /** 当前登录用户 ID（由认证中间件设置） */
+    private ?int $loginId = null;
+
     public function __construct(
         public readonly string $method,
         public readonly string $path,
@@ -49,21 +52,47 @@ class Request
         );
     }
 
-    public function query(string $key, mixed $default = null): mixed
+    /**
+     * 获取 GET 查询参数。
+     *
+     * @param string|null $key     参数名，为 null 时返回全部查询参数
+     * @param mixed       $default 默认值
+     * @return array<string, mixed>|mixed
+     */
+    public function query(?string $key = null, mixed $default = null): mixed
     {
+        if ($key === null) {
+            return $this->query;
+        }
+
         return $this->query[$key] ?? $default;
     }
 
     /**
      * 获取 GET 参数（query() 的别名）。
+     *
+     * @param string|null $key     参数名，为 null 时返回全部查询参数
+     * @param mixed       $default 默认值
+     * @return array<string, mixed>|mixed
      */
-    public function get(string $key, mixed $default = null): mixed
+    public function get(?string $key = null, mixed $default = null): mixed
     {
         return $this->query($key, $default);
     }
 
-    public function post(string $key, mixed $default = null): mixed
+    /**
+     * 获取 POST 请求体参数。
+     *
+     * @param string|null $key     参数名，为 null 时返回全部请求体参数
+     * @param mixed       $default 默认值
+     * @return array<string, mixed>|mixed
+     */
+    public function post(?string $key = null, mixed $default = null): mixed
     {
+        if ($key === null) {
+            return $this->body;
+        }
+
         return $this->body[$key] ?? $default;
     }
 
@@ -186,6 +215,24 @@ class Request
     public function routeParam(string $key, mixed $default = null): mixed
     {
         return $this->routeParams[$key] ?? $default;
+    }
+
+    // ── 认证相关 ────────────────────────────────────────────────────
+
+    /**
+     * 设置当前登录用户 ID（由认证中间件调用）。
+     */
+    public function setLoginId(int $loginId): void
+    {
+        $this->loginId = $loginId;
+    }
+
+    /**
+     * 获取当前登录用户 ID。
+     */
+    public function loginId(): ?int
+    {
+        return $this->loginId;
     }
 
     /** @param array<string, string> $params */
