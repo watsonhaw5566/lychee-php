@@ -1,0 +1,156 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Lychee\routing;
+
+use ReflectionClass;
+use ReflectionMethod;
+use FilesystemIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use SplFileInfo;
+
+/**
+ * 基于 Attribute 的路由收集与分发器。
+ */
+class Router
+{
+    /** @var array<int, array{method:string, pattern:string, controller:class-string, action:string, middlewares:array<class-string>}> */
+    private array $routes = [];
+
+    /** @var array<string, string> */
+    private array $namedRoutes = [];
+
+    /**
+     * @param class-string $controllerClass
+     */
+    public function registerController(string $controllerClass): void
+    {
+        $ref = new ReflectionClass($controllerClass);
+
+        $prefix = $this->resolvePrefix($ref);
+
+        $classMiddlewares = $this->collectMiddlewares($ref);
+
+        foreach ($ref->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+            $routeAttrs = $method->getAttributes(Route::class);
+            if (empty($routeAttrs)) {
+                continue;
+            }
+
+            $route             = $routeAttrs[0]->newInstance();
+            $path              = $this->joinPath($prefix, $route->path);
+            $methodMiddlewares = $this->collectMiddlewares($method);
+
+            $this->routes[] = [
+                'method'      => strtoupper($route->method),
+                'pattern'     => $this->compilePattern($path),
+                'controller'  => $controllerClass,
+                'action'      => $method->getName(),
+                'middlewares' => array_merge($classMiddlewares, $methodMiddlewares),
+            ];
+
+            if ($route->name !== '') {
+                $this->namedRoutes[$route->name] = $path;
+            }
+        }
+    }
+
+    public function registerDirectory(string $directory, string $namespace): void
+    {
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $file) {
+            /** @var SplFileInfo $file */
+            if ($file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $relative = substr($file->getPathname(), strlen($directory) + 1);
+            $relative = str_replace(DIRECTORY_SEPARATOR, '\\', $relative);
+            $class    = $namespace . '\\' . substr($relative, 0, -4);
+
+            if (class_exists($class)) {
+                $this->registerController($class);
+            }
+        }
+    }
+
+    public function dispatch(string $method, string $path): RouteMatch
+    {
+        $method = strtoupper($method);
+        $path   = '/' . trim($path, '/');
+
+        foreach ($this->routes as $route) {
+            if ($route['method'] !== $method) {
+                continue;
+            }
+
+            if (preg_match($route['pattern'], $path, $matches)) {
+                $params = array_filter(
+                    $matches,
+                    fn ($k) => is_string($k),
+                    ARRAY_FILTER_USE_KEY
+                );
+
+                return new RouteMatch(
+                    controller: $route['controller'],
+                    action: $route['action'],
+                    params: $params,
+                    middlewares: $route['middlewares'],
+                );
+            }
+        }
+
+        throw new RouteNotFoundException("No route found for [{$method}] {$path}");
+    }
+
+    /**
+     * 解析控制器类的路由前缀。
+     *
+     * 优先使用 #[Resource] 注解，其次回退到类级 #[Route] 注解。
+     */
+    private function resolvePrefix(ReflectionClass $ref): string
+    {
+        $resourceAttrs = $ref->getAttributes(Resource::class);
+        if (!empty($resourceAttrs)) {
+            return $resourceAttrs[0]->newInstance()->path;
+        }
+
+        $routeAttrs = $ref->getAttributes(Route::class);
+        if (!empty($routeAttrs)) {
+            return $routeAttrs[0]->newInstance()->path;
+        }
+
+        return '';
+    }
+
+    private function compilePattern(string $path): string
+    {
+        $pattern = preg_replace('#\{(\w+)\}#', '(?P<$1>[^/]+)', $path);
+
+        return '#^' . $pattern . '$#';
+    }
+
+    private function joinPath(string $prefix, string $path): string
+    {
+        return '/' . trim($prefix . '/' . trim($path, '/'), '/');
+    }
+
+    /**
+     * @param ReflectionClass|ReflectionMethod $reflector
+     * @return array<class-string>
+     */
+    private function collectMiddlewares(object $reflector): array
+    {
+        $middlewares = [];
+        foreach ($reflector->getAttributes(Middleware::class) as $attr) {
+            $middlewares[] = $attr->newInstance()->middleware;
+        }
+
+        return $middlewares;
+    }
+}

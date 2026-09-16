@@ -1,0 +1,8 @@
+parameters:
+    level: 1
+    paths:
+        - src
+        - tests
+    checkExplicitMixed: false
+    bootstrapFiles:
+        - tests/stub/bootstrap.php

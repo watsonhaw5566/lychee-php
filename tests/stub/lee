@@ -1,0 +1,82 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * 示例应用命令行入口。
+ *
+ * 用法：
+ *   php lee run [--host=0.0.0.0] [--port=8000]
+ *   php lee cron:run
+ *   php lee list
+ */
+
+$basePath = dirname(__FILE__);
+
+$argv = $_SERVER['argv'] ?? [];
+array_shift($argv);
+
+$command = $argv[0] ?? 'list';
+
+if ($command === 'run') {
+    runServer($basePath, array_slice($argv, 1));
+}
+
+// 引导应用，委托控制台应用处理其他命令
+require dirname(__DIR__, 2) . '/vendor/autoload.php';
+
+use Lychee\Application;
+
+$app = new Application(
+    basePath: $basePath,
+    controllerNamespace: 'Tests\\stub\\app\\controller',
+);
+
+$input  = new \Lychee\console\Input($argv);
+$output = new \Lychee\console\Output();
+
+/** @var \Lychee\console\Application $console */
+$console = $app->container->get(\Lychee\console\Application::class);
+exit($console->run($input, $output));
+
+/**
+ * @param list<string> $args
+ */
+function runServer(string $basePath, array $args): void
+{
+    $host = '0.0.0.0';
+    $port = 8000;
+
+    foreach ($args as $i => $arg) {
+        if ($arg === '--host' || $arg === '-H') {
+            $host = $args[$i + 1] ?? $host;
+        } elseif (str_starts_with($arg, '--host=')) {
+            $host = substr($arg, 7);
+        } elseif ($arg === '--port' || $arg === '-p') {
+            $port = (int) ($args[$i + 1] ?? $port);
+        } elseif (str_starts_with($arg, '--port=')) {
+            $port = (int) substr($arg, 7);
+        }
+    }
+
+    $docRoot = $basePath . '/public';
+    $router  = $docRoot . '/index.php';
+
+    if (!is_dir($docRoot)) {
+        fwrite(STDERR, "Error: public directory not found at {$docRoot}\n");
+        exit(1);
+    }
+
+    $cmd = sprintf(
+        '%s -S %s:%d -t %s %s',
+        escapeshellarg(PHP_BINARY),
+        escapeshellarg($host),
+        $port,
+        escapeshellarg($docRoot),
+        escapeshellarg($router),
+    );
+
+    passthru($cmd, $exitCode);
+    exit($exitCode);
+}
