@@ -21,9 +21,10 @@ class Request
         private readonly array $query,
         private readonly array $body,
         private readonly array $headers,
-        private readonly array $cookies = [],
+        public readonly array $cookies = [],
         public readonly string $rawBody = '',
         public readonly string $ip = '',
+        public readonly string $scheme = 'http',
     ) {
     }
 
@@ -49,6 +50,7 @@ class Request
             cookies: $_COOKIE,
             rawBody: $rawBody,
             ip: self::resolveIp($headers),
+            scheme: self::resolveScheme($headers),
         );
     }
 
@@ -110,6 +112,42 @@ class Request
     public function getUri(): string
     {
         return $this->path;
+    }
+
+    /**
+     * 获取请求协议（http / https）。
+     */
+    public function scheme(): string
+    {
+        return $this->scheme;
+    }
+
+    /**
+     * 获取请求主机名（含端口）。
+     *
+     * 反向代理场景优先读取 X-Forwarded-Host，否则回退到 Host 头。
+     */
+    public function host(): string
+    {
+        $host = $this->header('X-Forwarded-Host', '');
+        if ($host !== '') {
+            return $host;
+        }
+
+        return $this->header('Host', '');
+    }
+
+    /**
+     * 获取当前域名（协议 + 主机），如 https://example.com。
+     */
+    public function domain(): string
+    {
+        $host = $this->host();
+        if ($host === '') {
+            return '';
+        }
+
+        return $this->scheme . '://' . $host;
     }
 
     /**
@@ -296,6 +334,35 @@ class Request
         }
 
         return $ip;
+    }
+
+    /**
+     * 解析请求协议。
+     *
+     * 优先级：X-Forwarded-Proto 头 > $_SERVER['HTTPS'] > SERVER_PORT 443。
+     *
+     * @param  array<string, string> $headers
+     */
+    private static function resolveScheme(array $headers): string
+    {
+        $map = [];
+        foreach ($headers as $name => $value) {
+            $map[strtolower($name)] = $value;
+        }
+
+        if (isset($map['x-forwarded-proto']) && $map['x-forwarded-proto'] !== '') {
+            return strtolower(trim(explode(',', $map['x-forwarded-proto'])[0]));
+        }
+
+        if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+            return 'https';
+        }
+
+        if (($_SERVER['SERVER_PORT'] ?? '') === '443') {
+            return 'https';
+        }
+
+        return 'http';
     }
 
     private static function parseBody(string $raw, string $contentType): array
