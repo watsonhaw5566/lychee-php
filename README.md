@@ -59,12 +59,14 @@ your-app/
 ## 命令行
 
 ```bash
-php lee list              # 查看所有命令
-php lee migrate:run       # 执行迁移
-php lee migrate:rollback  # 回滚迁移
-php lee seed:run          # 数据填充
-php lee cron:run          # 执行定时任务
-php lee queue:work        # 队列消费
+php lee list                          # 查看所有命令
+php lee migrate:run                   # 执行迁移
+php lee migrate:rollback              # 回滚迁移
+php lee migrate:create create_users_table  # 创建迁移模板
+php lee seed:run                      # 数据填充
+php lee seed:create UserSeeder        # 创建 Seeder 模板
+php lee cron:run                      # 执行定时任务
+php lee queue:work                    # 队列消费
 ```
 
 ## 按需加载
