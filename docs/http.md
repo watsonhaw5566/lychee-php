@@ -23,6 +23,9 @@ $post = $request->post('title');
 // 请求头
 $token = $request->header('Authorization');
 
+// 客户端 IP（自动识别 X-Real-IP / X-Forwarded-For，回退 REMOTE_ADDR）
+$ip = $request->ip;
+
 // 判断请求类型
 $request->isGet();
 $request->isPost();
