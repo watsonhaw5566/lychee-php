@@ -14,7 +14,7 @@ use Lychee\console\Output;
  *
  * 静态文件从 public/ 目录直接提供，其余请求交由应用处理。
  */
-class ServeCommand extends Command
+class RunCommand extends Command
 {
     protected function configure(): void
     {
