@@ -21,6 +21,80 @@ class Response
         public array $headers = [],
     ) {
     }
+    /**
+     * 创建一个文件下载响应。
+     *
+     * 若 $file 为相对路径，则相对于 public 目录解析。
+     *
+     * @param  string               $file    文件路径（相对 public 或绝对路径）
+     * @param  string|null          $name    下载时展示的文件名，为 null 时使用原文件名
+     * @param  array<string,string> $headers 额外响应头
+     *
+     * @throws HttpException 文件不存在时抛出 404
+     */
+    public static function download(string $file, ?string $name = null, array $headers = []): self
+    {
+        $path = self::resolveDownloadPath($file);
+
+        if (!is_file($path)) {
+            throw new HttpException(404, "File not found: {$file}");
+        }
+
+        $filename = $name ?? basename($path);
+        $content  = (string) file_get_contents($path);
+
+        $headers['Content-Type']              = $headers['Content-Type'] ?? mime_content_type($path) ?: 'application/octet-stream';
+        $headers['Content-Length']            = (string) filesize($path);
+        $headers['Content-Disposition']       = 'attachment; filename="' . $filename . '"';
+        $headers['Content-Transfer-Encoding'] = 'binary';
+        $headers['Cache-Control']             = 'must-revalidate';
+        $headers['Pragma']                    = 'public';
+
+        return new self($content, 200, $headers);
+    }
+
+    /**
+     * 创建一个重定向响应。
+     *
+     * @param  string               $url     目标 URL
+     * @param  int                  $status  HTTP 状态码（默认 302）
+     * @param  array<string,string> $headers 额外响应头
+     */
+    public static function redirect(string $url, int $status = 302, array $headers = []): self
+    {
+        $headers['Location'] = $url;
+
+        return new self('', $status, $headers);
+    }
+
+    /**
+     * 解析下载文件的绝对路径。
+     *
+     * 相对路径基于 public 目录解析；绝对路径直接使用。
+     */
+    private static function resolveDownloadPath(string $file): string
+    {
+        if (self::isAbsolute($file)) {
+            return $file;
+        }
+
+        // path.public 已以目录分隔符结尾
+        return app('path.public') . ltrim($file, '/\\');
+    }
+
+    private static function isAbsolute(string $path): bool
+    {
+        if ($path === '') {
+            return false;
+        }
+
+        // Windows 盘符路径，如 C:\ 或 C:/
+        if (preg_match('/^[a-zA-Z]:[\/\\\\]/', $path) === 1) {
+            return true;
+        }
+
+        return str_starts_with($path, '/') || str_starts_with($path, DIRECTORY_SEPARATOR);
+    }
 
     /**
      * 设置一个 Cookie。

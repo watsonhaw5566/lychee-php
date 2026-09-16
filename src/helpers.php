@@ -263,6 +263,36 @@ if (!function_exists('response')) {
     }
 }
 
+if (!function_exists('download')) {
+    /**
+     * 创建文件下载响应。
+     *
+     * 相对路径基于 public 目录解析，绝对路径直接使用。
+     *
+     * @param  string               $file    文件路径
+     * @param  string|null          $name    下载时展示的文件名，为 null 时使用原文件名
+     * @param  array<string,string> $headers 额外响应头
+     */
+    function download(string $file, ?string $name = null, array $headers = []): Response
+    {
+        return Response::download($file, $name, $headers);
+    }
+}
+
+if (!function_exists('redirect')) {
+    /**
+     * 创建重定向响应。
+     *
+     * @param  string               $url     目标 URL
+     * @param  int                  $status  HTTP 状态码（默认 302）
+     * @param  array<string,string> $headers 额外响应头
+     */
+    function redirect(string $url, int $status = 302, array $headers = []): Response
+    {
+        return Response::redirect($url, $status, $headers);
+    }
+}
+
 if (!function_exists('lang')) {
     /**
      * 翻译指定键。
