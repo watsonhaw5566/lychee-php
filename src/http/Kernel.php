@@ -55,7 +55,15 @@ class Kernel
     private function callController(Request $request, RouteMatch $route): Response
     {
         $controller = $this->container->get($route->controller);
-        $method     = new ReflectionMethod($controller, $route->action);
+
+        // 中间件已执行完毕，此时调用 initialize 可拿到完整请求上下文
+        if (method_exists($controller, 'initialize')) {
+            $init = new ReflectionMethod($controller, 'initialize');
+            $init->setAccessible(true);
+            $init->invoke($controller);
+        }
+
+        $method = new ReflectionMethod($controller, $route->action);
 
         $args = [];
         foreach ($method->getParameters() as $param) {

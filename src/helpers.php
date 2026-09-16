@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Lychee\http\JsonResponse;
 use Lychee\http\Request;
 use Lychee\http\Response;
 
@@ -338,5 +339,58 @@ if (!function_exists('asset')) {
         $view = app('view');
 
         return $view->asset($path);
+    }
+}
+
+if (!function_exists('json')) {
+    /**
+     * 构造 JSON 响应。
+     *
+     * 不绑定固定格式，用户自行组织数据结构。
+     * 适合需要自定义响应结构的场景。
+     *
+     * @param  mixed                $data    响应数据
+     * @param  int                  $status  HTTP 状态码
+     * @param  array<string,string> $headers 额外响应头
+     */
+    function json(mixed $data = null, int $status = 200, array $headers = []): JsonResponse
+    {
+        return new JsonResponse($data, $status, $headers);
+    }
+}
+
+if (!function_exists('success')) {
+    /**
+     * 成功 JSON 响应（全局版本，供非控制器场景如中间件使用）。
+     *
+     * 默认格式：{errno, code, msg, data}，与 Controller::success() 保持一致。
+     * 控制器内推荐使用 $this->success() 以便覆盖格式。
+     */
+    function success(mixed $data = null, string $msg = 'success', int $code = 200): JsonResponse
+    {
+        return new JsonResponse([
+            'errno' => 0,
+            'code'  => $code,
+            'msg'   => $msg,
+            'data'  => $data,
+        ], $code);
+    }
+}
+
+if (!function_exists('fail')) {
+    /**
+     * 失败 JSON 响应（全局版本，供非控制器场景如中间件使用）。
+     *
+     * 默认格式：{errno, code, msg, data}，与 Controller::fail() 保持一致。
+     * 控制器内推荐使用 $this->fail() 以便覆盖格式。
+     */
+    function fail(string $msg = 'fail', int $code = 400): JsonResponse
+    {
+        return new JsonResponse([
+            'errno' => 0,
+            'code'  => $code,
+            'msg'   => $msg,
+            'data'  => null,
+        ], $code);
     }
 }

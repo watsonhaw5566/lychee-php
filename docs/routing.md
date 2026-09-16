@@ -136,3 +136,6 @@ class UserController
 
 若某个资源方法已显式声明 `#[Route]`，则以显式声明为准，自动注册会跳过该方法。
 `#[Resource]` 同样作为路径前缀作用于控制器内所有显式 `#[Route]` 方法。
+
+> 如需零代码实现增删改查，可结合 [控制器 / ResourceController](./controller.md#资源控制器-resourcecontroller) 使用，
+> 继承 `ResourceController` 并声明 `$model` 即可自动获得完整 CRUD 接口。
