@@ -50,4 +50,38 @@ class ViewTest extends TestCase
 
         $this->assertStringContainsString('Hello, World!', $html);
     }
+
+    public function test_render_twig_template(): void
+    {
+        $html = $this->view->render('welcome.twig', ['name' => 'Lychee']);
+
+        $this->assertStringContainsString('Welcome, Lychee!', $html);
+    }
+
+    public function test_render_template_without_extension_prefers_twig(): void
+    {
+        // welcome.twig 存在，welcome.html 不存在，应自动解析到 .twig
+        $html = $this->view->render('welcome', ['name' => 'Auto']);
+
+        $this->assertStringContainsString('Welcome, Auto!', $html);
+    }
+
+    public function test_render_template_without_extension_falls_back_to_html(): void
+    {
+        // hello.html 存在，hello.twig 不存在，应回退到 .html
+        $html = $this->view->render('hello', ['name' => 'Fallback']);
+
+        $this->assertStringContainsString('Hello, Fallback!', $html);
+    }
+
+    public function test_exists_with_twig_extension(): void
+    {
+        $this->assertTrue($this->view->exists('welcome.twig'));
+    }
+
+    public function test_exists_without_extension(): void
+    {
+        $this->assertTrue($this->view->exists('welcome'));
+        $this->assertTrue($this->view->exists('hello'));
+    }
 }

@@ -109,6 +109,7 @@ class Application
         $this->container->instance('app', $this->container);
 
         $this->container->instance('path.base', $this->basePath . DIRECTORY_SEPARATOR);
+        $this->container->instance('path.app', $this->basePath . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR);
         $this->container->instance('path.runtime', $this->basePath . DIRECTORY_SEPARATOR . 'runtime' . DIRECTORY_SEPARATOR);
         $this->container->instance('path.public', $this->basePath . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR);
 
@@ -373,10 +374,11 @@ class Application
         $config     = $this->container->get('config');
         $viewConfig = $config->get('view', []);
 
-        $viewPath  = (string) ($viewConfig['view_path'] ?? ($this->basePath . '/app/view'));
-        $cachePath = (string) ($viewConfig['cache_path'] ?? ($this->container->runtimePath . 'twig'));
-        $debug     = (bool) ($viewConfig['debug'] ?? false);
-        $baseUrl   = (string) ($viewConfig['base_url'] ?? '');
+        $viewPath   = (string) ($viewConfig['view_path'] ?? ($this->basePath . '/app/view'));
+        $cachePath  = (string) ($viewConfig['cache_path'] ?? ($this->container->runtimePath . 'twig'));
+        $debug      = (bool) ($viewConfig['debug'] ?? false);
+        $baseUrl    = (string) ($viewConfig['base_url'] ?? '');
+        $extensions = (array) ($viewConfig['extensions'] ?? ['.twig', '.html']);
 
         if (!is_dir($viewPath)) {
             @mkdir($viewPath, 0777, true);
@@ -387,6 +389,7 @@ class Application
             cachePath: $cachePath,
             debug: $debug,
             baseUrl: $baseUrl,
+            extensions: $extensions,
         );
 
         $this->container->instance(View::class, $view);
