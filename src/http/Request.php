@@ -54,9 +54,74 @@ class Request
         return $this->query[$key] ?? $default;
     }
 
-    public function input(string $key, mixed $default = null): mixed
+    /**
+     * 获取 GET 参数（query() 的别名）。
+     */
+    public function get(string $key, mixed $default = null): mixed
+    {
+        return $this->query($key, $default);
+    }
+
+    public function post(string $key, mixed $default = null): mixed
     {
         return $this->body[$key] ?? $default;
+    }
+
+    /**
+     * 获取请求方法。
+     */
+    public function getMethod(): string
+    {
+        return $this->method;
+    }
+
+    /**
+     * 获取请求 URI 路径。
+     */
+    public function getUri(): string
+    {
+        return $this->path;
+    }
+
+    /**
+     * 判断是否为 GET 请求。
+     */
+    public function isGet(): bool
+    {
+        return $this->method === 'GET';
+    }
+
+    /**
+     * 判断是否为 POST 请求。
+     */
+    public function isPost(): bool
+    {
+        return $this->method === 'POST';
+    }
+
+    /**
+     * 判断是否为 AJAX 请求。
+     */
+    public function isAjax(): bool
+    {
+        return $this->header('X-Requested-With', '') === 'XMLHttpRequest';
+    }
+
+    /**
+     * 判断是否为移动设备（基于 User-Agent）。
+     */
+    public function isMobile(): bool
+    {
+        $ua = $this->header('User-Agent', '');
+
+        if ($ua === '') {
+            return false;
+        }
+
+        return (bool) preg_match(
+            '/android|iphone|ipad|ipod|mobile|wap|webos|blackberry|windows phone|opera mini|iemobile/i',
+            $ua
+        );
     }
 
     public function all(): array
