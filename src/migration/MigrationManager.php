@@ -199,7 +199,7 @@ class MigrationManager
 
             $version = $matches[1];
             $name    = $matches[2];
-            $class   = $this->toClassName($name);
+            $class   = self::toClassName($name);
 
             $migrations[$version] = [
                 'name'  => $basename,
@@ -229,7 +229,7 @@ class MigrationManager
 
         foreach ($files as $file) {
             $basename = basename($file, '.php');
-            $class    = $this->toClassName($basename);
+            $class    = self::toClassName($basename);
 
             $seeders[] = [
                 'name'  => $basename,
@@ -323,7 +323,10 @@ class MigrationManager
         return $max + 1;
     }
 
-    private function toClassName(string $name): string
+    /**
+     * 将下划线/短横线分隔的名称转为 PascalCase 类名。
+     */
+    public static function toClassName(string $name): string
     {
         return str_replace(' ', '', ucwords(str_replace(['_', '-'], ' ', $name)));
     }

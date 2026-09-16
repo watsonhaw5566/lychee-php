@@ -13,11 +13,15 @@ database/
 ## 命令
 
 ```bash
-php lee migrate:run              # 执行所有未执行的迁移
-php lee migrate:rollback         # 回滚全部迁移
-php lee migrate:rollback --steps=1   # 回滚最近 1 步
-php lee seed:run                 # 执行所有 Seeder
+php lee migrate:run                   # 执行所有未执行的迁移
+php lee migrate:rollback              # 回滚全部迁移
+php lee migrate:rollback --steps=1    # 回滚最近 1 步
+php lee migrate:create create_users_table   # 创建迁移模板文件
+php lee seed:run                      # 执行所有 Seeder
+php lee seed:create UserSeeder        # 创建 Seeder 模板文件
 ```
+
+`migrate:create` 会自动生成 `YYYYMMDDHHMMSS_名称.php` 格式的文件名，并根据名称推导类名（`create_users_table` → `CreateUsersTable`）。`seed:create` 则直接以传入名称作为文件名与类名。
 
 ## 编写迁移
 
