@@ -143,6 +143,19 @@ class Response
     }
 
     /**
+     * 设置响应头（链式调用）。
+     *
+     * @param  string $name  响应头名称
+     * @param  string $value 响应头值
+     */
+    public function withHeader(string $name, string $value): static
+    {
+        $this->headers[$name] = $value;
+
+        return $this;
+    }
+
+    /**
      * 删除一个 Cookie。
      */
     public function withoutCookie(string $name, string $path = '/', ?string $domain = null): static

@@ -41,10 +41,14 @@ class Kernel
 
         $request = $request->withRouteParams($route->params);
 
+        // 合并全局中间件与路由中间件：全局中间件先于路由中间件执行
+        $globalMiddlewares = (array) config('middleware', []);
+        $middlewares       = array_merge($globalMiddlewares, $route->middlewares);
+
         try {
             return $this->pipeline->handle(
                 $request,
-                $route->middlewares,
+                $middlewares,
                 function (Request $req) use ($route): Response {
                     return $this->callController($req, $route);
                 }
