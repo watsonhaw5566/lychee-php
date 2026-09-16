@@ -11,10 +11,10 @@ $request = request();
 $method = $request->getMethod();
 $uri    = $request->getUri();
 
-// 获取参数
-$id    = $request->input('id');
-$name  = $request->input('name', '默认值');
-$all   = $request->all();
+// 获取参数（合并 GET / POST / 路由参数）
+$id    = $request->param('id');
+$name  = $request->param('name', '默认值');
+$all   = $request->param();
 
 // GET / POST
 $get  = $request->get('page');
