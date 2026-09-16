@@ -107,8 +107,8 @@ class Router
                 continue;
             }
 
-            $path              = $this->joinPath($prefix, $definition['path']);
-            $middlewares       = $this->resolveMethodMiddlewares($method, $classMiddlewares);
+            $path        = $this->joinPath($prefix, $definition['path']);
+            $middlewares = $this->resolveMethodMiddlewares($method, $classMiddlewares);
 
             foreach ($definition['methods'] as $httpMethod) {
                 $this->routes[] = [
