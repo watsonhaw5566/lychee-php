@@ -22,8 +22,8 @@ return [
             'endpoint'      => 'oss-cn-hangzhou.aliyuncs.com',
             'cdn'           => '',
         ],
-        'cos' => [
-            'type'       => 'cos',
+        'qcloud' => [
+            'type'       => 'qcloud',
             'app_id'     => 'your-app-id',
             'secret_id'  => 'your-secret-id',
             'secret_key' => 'your-secret-key',
@@ -56,7 +56,7 @@ $disk->fileExists('hello.txt');
 $disk->delete('hello.txt');
 
 // 列出文件
-$files = $disk->listContents('/')->toArray();
+$files = $disk->fileList('/')->toArray();
 
 // 获取 URL
 $url = $disk->getUrl('hello.txt');
@@ -66,5 +66,5 @@ $url = $disk->getUrl('hello.txt');
 
 ```php
 storage()->write('a.txt', 'content');
-storage('cos')->write('b.txt', 'content');
+storage('qcloud')->write('b.txt', 'content');
 ```

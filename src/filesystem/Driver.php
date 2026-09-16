@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Lychee\filesystem;
 
+use League\Flysystem\DirectoryListing;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemAdapter;
 use League\Flysystem\FilesystemException;
@@ -244,11 +245,19 @@ abstract class Driver
     }
 
     /**
+     * 列出目录内容。
+     */
+    public function fileList(?string $directory = null, bool $recursive = false): DirectoryListing
+    {
+        return $this->filesystem->listContents($directory ?? '', $recursive);
+    }
+
+    /**
      * @return string[]
      */
     public function files(?string $directory = null, bool $recursive = false): array
     {
-        return $this->filesystem->listContents($directory ?? '', $recursive)
+        return $this->fileList($directory, $recursive)
             ->filter(fn (StorageAttributes $a) => $a->isFile())
             ->sortByPath()
             ->map(fn (StorageAttributes $a) => $a->path())
@@ -268,7 +277,7 @@ abstract class Driver
      */
     public function directories(?string $directory = null, bool $recursive = false): array
     {
-        return $this->filesystem->listContents($directory ?? '', $recursive)
+        return $this->fileList($directory, $recursive)
             ->filter(fn (StorageAttributes $a) => $a->isDir())
             ->map(fn (StorageAttributes $a) => $a->path())
             ->toArray();
