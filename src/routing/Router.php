@@ -16,13 +16,6 @@ use SplFileInfo;
  */
 class Router
 {
-    private string $routePrefix;
-
-    public function __construct(string $routePrefix = '')
-    {
-        $this->routePrefix = trim($routePrefix, '/');
-    }
-
     /**
      * 资源路由默认动作映射。
      *
@@ -39,11 +32,17 @@ class Router
         'delete'       => ['methods' => ['DELETE'],          'path' => '/{id}'],
         'batch_delete' => ['methods' => ['DELETE'],          'path' => '/'],
     ];
+    private string $routePrefix;
     /** @var array<int, array{method:string, path:string, pattern:string, controller:class-string, action:string, middlewares:array<class-string>}> */
     private array $routes = [];
 
     /** @var array<string, string> */
     private array $namedRoutes = [];
+
+    public function __construct(string $routePrefix = '')
+    {
+        $this->routePrefix = trim($routePrefix, '/');
+    }
 
     /**
      * @param class-string $controllerClass
