@@ -15,6 +15,7 @@ use Lychee\cron\command\CronScheduleCommand;
 use Lychee\cron\Scheduler;
 use Lychee\filesystem\FilesystemManager;
 use Lychee\http\Kernel;
+use Lychee\http\ExceptionHandler;
 use Lychee\http\MiddlewarePipeline;
 use Lychee\http\Request;
 use Lychee\i18n\I18n;
@@ -164,6 +165,19 @@ class Application
         $this->container->singleton(Validate::class, fn (): Validate => new Validate());
 
         $this->container->singleton(
+            ExceptionHandler::class,
+            function (Container $c): ExceptionHandler {
+                $handlerClass = (string) config('app.exception_handler', ExceptionHandler::class);
+
+                if (class_exists($handlerClass) && is_subclass_of($handlerClass, ExceptionHandler::class)) {
+                    return $c->make($handlerClass);
+                }
+
+                return new ExceptionHandler();
+            }
+        );
+
+        $this->container->singleton(
             MiddlewarePipeline::class,
             fn (Container $c): MiddlewarePipeline => new MiddlewarePipeline($c)
         );
@@ -174,6 +188,7 @@ class Application
                 container: $c,
                 pipeline: $c->get(MiddlewarePipeline::class),
                 validator: $c->get(Validate::class),
+                exceptionHandler: $c->get(ExceptionHandler::class),
             );
         });
     }

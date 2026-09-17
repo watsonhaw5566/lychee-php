@@ -1,6 +1,6 @@
 # 数据验证 Validation
 
-框架集成了 [topthink/think-validate](https://github.com/top-think/think-validate) 作为数据验证器。验证失败时抛出 `Lychee\validation\ValidationException`，HTTP 内核会自动捕获并返回 **400** 状态码，`msg` 字段取自 think-validate 的实际校验错误信息：
+框架集成了 [topthink/think-validate](https://github.com/top-think/think-validate) 作为数据验证器。验证失败时抛出 `think\exception\ValidateException`，HTTP 内核会自动捕获并返回 **400** 状态码，`msg` 字段取自 think-validate 的实际校验错误信息：
 
 ```json
 {
@@ -9,36 +9,23 @@
 }
 ```
 
-## 自定义返回
-
-`ValidationException` 支持自定义提示信息和 HTTP 状态码，构造函数签名：
+`think\exception\ValidateException` 的构造函数接受 `$error`（字符串或数组）和可选的 `$key`（字段名）：
 
 ```php
-new ValidationException(array $errors, ?string $message = null, int $code = 400)
+// 单个错误
+throw new \think\exception\ValidateException('用户名必填');
+
+// 批量错误（数组形式）
+throw new \think\exception\ValidateException(['name' => '用户名必填', 'email' => '邮箱格式不正确']);
 ```
 
-- 第二个参数 `$message`：自定义 `msg` 字段；为 `null`（默认）时自动拼接 `$errors` 中的实际校验错误
-- 第三个参数 `$code`：自定义 HTTP 状态码（默认 400）
-
-```php
-// 默认：msg 自动取实际校验错误
-throw new ValidationException($errors);
-// 响应 msg: "用户名必填；邮箱格式不正确"
-
-// 自定义提示信息
-throw new ValidationException($errors, '参数校验失败，请检查输入');
-
-// 自定义状态码
-throw new ValidationException($errors, '请求参数错误', 422);
-```
-
-> 如需完全自定义响应结构，可在控制器中 `try/catch` 捕获 `ValidationException`，自行返回 `JsonResponse`。
+> 如需完全自定义响应结构，可在控制器中 `try/catch` 捕获 `ValidateException`，自行返回 `JsonResponse`；或通过 `app.exception_handler` 配置自定义异常处理器（详见 [应用配置 App](./app)）。
 
 ## 链式调用（控制器内联验证）
 
 ```php
 use Lychee\http\Request;
-use Lychee\validation\ValidationException;
+use think\exception\ValidateException;
 use think\Validate;
 
 public function save(Request $request): JsonResponse
@@ -61,7 +48,7 @@ public function save(Request $request): JsonResponse
         /** @var array<string,string> $errors */
         $errors = (array) $validate->getError(true);
 
-        throw new ValidationException($errors);
+        throw new ValidateException($errors);
     }
 
     // 验证通过，继续业务逻辑...
@@ -104,13 +91,13 @@ class User extends Validate
 $validate = new \app\validate\User();
 
 if (!$validate->check($data)) {
-    throw new ValidationException((array) $validate->getError(true));
+    throw new ValidateException((array) $validate->getError(true));
 }
 ```
 
 ## validate() 助手函数
 
-think-validate 提供了全局 `validate()` 函数，可快速生成验证器实例。默认开启 `failException`，验证失败会直接抛出 `think\exception\ValidateException`；如需手动处理，可传 `false`：
+think-validate 提供了全局 `validate()` 函数，可快速生成验证器实例。默认开启 `failException`，验证失败会直接抛出 `think\exception\ValidateException`，框架会自动捕获并返回 **400** 状态码；如需手动处理，可传 `false`：
 
 ```php
 // 传入规则数组，直接验证（失败抛异常）

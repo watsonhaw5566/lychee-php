@@ -14,4 +14,8 @@ return [
 
     // 是否显示错误信息（非调试模式下是否暴露真实异常信息）
     'show_error_msg'   => false,
+
+    // 异常处理器类名，需继承 Lychee\http\ExceptionHandler
+    // 留空或不配置时使用框架默认处理器
+    'exception_handler' => '',
 ];

@@ -7,8 +7,8 @@ namespace Tests\stub\app\controller;
 use Lychee\http\JsonResponse;
 use Lychee\http\Request;
 use Lychee\routing\Resource;
-use Lychee\validation\ValidationException;
 use Tests\stub\app\model\User;
+use think\exception\ValidateException;
 use think\Validate;
 
 /**
@@ -62,7 +62,7 @@ class UserController
             /** @var array<string,string> $errors */
             $errors = (array) $validate->getError(true);
 
-            throw new ValidationException($errors);
+            throw new ValidateException($errors);
         }
 
         $user = $this->user->create([

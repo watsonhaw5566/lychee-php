@@ -15,6 +15,9 @@ return [
 
     // 是否显示错误信息（非调试模式下是否暴露真实异常信息）
     'show_error_msg'   => false,
+
+    // 自定义异常处理器类名，需继承 Lychee\http\ExceptionHandler
+    'exception_handler' => '',
 ];
 ```
 
@@ -81,6 +84,78 @@ return [
 $message = $debug || $showErrorMsg
     ? ($e->getMessage() ?: $statusText)
     : $errorMessage;
+```
+
+### exception_handler
+
+自定义异常处理器类名，需继承 `Lychee\http\ExceptionHandler`。留空或不配置时使用框架默认处理器。
+
+需填写完整类名：
+
+```php
+// config/app.php
+'exception_handler' => \App\exception\Handler::class,
+```
+
+#### 自定义异常处理器
+
+框架默认的 `ExceptionHandler` 已处理以下异常类型：
+
+| 异常类 | HTTP 状态码 | 说明 |
+| --- | --- | --- |
+| `think\exception\ValidateException` | 400 | 数据验证失败 |
+| `Lychee\routing\RouteNotFoundException` | 404 | 路由未找到 |
+| `Lychee\http\HttpException` | 自定义 | HTTP 异常 |
+| 其他异常 | 500 | 服务器内部错误 |
+
+如需完全自定义异常处理逻辑，可继承 `ExceptionHandler` 并覆盖 `report()` 和/或 `render()` 方法：
+
+```php
+// app/exception/Handler.php
+namespace App\exception;
+
+use Lychee\http\ExceptionHandler;
+use Lychee\http\Request;
+use Lychee\http\Response;
+use Throwable;
+
+class Handler extends ExceptionHandler
+{
+    /**
+     * 不需要记录日志的异常类列表。
+     *
+     * @var array<class-string<Throwable>>
+     */
+    protected array $ignoreReport = [
+        \Lychee\http\HttpException::class,
+        \Lychee\routing\RouteNotFoundException::class,
+        \think\exception\ValidateException::class,
+    ];
+
+    /**
+     * 记录异常日志。
+     */
+    public function report(Throwable $e): void
+    {
+        parent::report($e);
+
+        // 可在此处上报到监控平台
+    }
+
+    /**
+     * 渲染异常响应。
+     */
+    public function render(Request $request, Throwable $e): Response
+    {
+        // 自定义业务异常处理
+        if ($e instanceof \App\exception\BusinessException) {
+            return json(['code' => $e->getCode(), 'msg' => $e->getMessage()], 400);
+        }
+
+        // 其余交给父类处理
+        return parent::render($request, $e);
+    }
+}
 ```
 
 ## 调试模式
