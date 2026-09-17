@@ -112,6 +112,9 @@ class Application
 
         // 迁移模块：始终注册命令，数据库连接可用时创建管理器
         $this->bootMigration();
+
+        // 校验器语言：注册 maker 闭包，使所有 Validate 实例默认中文（含全局 validate() 函数）
+        $this->bootValidateLang();
     }
 
     /**
@@ -348,6 +351,19 @@ class Application
 
         $this->container->instance(I18n::class, $i18n);
         $this->container->instance('i18n', $i18n);
+    }
+
+    /**
+     * 注册校验器语言闭包。
+     *
+     * 通过 think\Validate::maker() 注册构造钩子，使所有 Validate 实例
+     * （包括全局 validate() 函数创建的）默认使用内置中文提示。
+     */
+    private function bootValidateLang(): void
+    {
+        Validate::maker(function (Validate $v): void {
+            $v->useZh();
+        });
     }
 
     private function bootWebSocket(): void
