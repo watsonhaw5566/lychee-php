@@ -56,7 +56,7 @@ class MigrationManager
             try {
                 $this->pdo->beginTransaction();
                 $instance->up();
-                $this->recordMigration($version, $migration['name']);
+                $this->recordMigration((string) $version, $migration['name']);
                 $this->pdo->commit();
             } catch (Throwable $e) {
                 $this->pdo->rollBack();
@@ -110,7 +110,7 @@ class MigrationManager
             try {
                 $this->pdo->beginTransaction();
                 $instance->down();
-                $this->deleteMigration($version);
+                $this->deleteMigration((string) $version);
                 $this->pdo->commit();
             } catch (Throwable $e) {
                 $this->pdo->rollBack();
@@ -265,6 +265,21 @@ class MigrationManager
 
     private function ensureMigrationTable(): void
     {
+        $driver = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+        if ($driver === 'sqlite') {
+            $this->pdo->exec(
+                "CREATE TABLE IF NOT EXISTS `{$this->table()}` (
+                    `id` INTEGER PRIMARY KEY,
+                    `migration` VARCHAR(255) NOT NULL,
+                    `batch` INTEGER NOT NULL DEFAULT 1,
+                    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )"
+            );
+
+            return;
+        }
+
         $this->pdo->exec(
             "CREATE TABLE IF NOT EXISTS `{$this->table()}` (
                 `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
