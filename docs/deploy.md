@@ -169,15 +169,7 @@ APP_DEBUG=false
 APP_URL=https://example.com
 ```
 
-## 七、配置文件
-
-确保 `config/session.php` 中的 session 路径正确（避免 open_basedir 问题）：
-
-```php
-'path' => runtime_path('session'),
-```
-
-## 八、验证部署
+## 七、验证部署
 
 1. 访问首页，确认能正常打开
 2. 请求一个不存在的路由，应返回框架的 404 JSON：
@@ -189,7 +181,7 @@ APP_URL=https://example.com
 3. 查看 `runtime/log/` 目录是否有日志生成
 4. 查看 Nginx 错误日志 `/www/wwwlogs/example.com.error.log` 是否有异常
 
-## 九、SSL / HTTPS
+## 八、SSL / HTTPS
 
 宝塔面板 → 网站 → 设置 → **SSL**，可申请 Let's Encrypt 免费证书或上传已有证书。开启后建议勾选 **强制 HTTPS**。
 
@@ -204,33 +196,13 @@ APP_URL=https://example.com
 - 注释掉 `error_page 404 /404.html;`
 - 添加 `fastcgi_intercept_errors off;`
 
-### 2. Twig 报 `Unable to create the cache directory`
-
-**原因**：`runtime/twig` 目录无写入权限，或 open_basedir 限制。
-
-**解决**：
-```bash
-chown -R www:www /www/wwwroot/example.com/runtime
-chmod -R 755 /www/wwwroot/example.com/runtime
-```
-
-### 3. Session 报 open_basedir 错误
-
-**原因**：`config/session.php` 中的 `path` 配置为 `/` 或空字符串，超出了 open_basedir 限制。
-
-**解决**：将 session 路径设置为 runtime 目录下：
-
-```php
-'path' => runtime_path('session'),
-```
-
-### 4. 静态资源 404
+### 2. 静态资源 404
 
 **原因**：Nginx 的 `root` 没有指向 `public` 目录。
 
 **解决**：确保站点根目录和运行目录都指向 `public`。
 
-### 5. 上传大小限制
+### 3. 上传大小限制
 
 修改 PHP 配置（宝塔 → 软件商店 → PHP 设置 → 配置修改）：
 
