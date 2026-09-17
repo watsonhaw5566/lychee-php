@@ -25,6 +25,16 @@ return [
             'charset'  => 'utf8mb4',
             'prefix'   => '',
             'debug'    => false,
+
+            // 是否开启断线重连（默认 false）
+            // 常驻进程（队列/定时任务/WebSocket）中建议开启，
+            // 查询遇到 "Lost connection"、"MySQL server has gone away" 等断线异常时自动重连重试
+            'break_reconnect' => false,
+
+            // 是否监听 SQL（默认 true）
+            // 开启后执行的 SQL 会通过框架日志模块输出
+            // 日志频道优先使用 config/log.php 中的 'sql' 频道，未配置则使用默认频道
+            'trigger_sql' => true,
         ],
         'sqlite' => [
             'type'     => 'sqlite',
@@ -33,10 +43,35 @@ return [
             'debug'    => false,
         ],
     ],
+
+    // 以下为全局配置（对所有连接的模型生效）
+
+    // 是否自动写入时间戳（默认 true）
+    // true：自动检测字段类型；'datetime'：强制写入 Y-m-d H:i:s 格式字符串
+    'auto_timestamp' => true,
+
+    // 时间字段取出后的默认时间格式
+    'datetime_format' => 'Y-m-d H:i:s',
+
+    // 全局时间字段名，格式：create_time,update_time
+    // 留空则使用模型默认值（create_time / update_time）
+    'datetime_field' => '',
 ];
 ```
 
 框架启动时会自动读取该配置并初始化 `DbManager`，同时绑定到模型基类（`think\Model`）。
+
+### 配置说明
+
+| 配置项 | 位置 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `break_reconnect` | connections 内 | `false` | 断线重连开关，常驻进程建议开启 |
+| `trigger_sql` | connections 内 | `true` | SQL 监听开关，开启后 SQL 输出到日志 |
+| `auto_timestamp` | 顶层 | `true` | 模型自动写入创建/更新时间 |
+| `datetime_format` | 顶层 | `Y-m-d H:i:s` | 时间字段读取时的格式化字符串 |
+| `datetime_field` | 顶层 | `''` | 全局时间字段名，格式 `create_time,update_time` |
+
+> `break_reconnect` 与 `trigger_sql` 是连接级配置，需写在 `connections` 数组的具体连接内；`auto_timestamp`、`datetime_format`、`datetime_field` 是全局配置，写在配置顶层。
 
 ## 获取数据库实例
 
