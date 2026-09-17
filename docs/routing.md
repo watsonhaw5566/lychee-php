@@ -1,8 +1,20 @@
 # 路由 Routing
 
-基于注解的路由系统，自动扫描控制器目录。
+基于注解的路由系统，自动扫描 `app/controller` 目录下的控制器。
 
 ## 定义路由
+
+使用 `#[Route]` 注解标注控制器方法，构造函数签名为：
+
+```php
+public function __construct(
+    public string $path,              // 路由路径
+    public string $method = 'GET',    // HTTP 方法，默认 GET
+    public string $name = '',         // 路由名称（可选）
+)
+```
+
+第一个参数为**路径**，第二个参数为 **HTTP 方法**（可省略，默认 `GET`）。
 
 ```php
 // app/controller/UserController.php
@@ -12,19 +24,19 @@ use Lychee\routing\Route;
 
 class UserController
 {
-    #[Route('GET', '/users')]
+    #[Route('/users')]                 // GET  /users（method 省略时默认为 GET）
     public function index()
     {
         return 'user list';
     }
 
-    #[Route('GET', '/users/{id}')]
+    #[Route('/users/{id}')]            // GET  /users/{id}
     public function show(int $id)
     {
         return "user {$id}";
     }
 
-    #[Route('POST', '/users')]
+    #[Route('/users', 'POST')]         // POST /users
     public function store()
     {
         return 'created';
@@ -32,13 +44,54 @@ class UserController
 }
 ```
 
-## 路由参数
+## 类级路由前缀
+
+在控制器类上标注 `#[Route]` 或 `#[Resource]`，可作为该控制器所有方法路由的路径前缀：
 
 ```php
-#[Route('GET', '/users/{id}/posts/{postId}')]
+use Lychee\routing\Route;
+
+#[Route('/admin')]
+class AdminController
+{
+    #[Route('/users')]       // 实际路径：GET  /admin/users
+    public function index() {}
+
+    #[Route('/users/{id}')]  // 实际路径：GET  /admin/users/{id}
+    public function show(int $id) {}
+}
+```
+
+> 若类上同时标注 `#[Resource]` 和 `#[Route]`，以 `#[Resource]` 的路径为准。
+
+## 路由参数
+
+路由路径中的 `{param}` 占位符会自动注入到控制器方法的同名参数中：
+
+```php
+#[Route('/users/{id}/posts/{postId}')]
 public function post(int $id, int $postId)
 {
     // $id, $postId 自动从 URL 注入
+}
+```
+
+### 参数类型自动转换
+
+路由参数会根据方法参数的类型声明自动转换：
+
+| 参数类型 | 转换方式 |
+| --- | --- |
+| `int` | `(int) $value` |
+| `float` | `(float) $value` |
+| `bool` | `filter_var` 布尔过滤 |
+| `string` | `(string) $value` |
+| `array` | `(array) $value` |
+
+```php
+#[Route('/users/{id}')]
+public function show(int $id)  // URL 中的字符串自动转为 int
+{
 }
 ```
 
@@ -140,6 +193,52 @@ class UserController
 > 如需零代码实现增删改查，可结合 [控制器 / ResourceController](./controller.md#资源控制器-resourcecontroller) 使用，
 > 继承 `ResourceController` 并声明 `$model` 即可自动获得完整 CRUD 接口。
 
+## 控制器方法参数注入
+
+控制器方法的参数会按以下优先级自动解析注入：
+
+1. **类型提示为类**：
+   - `Request` 或其子类 → 注入当前请求对象
+   - 容器中已注册的服务 → 从容器解析
+2. **路由参数**：与 `{param}` 同名的参数从 URL 注入
+3. **请求参数**：从 GET/POST 数据中获取同名参数
+4. **默认值**：参数有默认值时使用默认值
+5. **可空参数**：允许 `null` 的参数返回 `null`
+
+```php
+use Lychee\http\Request;
+
+#[Route('/users/{id}')]
+public function update(int $id, Request $request)  // $id 来自路由，$request 自动注入
+{
+    $data = $request->param();
+}
+```
+
+## 控制器返回值
+
+控制器方法的返回值处理规则：
+
+- 返回 `Response` 实例 → 直接输出
+- 返回其他类型（数组、字符串等）→ 自动包装为 `JsonResponse`
+
+```php
+#[Route('/users')]
+public function index()
+{
+    return ['data' => []];  // 自动转为 JSON 响应
+}
+```
+
+## 路由命名
+
+`#[Route]` 第三个参数可指定路由名称，便于后续通过名称生成 URL：
+
+```php
+#[Route('/users/{id}', 'GET', 'user.show')]
+public function show(int $id) {}
+```
+
 ## 全局路由前缀
 
 在 `config/app.php` 中设置 `route_prefix`，可为所有路由统一添加前缀，API 开发时尤为有用：
@@ -151,5 +250,27 @@ return [
 ];
 ```
 
-设置后，`#[Resource('/users')]` 的实际访问路径变为 `/api/users`，`#[Route('GET', '/')]` 变为 `/api/`。
+设置后，`#[Resource('/users')]` 的实际访问路径变为 `/api/users`，`#[Route('/')]` 变为 `/api`。
 前缀会自动去除首尾斜杠，`'api'`、`'/api'`、`'api/'` 等效。留空或不配置则不添加前缀。
+
+## 查看路由列表
+
+使用 `route:list` 命令查看所有已注册的路由：
+
+```bash
+php lee route:list
+```
+
+输出示例：
+
+```
+Registered routes: (7)
+
+  GET     /api/users          App\controller\UserController@index
+  POST    /api/users          App\controller\UserController@save
+  GET     /api/users/{id}     App\controller\UserController@read
+  PUT     /api/users/{id}     App\controller\UserController@update
+  PATCH   /api/users/{id}     App\controller\UserController@update
+  DELETE  /api/users/{id}     App\controller\UserController@delete
+  DELETE  /api/users          App\controller\UserController@batch_delete
+```

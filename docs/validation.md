@@ -1,6 +1,8 @@
 # 数据验证 Validation
 
-框架集成了 [topthink/think-validate](https://github.com/top-think/think-validate) 作为数据验证器。验证失败时抛出 `think\exception\ValidateException`，HTTP 内核会自动捕获并返回 **400** 状态码，`msg` 字段取自 think-validate 的实际校验错误信息：
+框架集成了 [topthink/think-validate](https://github.com/top-think/think-validate) 作为数据验证器。
+
+验证失败时抛出 `think\exception\ValidateException`，HTTP 内核会自动捕获并返回 **400** 状态码，`msg` 字段取自 think-validate 的实际校验错误信息：
 
 ```json
 {
