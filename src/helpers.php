@@ -19,7 +19,7 @@ if (!function_exists('env')) {
 
         // 大小写不敏感回退：尝试大写形式（Env::load 会同时写入大写键）
         if ($value === false || $value === null) {
-            $upper  = strtoupper($key);
+            $upper = strtoupper($key);
             if ($upper !== $key) {
                 $value = $_ENV[$upper] ?? $_SERVER[$upper] ?? getenv($upper);
             }
