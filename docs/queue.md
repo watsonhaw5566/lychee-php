@@ -27,25 +27,46 @@ return [
 
 ## 定义任务
 
+任务类为普通类，**不需要继承任何基类**，实现 `fire()` 方法即可：
+
 ```php
 // app/job/SendEmail.php
 namespace App\job;
 
 use Lychee\queue\Job;
+use Throwable;
 
-class SendEmail extends Job
+class SendEmail
 {
-    public function __construct(
-        protected string $email,
-        protected string $content,
-    ) {}
-
-    public function handle(): void
+    /**
+     * 执行任务。
+     *
+     * @param Job   $job  框架任务包装器，可调用 delete()/release()
+     * @param mixed $data queue() 传入的数据
+     */
+    public function fire(Job $job, mixed $data): void
     {
-        // 发送邮件逻辑
+        $email   = $data['email'];
+        $content = $data['content'];
+
+        // 发送邮件逻辑...
+
+        $job->delete(); // 执行完成后删除任务
+    }
+
+    /**
+     * 可选：任务全部重试失败后回调。
+     */
+    public function failed(mixed $data, Throwable $e): void
+    {
+        // 记录失败日志
     }
 }
 ```
+
+说明：
+- 默认调用 `fire()` 方法；如需指定其他方法，推送时使用 `Class@method` 语法，例如 `queue(SendEmail::class . '@handle', $data)`
+- 数据通过 `fire()` 的 `$data` 参数传入，不走构造函数注入
 
 ## 推送任务
 
