@@ -215,27 +215,34 @@ class Kernel
             $status = $e->getStatusCode();
         }
 
-        $debug = (bool) config('app.debug', env('APP_DEBUG', false));
+        $debug        = (bool) config('app.debug', env('APP_DEBUG', false));
+        $errorMessage = (string) config('app.error_message', '页面错误,请稍后再试~');
+        $showErrorMsg = (bool) config('app.show_error_msg', false);
+
+        // 非调试模式下，show_error_msg 决定是否暴露真实异常信息
+        $message = $debug || $showErrorMsg
+            ? ($e->getMessage() ?: $this->statusText($status))
+            : $errorMessage;
 
         // 浏览器请求渲染异常页；JSON 请求返回结构化错误
         if ($this->wantsHtml($request)) {
-            if ($debug) {
-                $renderer = new ExceptionRenderer(
-                    cachePath: (string) app('path.runtime') . 'twig'
-                );
+            $renderer = new ExceptionRenderer(
+                cachePath: (string) app('path.runtime') . 'twig',
+            );
 
+            if ($debug) {
                 $html = $renderer->render(
                     status: $status,
                     e: $e,
                     method: $request->method,
                     url: $request->path,
                 );
-
-                return new Response($html, $status, ['Content-Type' => 'text/html; charset=utf-8']);
+            } else {
+                // 非调试模式渲染通用错误页，不暴露异常详情
+                $html = $renderer->renderError($status, $message);
             }
 
-            // 非调试模式返回空白页
-            return new Response('', $status, ['Content-Type' => 'text/html; charset=utf-8']);
+            return new Response($html, $status, ['Content-Type' => 'text/html; charset=utf-8']);
         }
 
         // JSON 请求
@@ -252,7 +259,7 @@ class Kernel
 
         return new JsonResponse([
             'code' => $status,
-            'msg'  => $this->statusText($status),
+            'msg'  => $message,
         ], $status);
     }
 

@@ -68,6 +68,7 @@ class Application
         $this->loadEnvironment();
         $this->registerBindings();
         $this->bootConfig();
+        $this->bootTimezone();
         $this->bootOptionalModules();
     }
 
@@ -186,6 +187,20 @@ class Application
 
         $this->container->instance('config', $config);
         $this->container->instance(Config::class, $config);
+    }
+
+    /**
+     * 根据配置设置默认时区。
+     *
+     * 读取 app.default_timezone，缺省为 Asia/Shanghai。
+     */
+    private function bootTimezone(): void
+    {
+        $timezone = (string) config('app.default_timezone', 'Asia/Shanghai');
+
+        if ($timezone !== '') {
+            date_default_timezone_set($timezone);
+        }
     }
 
     private function bootOrm(): void
@@ -490,30 +505,31 @@ class Application
             return;
         }
 
-        $debug = (bool) config('app.debug', env('APP_DEBUG', false));
+        $debug        = (bool) config('app.debug', env('APP_DEBUG', false));
+        $errorMessage = (string) config('app.error_message', '页面错误！请稍后再试~');
+        $showErrorMsg = (bool) config('app.show_error_msg', false);
 
-        if (!$debug) {
-            http_response_code(500);
-            echo '';
-
-            return;
-        }
-
-        $e = new ErrorException($error['message'], 0, $error['type'], $error['file'], $error['line']);
+        $e      = new ErrorException($error['message'], 0, $error['type'], $error['file'], $error['line']);
+        $status = 500;
 
         try {
             $renderer = new ExceptionRenderer(
-                cachePath: (string) $this->container->runtimePath . 'twig'
+                cachePath: (string) $this->container->runtimePath . 'twig',
             );
 
-            $html = $renderer->render(
-                status: 500,
-                e: $e,
-                method: $_SERVER['REQUEST_METHOD'] ?? 'GET',
-                url: $_SERVER['REQUEST_URI']       ?? '/',
-            );
+            if ($debug) {
+                $html = $renderer->render(
+                    status: $status,
+                    e: $e,
+                    method: $_SERVER['REQUEST_METHOD'] ?? 'GET',
+                    url: $_SERVER['REQUEST_URI']       ?? '/',
+                );
+            } else {
+                $message = $showErrorMsg ? $error['message'] : $errorMessage;
+                $html    = $renderer->renderError($status, $message);
+            }
 
-            http_response_code(500);
+            http_response_code($status);
             header('Content-Type: text/html; charset=utf-8');
             echo $html;
         } catch (Throwable) {

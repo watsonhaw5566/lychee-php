@@ -20,6 +20,7 @@ export default defineConfig({
                 text: '核心模块',
                 items: [
                     {text: '容器', link: '/container'},
+                    {text: '应用配置', link: '/app'},
                     {text: '配置', link: '/config'},
                     {text: '路由', link: '/routing'},
                     {text: '中间件', link: '/middleware'},
@@ -61,6 +62,7 @@ export default defineConfig({
                 text: '核心',
                 items: [
                     {text: '容器 Container', link: '/container'},
+                    {text: '应用配置 App', link: '/app'},
                     {text: '配置 Config', link: '/config'},
                     {text: '路由 Routing', link: '/routing'},
                     {text: '中间件 Middleware', link: '/middleware'},
