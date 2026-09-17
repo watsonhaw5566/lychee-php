@@ -50,7 +50,7 @@ class I18nMiddleware implements MiddlewareInterface
     private function resolveLocale(Request $request): string
     {
         // 1. 查询参数
-        $query = $request->query('lang');
+        $query = $request->get('lang');
         if (is_string($query) && $query !== '') {
             return $this->normalize($query);
         }
