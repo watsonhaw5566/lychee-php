@@ -102,13 +102,23 @@ class LogTest extends TestCase
 
     public function test_logger_helper_function(): void
     {
-        logger('helper debug message', ['key' => 'value']);
+        logger()->info('helper info message', ['key' => 'value']);
 
         $logFile = STUB_DIR . '/runtime/log/' . date('Y-m-d') . '.log';
         $content = file_get_contents($logFile);
 
-        $this->assertStringContainsString('helper debug message', $content);
+        $this->assertStringContainsString('helper info message', $content);
         $this->assertStringContainsString('"key":"value"', $content);
+    }
+
+    public function test_logger_helper_with_channel(): void
+    {
+        logger('file')->warning('channel warning message');
+
+        $logFile = STUB_DIR . '/runtime/log/' . date('Y-m-d') . '.log';
+        $content = file_get_contents($logFile);
+
+        $this->assertStringContainsString('channel warning message', $content);
     }
 
     public function test_logger_helper_returns_instance(): void
