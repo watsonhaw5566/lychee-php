@@ -20,6 +20,7 @@ php lee run --host=0.0.0.0      # 指定监听地址
 | `list` | 列出所有可用命令 |
 | `run` | 启动 PHP 内置开发服务器（自动处理 public/ 静态文件） |
 | `route:list` | 列出所有已注册的路由 |
+| `make:controller` | 创建资源控制器（同时生成 Model 与 Validate） |
 | `migrate:run` | 执行数据库迁移 |
 | `migrate:rollback` | 回滚迁移 |
 | `seed:run` | 执行数据填充 |
@@ -61,6 +62,43 @@ Registered routes: (8)
   DELETE  /users       App\controller\UserController@batch_delete
   GET     /            App\controller\IndexController@index
 ```
+
+### make:controller 创建资源控制器
+
+`make:controller` 命令一键生成资源控制器及其配套的 Model 和 Validate 文件，三个文件同时创建、互相引用：
+
+```bash
+php lee make:controller User
+```
+
+执行后会生成以下三个文件：
+
+| 文件 | 说明 |
+|------|------|
+| `app/controller/UserController.php` | 继承 `ResourceController`，自动绑定 Model 与 Validate，预置 6 个资源方法 |
+| `app/model/User.php` | 继承 `think\Model`，表名按类名自动推断 |
+| `app/validate/UserValidate.php` | 继承 `think\Validate`，预置空的 `$rule` 与 `$message` |
+
+控制器自动绑定的资源路径为模型名的小写形式（`User` → `/user`），并生成以下方法骨架，方便直接修改业务逻辑：
+
+```php
+#[Resource('/user')]
+class UserController extends ResourceController
+{
+    protected string $model = User::class;
+    protected string $validate = UserValidate::class;
+
+    public function index(): JsonResponse          // → $this->baseIndex($where)
+    public function save(): JsonResponse           // → $this->baseSave($this->request->post())
+    public function read(int $id): JsonResponse    // → $this->baseRead($id)
+    public function update(int $id): JsonResponse  // → $this->baseUpdate($id, $this->request->post())
+    public function delete(int $id): JsonResponse  // → $this->baseDelete($id)
+    public function batch_delete(): JsonResponse   // → $this->baseBatchDelete($ids)
+}
+```
+
+> 模型名支持省略 `Controller` 后缀，`php lee make:controller User` 与 `php lee make:controller UserController` 等效。
+> 若控制器文件已存在则命令中止并报错；若同名 Model 或 Validate 已存在则跳过创建，不会覆盖已有文件。
 
 ## 自定义命令
 

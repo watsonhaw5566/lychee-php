@@ -1,0 +1,14 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{namespace}}\model;
+
+use think\Model;
+
+/**
+ * {{model}} 模型。
+ */
+class {{model}} extends Model
+{
+}
