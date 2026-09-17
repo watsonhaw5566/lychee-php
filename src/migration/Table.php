@@ -48,9 +48,9 @@ class Table
      */
     public function create(): void
     {
-        $columns     = [];
-        $idColumn    = $this->options['id'] ?? null;
-        $pkColumns   = !empty($this->options['primary_key']) ? (array)$this->options['primary_key'] : [];
+        $columns   = [];
+        $idColumn  = $this->options['id'] ?? null;
+        $pkColumns = !empty($this->options['primary_key']) ? (array)$this->options['primary_key'] : [];
 
         if (!empty($idColumn)) {
             if ($this->isSqlite()) {
@@ -84,7 +84,7 @@ class Table
             $type = strtoupper((string)($idx['options']['type'] ?? 'INDEX'));
 
             if ($type === 'UNIQUE') {
-                $cols = implode(', ', array_map(fn ($c) => "`{$c}`", $idx['columns']));
+                $cols      = implode(', ', array_map(fn ($c) => "`{$c}`", $idx['columns']));
                 $columns[] = "UNIQUE ({$cols})";
             } elseif ($type === 'PRIMARY') {
                 // 已通过 primary_key 选项处理
@@ -374,7 +374,7 @@ class Table
         $changes = [];
         foreach ($this->pendingChanges as $change) {
             match ($change['type']) {
-                'drop'   => $drops[$change['name']] = true,
+                'drop'   => $drops[$change['name']]   = true,
                 'rename' => $renames[$change['from']] = $change['to'],
                 'change' => $changes[$change['name']] = $change,
                 default  => null,
@@ -399,9 +399,9 @@ class Table
             if (isset($changes[$name])) {
                 $newColumns[] = $this->buildColumnDefinition($newName, $changes[$name]['columnType'], $changes[$name]['options']);
             } else {
-                $type    = $col['type'] ?: 'TEXT';
-                $notNull = (int)$col['notnull'] === 1 ? 'NOT NULL' : '';
-                $default = $col['dflt_value'] !== null ? 'DEFAULT ' . $col['dflt_value'] : '';
+                $type         = $col['type'] ?: 'TEXT';
+                $notNull      = (int)$col['notnull'] === 1 ? 'NOT NULL' : '';
+                $default      = $col['dflt_value'] !== null ? 'DEFAULT ' . $col['dflt_value'] : '';
                 $newColumns[] = trim("`{$newName}` {$type} {$notNull} {$default}");
             }
 
@@ -511,19 +511,19 @@ class Table
 
         if ($this->isSqlite()) {
             return match ($lower) {
-                'string', 'varchar'        => 'VARCHAR(' . ($length ?? 255) . ')',
-                'char'                     => 'CHAR(' . ($length ?? 255) . ')',
-                'text', 'mediumtext', 'longtext' => 'TEXT',
+                'string', 'varchar'                                                                            => 'VARCHAR(' . ($length ?? 255) . ')',
+                'char'                                                                                         => 'CHAR(' . ($length ?? 255) . ')',
+                'text', 'mediumtext', 'longtext'                                                               => 'TEXT',
                 'integer', 'int', 'biginteger', 'bigint', 'smallinteger', 'smallint', 'tinyinteger', 'tinyint' => 'INTEGER',
-                'float', 'double'          => 'REAL',
-                'decimal'                  => 'NUMERIC',
-                'boolean', 'bool'          => 'INTEGER',
-                'date', 'datetime', 'timestamp', 'time' => strtoupper($lower),
-                'json'                     => 'TEXT',
-                'enum'                     => 'TEXT',
-                'binary'                   => 'BLOB',
-                'uuid'                     => 'CHAR(36)',
-                default                    => strtoupper($type),
+                'float', 'double'                                                                              => 'REAL',
+                'decimal'                                                                                      => 'NUMERIC',
+                'boolean', 'bool'                                                                              => 'INTEGER',
+                'date', 'datetime', 'timestamp', 'time'                                                        => strtoupper($lower),
+                'json'                                                                                         => 'TEXT',
+                'enum'                                                                                         => 'TEXT',
+                'binary'                                                                                       => 'BLOB',
+                'uuid'                                                                                         => 'CHAR(36)',
+                default                                                                                        => strtoupper($type),
             };
         }
 
