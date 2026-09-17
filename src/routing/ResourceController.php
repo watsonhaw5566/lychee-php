@@ -336,27 +336,23 @@ abstract class ResourceController
     /**
      * 通用列表查询（可被子类复用）。
      *
-     * 分页参数（page / page_size）与排序（order）默认从请求中自动获取，
+     * 分页参数（current / pageSize）与排序（order）默认从请求中自动获取，
      * 子类调用时通常只需传入 $where 即可。
      *
      * @param array              $where    查询条件（支持 _like / _range / _between / _in 后缀 DSL）
-     * @param int|null           $current  当前页码，为 null 时从请求 page 参数读取
-     * @param int|null           $pageSize 每页条数，为 null 时从请求 page_size 参数读取
      * @param array              $append   追加属性
      * @param array              $with     关联预加载
      * @param array|string|null  $order    排序，为 null 时从请求 order 参数读取
      */
     protected function baseIndex(
         array $where = [],
-        ?int $current = null,
-        ?int $pageSize = null,
         array $append = [],
         array $with = [],
         array|string|null $order = null,
     ): JsonResponse {
         try {
-            $current  ??= (int) $this->request->param('page', 1);
-            $pageSize ??= (int) $this->request->param('page_size', 10);
+            $current  ??= (int) $this->request->param('current', 1);
+            $pageSize ??= (int) $this->request->param('pageSize', 20);
             $order    ??= $this->request->param('order', ['create_time' => 'desc']);
 
             $model = $this->getModel();
