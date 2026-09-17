@@ -11,6 +11,7 @@ use Lychee\console\Application as ConsoleApplication;
 use Lychee\container\Container;
 use Lychee\cron\command\CronListCommand;
 use Lychee\cron\command\CronRunCommand;
+use Lychee\cron\command\CronScheduleCommand;
 use Lychee\cron\Scheduler;
 use Lychee\filesystem\FilesystemManager;
 use Lychee\http\Kernel;
@@ -283,6 +284,7 @@ class Application
         $console = $this->container->get(ConsoleApplication::class);
         $console->addCommand(CronRunCommand::class);
         $console->addCommand(CronListCommand::class);
+        $console->addCommand(CronScheduleCommand::class);
     }
 
     private function bootQueue(): void
