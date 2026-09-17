@@ -223,7 +223,7 @@ class Router
         $path = '/' . trim($prefix . '/' . trim($path, '/'), '/');
 
         if ($this->routePrefix !== '') {
-            $path = '/' . $this->routePrefix . $path;
+            $path = '/' . trim($this->routePrefix . $path, '/');
         }
 
         return $path;
