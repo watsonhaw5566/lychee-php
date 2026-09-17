@@ -13,11 +13,11 @@ use RuntimeException;
 /**
  * 创建资源控制器命令（同时生成 Model 与 Validate）。
  *
- * 用法：php lee make:controller User
+ * 用法：php lee make:rest User
  */
-class MakeControllerCommand extends Command
+class MakeRestCommand extends Command
 {
-    protected string $name = 'make:controller';
+    protected string $name = 'make:rest';
 
     protected string $description = 'Create a new resource controller (with Model & Validate)';
 
@@ -25,7 +25,7 @@ class MakeControllerCommand extends Command
     {
         $this->setName($this->name);
         $this->setDescription($this->description);
-        $this->addArgument('name', Argument::REQUIRED, 'The name of the controller (e.g. User)');
+        $this->addArgument('name', Argument::REQUIRED, 'The name of the resource (e.g. User)');
     }
 
     protected function execute(Input $input, Output $output): int
@@ -33,13 +33,13 @@ class MakeControllerCommand extends Command
         $name = trim((string) $input->getArgument('name'));
 
         if ($name === '') {
-            $output->writeln('<error>Controller name cannot be empty.</error>');
+            $output->writeln('<error>Resource name cannot be empty.</error>');
 
             return 1;
         }
 
         if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $name)) {
-            $output->writeln('<error>Controller name may only contain letters, numbers and underscores.</error>');
+            $output->writeln('<error>Resource name may only contain letters, numbers and underscores.</error>');
 
             return 1;
         }
