@@ -165,7 +165,7 @@ class LogTest extends TestCase
         $this->assertCount(2, $remaining);
 
         // 最新的两个文件应保留
-        $dates = array_map(fn($f) => basename($f, '.log'), $remaining);
+        $dates = array_map(fn ($f) => basename($f, '.log'), $remaining);
         sort($dates);
         $this->assertEquals(date('Y-m-d'), end($dates));
 
