@@ -38,13 +38,19 @@ return [
 
 ## 运行
 
-由系统 crontab 每分钟调用一次：
+`cron:schedule` 会每分钟启动一个子进程执行 `cron:run`，无需依赖系统 crontab，建议配合 supervisor / systemd 守护运行：
 
 ```bash
-* * * * * php lee cron:run
+php lee cron:schedule
 ```
 
-调度器自动判断并执行到期任务。
+启动后输出：
+
+```
+Cron schedule started. Press Ctrl+C to stop.
+```
+
+每次调度通过独立子进程执行，避免内存泄漏与状态污染。`cron:run` 异常退出时会打印退出码。
 
 ## 查看任务列表
 
