@@ -355,6 +355,7 @@ if (!function_exists('error_message')) {
         if (app()->has('i18n')) {
             /** @var \Lychee\i18n\I18n $i18n */
             $i18n = app('i18n');
+
             // lang() 在找不到翻译时返回键本身，因此中文默认值会原样返回
             return $i18n->lang($message);
         }
