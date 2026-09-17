@@ -253,7 +253,7 @@ class Application
         // 全局时间字段配置：think-orm 原生支持 auto_timestamp 与 datetime_format，
         // 但不支持 datetime_field 全局配置。这里通过 Model::maker() 闭包，
         // 将 'create_time,update_time' 格式的配置应用到所有模型实例。
-        $datetimeField = (string) $dbConfig['datetime_field'] ?? '';
+        $datetimeField = (string) ($dbConfig['datetime_field'] ?? '');
         if ($datetimeField !== '') {
             $parts = array_map('trim', explode(',', $datetimeField));
             if (count($parts) >= 2) {
