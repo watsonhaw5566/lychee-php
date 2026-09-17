@@ -48,7 +48,7 @@ class MigrateCreateCommand extends Command
         $timestamp = date('YmdHis');
         $filename  = "{$timestamp}_{$name}.php";
         $path      = base_path('database/migrations') . $filename;
-        $class     = MigrationManager::toClassName($name);
+        $class     = MigrationManager::toMigrationClassName($name);
 
         $directory = dirname($path);
         if (!is_dir($directory) && !mkdir($directory, 0777, true) && !is_dir($directory)) {

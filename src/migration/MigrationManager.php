@@ -212,7 +212,7 @@ class MigrationManager
 
             $version = $matches[1];
             $name    = $matches[2];
-            $class   = self::toClassName($name);
+            $class   = self::toMigrationClassName($name);
 
             $migrations[$version] = [
                 'name'  => $basename,
@@ -242,7 +242,7 @@ class MigrationManager
 
         foreach ($files as $file) {
             $basename = basename($file, '.php');
-            $class    = self::toClassName($basename);
+            $class    = self::toSeederClassName($basename);
 
             $seeders[] = [
                 'name'  => $basename,
@@ -357,6 +357,26 @@ class MigrationManager
     public static function toClassName(string $name): string
     {
         return str_replace(' ', '', ucwords(str_replace(['_', '-'], ' ', $name)));
+    }
+
+    /**
+     * 生成迁移类名，自动追加 Migration 后缀（若尚未存在）。
+     */
+    public static function toMigrationClassName(string $name): string
+    {
+        $class = self::toClassName($name);
+
+        return str_ends_with($class, 'Migration') ? $class : $class . 'Migration';
+    }
+
+    /**
+     * 生成 Seeder 类名，自动追加 Seeder 后缀（若尚未存在）。
+     */
+    public static function toSeederClassName(string $name): string
+    {
+        $class = self::toClassName($name);
+
+        return str_ends_with($class, 'Seeder') ? $class : $class . 'Seeder';
     }
 
     private function table(): string

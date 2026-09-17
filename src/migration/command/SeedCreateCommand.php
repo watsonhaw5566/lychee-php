@@ -45,9 +45,9 @@ class SeedCreateCommand extends Command
             return 1;
         }
 
-        $filename = "{$name}.php";
+        $class    = MigrationManager::toSeederClassName($name);
+        $filename = "{$class}.php";
         $path     = base_path('database/seeders') . $filename;
-        $class    = MigrationManager::toClassName($name);
 
         $directory = dirname($path);
         if (!is_dir($directory) && !mkdir($directory, 0777, true) && !is_dir($directory)) {
