@@ -18,6 +18,9 @@ return [
 
     // 自定义异常处理器类名，需继承 Lychee\http\ExceptionHandler
     'exception_handler' => '',
+
+    // 校验提示语言：'zh'（默认）中文 | 'en' 英文
+    'validate_lang' => 'zh',
 ];
 ```
 
@@ -157,6 +160,25 @@ class Handler extends ExceptionHandler
     }
 }
 ```
+
+### validate_lang
+
+校验失败提示的默认语言，作用于所有通过 `think\Validate` 进行的校验（包括全局 `validate()` 函数、`ResourceController` 的 `validate()` 方法、验证器类等）。
+
+| 值 | 说明 |
+| --- | --- |
+| `'zh'`（默认，不配置即为中文） | 使用 think-validate 内置中文提示 |
+| `'en'` | 使用 think-validate 内置英文提示 |
+
+不配置该项时默认为中文，开箱即用。如需切换为英文，在 `config/app.php` 中添加：
+
+```php
+'validate_lang' => 'en',
+```
+
+::: tip
+该配置仅控制校验框架的默认提示语言。若需要更精细的多语言校验提示（如按请求语言动态切换），可在验证器中通过 `$message` 数组自定义，或结合 i18n 模块自行实现。
+:::
 
 ## 调试模式
 
