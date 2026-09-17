@@ -134,20 +134,15 @@ if (!function_exists('storage_path')) {
 
 if (!function_exists('logger')) {
     /**
-     * 获取日志记录器，或记录一条 debug 级别日志。
+     * 获取指定频道的日志记录器。
      *
-     * @param  string|null $message 日志消息，为 null 时返回 Logger 实例
-     * @param  array       $context 上下文数据
+     * 始终返回 PSR-3 LoggerInterface 实例，由调用方显式调用级别方法记录日志。
+     *
+     * @param  string|null $channel 频道名，为 null 时使用默认频道
      */
-    function logger(?string $message = null, array $context = []): \Psr\Log\LoggerInterface
+    function logger(?string $channel = null): \Psr\Log\LoggerInterface
     {
-        $log = app('log')->channel();
-
-        if ($message !== null) {
-            $log->debug($message, $context);
-        }
-
-        return $log;
+        return app('log')->channel($channel);
     }
 }
 
