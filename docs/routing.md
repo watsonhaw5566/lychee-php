@@ -139,3 +139,17 @@ class UserController
 
 > 如需零代码实现增删改查，可结合 [控制器 / ResourceController](./controller.md#资源控制器-resourcecontroller) 使用，
 > 继承 `ResourceController` 并声明 `$model` 即可自动获得完整 CRUD 接口。
+
+## 全局路由前缀
+
+在 `config/app.php` 中设置 `route_prefix`，可为所有路由统一添加前缀，API 开发时尤为有用：
+
+```php
+// config/app.php
+return [
+    'route_prefix' => 'api',  // 所有路由自动加上 /api 前缀
+];
+```
+
+设置后，`#[Resource('/users')]` 的实际访问路径变为 `/api/users`，`#[Route('GET', '/')]` 变为 `/api/`。
+前缀会自动去除首尾斜杠，`'api'`、`'/api'`、`'api/'` 等效。留空或不配置则不添加前缀。

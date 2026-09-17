@@ -135,7 +135,8 @@ class Application
         $this->container->instance('path.public', $this->basePath . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR);
 
         $this->container->singleton(Router::class, function (): Router {
-            $router = new Router();
+            $routePrefix = (string) config('app.route_prefix', '');
+            $router      = new Router($routePrefix);
             $router->registerDirectory(
                 $this->basePath . '/app/controller',
                 $this->controllerNamespace
