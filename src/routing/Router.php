@@ -16,6 +16,13 @@ use SplFileInfo;
  */
 class Router
 {
+    private string $routePrefix;
+
+    public function __construct(string $routePrefix = '')
+    {
+        $this->routePrefix = trim($routePrefix, '/');
+    }
+
     /**
      * 资源路由默认动作映射。
      *
@@ -214,7 +221,13 @@ class Router
 
     private function joinPath(string $prefix, string $path): string
     {
-        return '/' . trim($prefix . '/' . trim($path, '/'), '/');
+        $path = '/' . trim($prefix . '/' . trim($path, '/'), '/');
+
+        if ($this->routePrefix !== '') {
+            $path = '/' . $this->routePrefix . $path;
+        }
+
+        return $path;
     }
 
     /**
