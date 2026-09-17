@@ -66,7 +66,7 @@ export default defineConfig({
                     {text: '配置 Config', link: '/config'},
                     {text: '路由 Routing', link: '/routing'},
                     {text: '中间件 Middleware', link: '/middleware'},
-                    {text: 'HTTP 请求与响应', link: '/http'},
+                    {text: '请求与响应 HTTP', link: '/http'},
                     {text: '控制器 Controller', link: '/controller'},
                     {text: 'Cookie', link: '/cookie'},
                     {text: '数据验证 Validation', link: '/validation'},
