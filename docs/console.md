@@ -20,7 +20,8 @@ php lee run --host=0.0.0.0      # 指定监听地址
 | `list` | 列出所有可用命令 |
 | `run` | 启动 PHP 内置开发服务器（自动处理 public/ 静态文件） |
 | `route:list` | 列出所有已注册的路由 |
-| `make:controller` | 创建资源控制器（同时生成 Model 与 Validate） |
+| `make:rest` | 创建资源控制器（同时生成 Model 与 Validate） |
+| `make:base` | 创建基础控制器（不集成资源路由，含 `#[Route]` 注解） |
 | `migrate:run` | 执行数据库迁移 |
 | `migrate:rollback` | 回滚迁移 |
 | `seed:run` | 执行数据填充 |
@@ -63,12 +64,12 @@ Registered routes: (8)
   GET     /            App\controller\IndexController@index
 ```
 
-### make:controller 创建资源控制器
+### make:rest 创建资源控制器
 
-`make:controller` 命令一键生成资源控制器及其配套的 Model 和 Validate 文件，三个文件同时创建、互相引用：
+`make:rest` 命令一键生成资源控制器及其配套的 Model 和 Validate 文件，三个文件同时创建、互相引用：
 
 ```bash
-php lee make:controller User
+php lee make:rest User
 ```
 
 执行后会生成以下三个文件：
@@ -97,8 +98,43 @@ class UserController extends ResourceController
 }
 ```
 
-> 模型名支持省略 `Controller` 后缀，`php lee make:controller User` 与 `php lee make:controller UserController` 等效。
+> 模型名支持省略 `Controller` 后缀，`php lee make:rest User` 与 `php lee make:rest UserController` 等效。
 > 若控制器文件已存在则命令中止并报错；若同名 Model 或 Validate 已存在则跳过创建，不会覆盖已有文件。
+
+### make:base 创建基础控制器
+
+`make:base` 命令生成一个不集成资源路由的基础控制器，不继承任何基类，通过 `#[Route]` 注解注册路由，仅预置一个返回空 `JsonResponse` 的 `index` 方法，适合自定义业务逻辑的场景：
+
+```bash
+php lee make:base Index
+```
+
+生成的文件结构：
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\controller;
+
+use Lychee\http\JsonResponse;
+use Lychee\routing\Route;
+
+#[Route('/index')]
+class IndexController
+{
+    #[Route('/')]
+    public function index(): JsonResponse
+    {
+        return new JsonResponse(null);
+    }
+}
+```
+
+> 类上的 `#[Route('/index')]` 作为路由前缀，方法上的 `#[Route('/')]` 将该方法注册为路由（默认 GET），最终路由为 `GET /index`。
+> 控制器名支持省略 `Controller` 后缀，`php lee make:base Index` 与 `php lee make:base IndexController` 等效。
+> 若控制器文件已存在则命令中止并报错。
 
 ## 自定义命令
 

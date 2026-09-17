@@ -9,13 +9,13 @@ use Lychee\console\Input;
 use Lychee\console\Output;
 use PHPUnit\Framework\TestCase;
 
-class MakeControllerCommandTest extends TestCase
+class MakeRestCommandTest extends TestCase
 {
     private string $tempDir;
 
     protected function setUp(): void
     {
-        $this->tempDir = sys_get_temp_dir() . '/lychee_make_ctrl_' . uniqid();
+        $this->tempDir = sys_get_temp_dir() . '/lychee_make_rest_' . uniqid();
         mkdir($this->tempDir . '/config', 0777, true);
     }
 
@@ -29,15 +29,15 @@ class MakeControllerCommandTest extends TestCase
         $app     = $this->createApp();
         $console = $app->container->get(\Lychee\console\Application::class);
 
-        $this->assertTrue($console->has('make:controller'));
+        $this->assertTrue($console->has('make:rest'));
     }
 
-    public function test_make_controller_creates_controller_model_and_validate(): void
+    public function test_make_rest_creates_controller_model_and_validate(): void
     {
         $app     = $this->createApp();
         $console = $app->container->get(\Lychee\console\Application::class);
 
-        $input  = new Input(['make:controller', 'User']);
+        $input  = new Input(['make:rest', 'User']);
         $output = new Output();
 
         $code = $console->run($input, $output);
@@ -85,12 +85,12 @@ class MakeControllerCommandTest extends TestCase
         $this->assertStringContainsString('class UserValidate extends Validate', $validate);
     }
 
-    public function test_make_controller_accepts_controller_suffix(): void
+    public function test_make_rest_accepts_controller_suffix(): void
     {
         $app     = $this->createApp();
         $console = $app->container->get(\Lychee\console\Application::class);
 
-        $code = $console->run(new Input(['make:controller', 'PostController']), new Output());
+        $code = $console->run(new Input(['make:rest', 'PostController']), new Output());
 
         $this->assertSame(0, $code);
         $this->assertFileExists($this->tempDir . '/app/controller/PostController.php');
@@ -98,12 +98,12 @@ class MakeControllerCommandTest extends TestCase
         $this->assertFileExists($this->tempDir . '/app/validate/PostValidate.php');
     }
 
-    public function test_make_controller_capitalizes_first_letter(): void
+    public function test_make_rest_capitalizes_first_letter(): void
     {
         $app     = $this->createApp();
         $console = $app->container->get(\Lychee\console\Application::class);
 
-        $code = $console->run(new Input(['make:controller', 'user']), new Output());
+        $code = $console->run(new Input(['make:rest', 'user']), new Output());
 
         $this->assertSame(0, $code);
         $this->assertFileExists($this->tempDir . '/app/controller/UserController.php');
@@ -115,7 +115,7 @@ class MakeControllerCommandTest extends TestCase
         $this->assertStringContainsString("#[Resource('/user')]", $controller);
     }
 
-    public function test_make_controller_fails_when_controller_exists(): void
+    public function test_make_rest_fails_when_controller_exists(): void
     {
         $app     = $this->createApp();
         $console = $app->container->get(\Lychee\console\Application::class);
@@ -123,12 +123,12 @@ class MakeControllerCommandTest extends TestCase
         mkdir($this->tempDir . '/app/controller', 0777, true);
         file_put_contents($this->tempDir . '/app/controller/UserController.php', '<?php');
 
-        $code = $console->run(new Input(['make:controller', 'User']), new Output());
+        $code = $console->run(new Input(['make:rest', 'User']), new Output());
 
         $this->assertSame(1, $code);
     }
 
-    public function test_make_controller_skips_existing_model_and_validate(): void
+    public function test_make_rest_skips_existing_model_and_validate(): void
     {
         $app     = $this->createApp();
         $console = $app->container->get(\Lychee\console\Application::class);
@@ -139,7 +139,7 @@ class MakeControllerCommandTest extends TestCase
         file_put_contents($this->tempDir . '/app/model/User.php', '<?php // existing model');
         file_put_contents($this->tempDir . '/app/validate/UserValidate.php', '<?php // existing validate');
 
-        $code = $console->run(new Input(['make:controller', 'User']), new Output());
+        $code = $console->run(new Input(['make:rest', 'User']), new Output());
 
         $this->assertSame(0, $code);
 
@@ -151,12 +151,12 @@ class MakeControllerCommandTest extends TestCase
         $this->assertSame('<?php // existing validate', file_get_contents($this->tempDir . '/app/validate/UserValidate.php'));
     }
 
-    public function test_make_controller_rejects_invalid_name(): void
+    public function test_make_rest_rejects_invalid_name(): void
     {
         $app     = $this->createApp();
         $console = $app->container->get(\Lychee\console\Application::class);
 
-        $code = $console->run(new Input(['make:controller', '123Invalid']), new Output());
+        $code = $console->run(new Input(['make:rest', '123Invalid']), new Output());
 
         $this->assertSame(1, $code);
     }
