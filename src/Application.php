@@ -87,9 +87,9 @@ class Application
         $config = $this->container->get('config');
 
         $modules = [
+            'log'        => $this->bootLog(...),
             'database'   => $this->bootOrm(...),
             'cache'      => $this->bootCache(...),
-            'log'        => $this->bootLog(...),
             'filesystem' => $this->bootFilesystem(...),
             'satoken'    => $this->bootSaToken(...),
             'cron'       => $this->bootCron(...),
@@ -234,6 +234,35 @@ class Application
         $dbManager = new DbManager();
         $dbManager->setConfig($dbConfig);
         ThinkModel::setDb($dbManager);
+
+        // 接入 SQL 日志：当日志模块已启动时，将 ORM 的 SQL 监听输出到日志通道。
+        // 优先使用 'sql' 频道（用户可在 config/log.php 中单独配置），否则回退到默认频道。
+        // DbManager::log() 传入的类型为 'sql'，非 PSR-3 标准级别，
+        // 故用 Closure 适配为 debug 级别，避免被级别过滤。
+        if ($this->container->bound(LogManager::class)) {
+            $logManager = $this->container->get(LogManager::class);
+            $channels   = $logManager->getConfig('channels', []);
+            $channel    = array_key_exists('sql', $channels) ? 'sql' : null;
+            $logger     = $logManager->channel($channel);
+
+            $dbManager->setLog(static function (string $type, string $message) use ($logger): void {
+                $logger->debug($message);
+            });
+        }
+
+        // 全局时间字段配置：think-orm 原生支持 auto_timestamp 与 datetime_format，
+        // 但不支持 datetime_field 全局配置。这里通过 Model::maker() 闭包，
+        // 将 'create_time,update_time' 格式的配置应用到所有模型实例。
+        $datetimeField = (string) $dbConfig['datetime_field'] ?? '';
+        if ($datetimeField !== '') {
+            $parts = array_map('trim', explode(',', $datetimeField));
+            if (count($parts) >= 2) {
+                [$createTime, $updateTime] = $parts;
+                ThinkModel::maker(static function ($model) use ($createTime, $updateTime): void {
+                    $model->setTimeField($createTime, $updateTime);
+                });
+            }
+        }
 
         $this->container->instance('db', $dbManager);
         $this->container->instance(DbManager::class, $dbManager);
