@@ -57,7 +57,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-                "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
             background: var(--bg);
             color: var(--text);
             line-height: 1.6;
@@ -149,30 +149,27 @@
 
         @media (max-width: 600px) {
             body { padding: 12px; }
-            .card { max-height: calc(100vh - 24px); display: flex; flex-direction: column; }
-            .card__head, .card__foot { flex-shrink: 0; }
             .card__head, .card__body { padding-left: 20px; padding-right: 20px; }
-            .card__body { flex: 1; display: flex; flex-direction: column; justify-content: center; padding-top: 20px; padding-bottom: 20px; }
             .status { font-size: 36px; }
             .message { font-size: 16px; }
         }
     </style>
 </head>
 <body>
-    <main class="card">
-        <header class="card__head">
-            <div class="logo" aria-hidden="true">
-                {% if logo %}<img src="{{ logo }}" alt="Lychee PHP">{% endif %}
-            </div>
-            <div class="head__title">页面错误</div>
-        </header>
+<main class="card">
+    <header class="card__head">
+        <div class="logo" aria-hidden="true">
+            {% if logo %}<img src="{{ logo }}" alt="Lychee PHP">{% endif %}
+        </div>
+        <div class="head__title">页面错误</div>
+    </header>
 
-        <section class="card__body">
-            <div class="status">{{ status }}</div>
-            <p class="message">{{ message|e }}</p>
-        </section><footer class="card__foot">
-            Lychee PHP <span class="dot">●</span>
-        </footer>
-    </main>
+    <section class="card__body">
+        <div class="status">{{ status }}</div>
+        <p class="message">{{ message|e }}</p>
+    </section><footer class="card__foot">
+        Lychee PHP <span class="dot">●</span>
+    </footer>
+</main>
 </body>
 </html>
