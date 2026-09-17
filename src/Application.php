@@ -416,9 +416,9 @@ class Application
         $config   = $this->container->get('config');
         $dbConfig = $config->get('database', []);
 
-        $default     = $dbConfig['default'] ?? 'mysql';
+        $default     = $dbConfig['default']     ?? 'mysql';
         $connections = $dbConfig['connections'] ?? [];
-        $connection  = $connections[$default] ?? [];
+        $connection  = $connections[$default]   ?? [];
 
         return (string) ($connection['prefix'] ?? '');
     }
