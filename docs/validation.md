@@ -88,7 +88,7 @@ class User extends Validate
 调用：
 
 ```php
-$validate = new \app\validate\User();
+$validate = new \App\validate\User();
 
 if (!$validate->check($data)) {
     throw new ValidateException((array) $validate->getError(true));
@@ -152,7 +152,7 @@ class User extends Validate
 }
 
 // 调用时指定场景
-$validate = new \app\validate\User();
+$validate = new \App\validate\User();
 $validate->scene('edit')->check($data);
 ```
 
