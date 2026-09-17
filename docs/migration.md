@@ -58,10 +58,10 @@ class CreateUsersTable extends Migration
 $table = $this->table('table_name');
 
 // 字段
-$table->addColumn('name', 'varchar', ['length' => 100]);
+$table->addColumn('name', 'string', ['length' => 100]);
 $table->addColumn('age', 'integer', ['unsigned' => true]);
-$table->addColumn('price', 'decimal', ['precision' => 10, 'scale' => 2]);
-$table->addColumn('status', 'boolean');
+$table->addColumn('price', 'decimal', ['precision' => 10, 'scale' => 2]); // 默认为10位数字，2位小数
+$table->addColumn('status', 'boolean', ['default' => 0]); // 默认值为0
 $table->addColumn('content', 'text');
 $table->addColumn('data', 'json');
 
@@ -107,4 +107,4 @@ class UserSeeder extends Seeder
 
 ## 数据库连接
 
-优先使用 `config/database.php` 配置的数据库；不可用时兜底到 SQLite（`runtime/migration.sqlite`）。
+使用 `config/database.php` 中默认连接配置的数据库。若数据库未配置或连接失败，迁移命令会提示 `Database connection is not available. Please configure database first`。

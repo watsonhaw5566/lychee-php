@@ -23,6 +23,7 @@ class MigrationManager
         private readonly PDO $pdo,
         private readonly string $migrationPath,
         private readonly string $seederPath,
+        private readonly string $prefix = '',
     ) {
     }
 
@@ -57,9 +58,13 @@ class MigrationManager
                 $this->pdo->beginTransaction();
                 $instance->up();
                 $this->recordMigration((string) $version, $migration['name']);
-                $this->pdo->commit();
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->commit();
+                }
             } catch (Throwable $e) {
-                $this->pdo->rollBack();
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->rollBack();
+                }
 
                 throw new RuntimeException(
                     "Migration {$migration['name']} failed: {$e->getMessage()}",
@@ -111,9 +116,13 @@ class MigrationManager
                 $this->pdo->beginTransaction();
                 $instance->down();
                 $this->deleteMigration((string) $version);
-                $this->pdo->commit();
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->commit();
+                }
             } catch (Throwable $e) {
-                $this->pdo->rollBack();
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->rollBack();
+                }
 
                 throw new RuntimeException(
                     "Rollback of {$migration['name']} failed: {$e->getMessage()}",
@@ -156,14 +165,18 @@ class MigrationManager
             }
 
             /** @var Seeder $instance */
-            $instance = new $seeder['class']($this->pdo);
+            $instance = new $seeder['class']($this->pdo, $this->prefix);
 
             try {
                 $this->pdo->beginTransaction();
                 $instance->run();
-                $this->pdo->commit();
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->commit();
+                }
             } catch (Throwable $e) {
-                $this->pdo->rollBack();
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->rollBack();
+                }
 
                 throw new RuntimeException(
                     "Seeder {$seeder['name']} failed: {$e->getMessage()}",
@@ -252,7 +265,7 @@ class MigrationManager
         }
 
         /** @var Migration $instance */
-        $instance = new $class($this->pdo);
+        $instance = new $class($this->pdo, $this->prefix);
 
         if (!$instance instanceof Migration) {
             throw new InvalidArgumentException(

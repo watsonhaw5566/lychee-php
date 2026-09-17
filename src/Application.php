@@ -350,13 +350,15 @@ class Application
         $migrationPath = $this->basePath . '/database/migrations';
         $seederPath    = $this->basePath . '/database/seeders';
 
-        $pdo = $this->resolveMigrationPdo();
+        $pdo    = $this->resolveMigrationPdo();
+        $prefix = $this->resolveMigrationPrefix();
 
         if ($pdo instanceof PDO) {
             $manager = new MigrationManager(
                 pdo: $pdo,
                 migrationPath: $migrationPath,
                 seederPath: $seederPath,
+                prefix: $prefix,
             );
 
             $this->container->instance(MigrationManager::class, $manager);
@@ -375,44 +377,50 @@ class Application
     /**
      * 解析迁移模块使用的 PDO 连接。
      *
-     * 优先使用用户配置的数据库；连接失败时兜底到 SQLite；
-     * 若 SQLite 扩展不可用则返回 null。
+     * 仅使用用户配置的数据库；若未配置数据库或连接失败则返回 null，
+     * 由迁移命令提示用户先配置数据库连接。
      */
     private function resolveMigrationPdo(): ?PDO
     {
-        // 优先使用用户配置的数据库
-        if ($this->container->bound('db')) {
-            /** @var DbManager $dbManager */
-            $dbManager = $this->container->get('db');
-
-            try {
-                /** @var \think\db\PDOConnection $connection */
-                $connection = $dbManager->connect();
-                $pdo        = $connection->getPdo();
-
-                if ($pdo instanceof PDO) {
-                    return $pdo;
-                }
-            } catch (Throwable) {
-                // 配置的数据库不可用，尝试兜底到 SQLite
-            }
-        }
-
-        // 兜底：使用 SQLite 文件数据库
-        if (!extension_loaded('pdo_sqlite')) {
+        if (!$this->container->bound('db')) {
             return null;
         }
 
-        $sqliteDir = $this->container->runtimePath;
-        if (!is_dir($sqliteDir)) {
-            @mkdir($sqliteDir, 0777, true);
-        }
+        /** @var DbManager $dbManager */
+        $dbManager = $this->container->get('db');
 
         try {
-            return new PDO('sqlite:' . $sqliteDir . 'migration.sqlite');
+            /** @var \think\db\PDOConnection $connection */
+            $connection = $dbManager->connect();
+            // connect() 会主动建立连接并返回 PDO；连接失败时抛出异常
+            $pdo = $connection->connect();
+
+            return $pdo instanceof PDO ? $pdo : null;
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /**
+     * 解析迁移模块使用的表前缀。
+     *
+     * 从数据库配置中读取默认连接的 prefix 字段。
+     */
+    private function resolveMigrationPrefix(): string
+    {
+        if (!$this->container->bound('config')) {
+            return '';
+        }
+
+        /** @var Config $config */
+        $config   = $this->container->get('config');
+        $dbConfig = $config->get('database', []);
+
+        $default     = $dbConfig['default']     ?? 'mysql';
+        $connections = $dbConfig['connections'] ?? [];
+        $connection  = $connections[$default]   ?? [];
+
+        return (string) ($connection['prefix'] ?? '');
     }
 
     private function bootView(): void

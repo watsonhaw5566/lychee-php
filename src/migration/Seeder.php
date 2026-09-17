@@ -15,6 +15,7 @@ abstract class Seeder
 {
     public function __construct(
         protected readonly PDO $pdo,
+        protected readonly string $prefix = '',
     ) {
     }
 
@@ -35,7 +36,7 @@ abstract class Seeder
 
         $sql = sprintf(
             'INSERT INTO `%s` (`%s`) VALUES (%s)',
-            $table,
+            $this->prefix . $table,
             implode('`, `', $columns),
             implode(', ', $placeholders)
         );
@@ -61,7 +62,7 @@ abstract class Seeder
 
         $sql = sprintf(
             'INSERT INTO `%s` (`%s`) VALUES %s',
-            $table,
+            $this->prefix . $table,
             implode('`, `', $columns),
             $allPlaceholders
         );
@@ -82,7 +83,7 @@ abstract class Seeder
      */
     protected function truncate(string $table): void
     {
-        $this->pdo->exec("TRUNCATE TABLE `{$table}`");
+        $this->pdo->exec("TRUNCATE TABLE `{$this->prefix}{$table}`");
     }
 
     /**
