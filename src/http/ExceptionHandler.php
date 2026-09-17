@@ -37,7 +37,8 @@ class ExceptionHandler
     /**
      * 记录异常信息（日志）。
      *
-     * 子类可覆盖此方法实现自定义日志逻辑，例如上报到监控平台。
+     * 仅记录异常类、文件与行号，不写入完整堆栈（避免日志过长）。
+     * 需要堆栈时可在子类覆盖 report() 自行追加。
      */
     public function report(Throwable $e): void
     {
@@ -46,7 +47,6 @@ class ExceptionHandler
                 'exception' => $e::class,
                 'file'      => $e->getFile(),
                 'line'      => $e->getLine(),
-                'trace'     => $e->getTraceAsString(),
             ]);
         }
     }
