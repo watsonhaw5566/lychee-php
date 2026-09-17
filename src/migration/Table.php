@@ -38,6 +38,7 @@ class Table
         private readonly string $name,
         private readonly PDO    $pdo,
         array                   $options = [],
+        private readonly string $prefix = '',
     ) {
         $this->driverName = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
         $this->options    = array_merge($this->options, $options);
@@ -94,7 +95,7 @@ class Table
             }
         }
 
-        $sql = sprintf('CREATE TABLE IF NOT EXISTS `%s` (%s)', $this->name, implode(', ', $columns));
+        $sql = sprintf('CREATE TABLE IF NOT EXISTS `%s` (%s)', $this->getTableName(), implode(', ', $columns));
 
         if (!$this->isSqlite()) {
             $sql .= sprintf(
@@ -121,7 +122,7 @@ class Table
      */
     public function drop(): void
     {
-        $this->pdo->exec("DROP TABLE IF EXISTS `{$this->name}`");
+        $this->pdo->exec("DROP TABLE IF EXISTS `{$this->getTableName()}`");
     }
 
     /**
@@ -139,7 +140,7 @@ class Table
             );
         }
 
-        $stmt->execute([$this->name]);
+        $stmt->execute([$this->getTableName()]);
 
         return (int)$stmt->fetchColumn() > 0;
     }
@@ -314,7 +315,7 @@ class Table
             return;
         }
 
-        $this->pdo->exec(sprintf('ALTER TABLE `%s` %s', $this->name, implode(', ', $parts)));
+        $this->pdo->exec(sprintf('ALTER TABLE `%s` %s', $this->getTableName(), implode(', ', $parts)));
     }
 
     /**
@@ -339,8 +340,8 @@ class Table
         } else {
             foreach ($this->pendingChanges as $change) {
                 match ($change['type']) {
-                    'drop'       => $this->pdo->exec(sprintf('ALTER TABLE `%s` DROP COLUMN `%s`', $this->name, $change['name'])),
-                    'rename'     => $this->pdo->exec(sprintf('ALTER TABLE `%s` RENAME COLUMN `%s` TO `%s`', $this->name, $change['from'], $change['to'])),
+                    'drop'       => $this->pdo->exec(sprintf('ALTER TABLE `%s` DROP COLUMN `%s`', $this->getTableName(), $change['name'])),
+                    'rename'     => $this->pdo->exec(sprintf('ALTER TABLE `%s` RENAME COLUMN `%s` TO `%s`', $this->getTableName(), $change['from'], $change['to'])),
                     'drop_index' => $this->pdo->exec(sprintf('DROP INDEX IF EXISTS `%s`', $change['name'])),
                     default      => null,
                 };
@@ -349,7 +350,7 @@ class Table
             foreach ($this->columns as $col) {
                 $this->pdo->exec(sprintf(
                     'ALTER TABLE `%s` ADD COLUMN %s',
-                    $this->name,
+                    $this->getTableName(),
                     $this->buildColumnDefinition($col['name'], $col['type'], $col['options'])
                 ));
             }
@@ -365,7 +366,8 @@ class Table
      */
     private function recreateTableForSqlite(): void
     {
-        $stmt        = $this->pdo->query(sprintf('PRAGMA table_info(`%s`)', $this->name));
+        $tableName   = $this->getTableName();
+        $stmt        = $this->pdo->query(sprintf('PRAGMA table_info(`%s`)', $tableName));
         $currentCols = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
         // 收集各类挂起变更
@@ -418,7 +420,7 @@ class Table
             $newColumns[] = $this->buildColumnDefinition($col['name'], $col['type'], $col['options']);
         }
 
-        $tempName = $this->name . '_temp_' . time();
+        $tempName = $tableName . '_temp_' . time();
 
         $this->pdo->exec(sprintf('CREATE TABLE `%s` (%s)', $tempName, implode(', ', $newColumns)));
         $this->pdo->exec(sprintf(
@@ -426,10 +428,10 @@ class Table
             $tempName,
             implode(', ', $targetColumns),
             implode(', ', $sourceColumns),
-            $this->name
+            $tableName
         ));
-        $this->pdo->exec(sprintf('DROP TABLE `%s`', $this->name));
-        $this->pdo->exec(sprintf('ALTER TABLE `%s` RENAME TO `%s`', $tempName, $this->name));
+        $this->pdo->exec(sprintf('DROP TABLE `%s`', $tableName));
+        $this->pdo->exec(sprintf('ALTER TABLE `%s` RENAME TO `%s`', $tempName, $tableName));
     }
 
     /**
@@ -452,7 +454,7 @@ class Table
             $unique,
             $ifNotExists,
             $name,
-            $this->name,
+            $this->getTableName(),
             $cols
         ));
     }
@@ -581,5 +583,13 @@ class Table
     private function isSqlite(): bool
     {
         return $this->driverName === 'sqlite';
+    }
+
+    /**
+     * 获取带前缀的表名。
+     */
+    private function getTableName(): string
+    {
+        return $this->prefix . $this->name;
     }
 }

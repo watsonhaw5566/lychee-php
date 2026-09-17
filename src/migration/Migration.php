@@ -15,6 +15,7 @@ abstract class Migration
 {
     public function __construct(
         protected readonly PDO $pdo,
+        protected readonly string $prefix = '',
     ) {
     }
 
@@ -35,7 +36,7 @@ abstract class Migration
      */
     protected function table(string $name, array $options = []): Table
     {
-        return new Table($name, $this->pdo, $options);
+        return new Table($name, $this->pdo, $options, $this->prefix);
     }
 
     /**

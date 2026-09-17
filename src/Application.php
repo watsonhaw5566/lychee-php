@@ -350,13 +350,15 @@ class Application
         $migrationPath = $this->basePath . '/database/migrations';
         $seederPath    = $this->basePath . '/database/seeders';
 
-        $pdo = $this->resolveMigrationPdo();
+        $pdo    = $this->resolveMigrationPdo();
+        $prefix = $this->resolveMigrationPrefix();
 
         if ($pdo instanceof PDO) {
             $manager = new MigrationManager(
                 pdo: $pdo,
                 migrationPath: $migrationPath,
                 seederPath: $seederPath,
+                prefix: $prefix,
             );
 
             $this->container->instance(MigrationManager::class, $manager);
@@ -397,6 +399,28 @@ class Application
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /**
+     * 解析迁移模块使用的表前缀。
+     *
+     * 从数据库配置中读取默认连接的 prefix 字段。
+     */
+    private function resolveMigrationPrefix(): string
+    {
+        if (!$this->container->bound('config')) {
+            return '';
+        }
+
+        /** @var Config $config */
+        $config   = $this->container->get('config');
+        $dbConfig = $config->get('database', []);
+
+        $default     = $dbConfig['default'] ?? 'mysql';
+        $connections = $dbConfig['connections'] ?? [];
+        $connection  = $connections[$default] ?? [];
+
+        return (string) ($connection['prefix'] ?? '');
     }
 
     private function bootView(): void

@@ -23,6 +23,7 @@ class MigrationManager
         private readonly PDO $pdo,
         private readonly string $migrationPath,
         private readonly string $seederPath,
+        private readonly string $prefix = '',
     ) {
     }
 
@@ -164,7 +165,7 @@ class MigrationManager
             }
 
             /** @var Seeder $instance */
-            $instance = new $seeder['class']($this->pdo);
+            $instance = new $seeder['class']($this->pdo, $this->prefix);
 
             try {
                 $this->pdo->beginTransaction();
@@ -264,7 +265,7 @@ class MigrationManager
         }
 
         /** @var Migration $instance */
-        $instance = new $class($this->pdo);
+        $instance = new $class($this->pdo, $this->prefix);
 
         if (!$instance instanceof Migration) {
             throw new InvalidArgumentException(
