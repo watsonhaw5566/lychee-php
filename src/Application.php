@@ -358,11 +358,21 @@ class Application
      *
      * 通过 think\Validate::maker() 注册构造钩子，使所有 Validate 实例
      * （包括全局 validate() 函数创建的）默认使用内置中文提示。
+     *
+     * 可通过 config/app.php 的 validate_lang 配置切换：
+     * - 'zh'（默认，不配置即为中文）：中文提示
+     * - 'en'：英文提示（think-validate 默认）
      */
     private function bootValidateLang(): void
     {
-        Validate::maker(function (Validate $v): void {
-            $v->useZh();
+        /** @var Config $config */
+        $config = $this->container->get('config');
+        $lang   = strtolower((string) $config->get('app.validate_lang', 'zh'));
+
+        Validate::maker(function (Validate $v) use ($lang): void {
+            if ($lang === 'zh') {
+                $v->useZh();
+            }
         });
     }
 
