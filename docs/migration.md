@@ -21,7 +21,7 @@ php lee seed:run                      # 执行所有 Seeder
 php lee seed:create UserSeeder        # 创建 Seeder 模板文件
 ```
 
-`migrate:create` 会自动生成 `YYYYMMDDHHMMSS_名称.php` 格式的文件名，并根据名称推导类名（`create_users_table` → `CreateUsersTable`）。`seed:create` 则直接以传入名称作为文件名与类名。
+`migrate:create` 会自动生成 `YYYYMMDDHHMMSS_名称.php` 格式的文件名，并根据名称推导类名（`create_users_table` → `CreateUsersTableMigration`）。`seed:create` 会自动追加 `Seeder` 后缀生成文件名与类名（`User` → `UserSeeder.php` / `UserSeeder`）。
 
 ## 编写迁移
 
@@ -33,7 +33,7 @@ php lee seed:create UserSeeder        # 创建 Seeder 模板文件
 
 use Lychee\migration\Migration;
 
-class CreateUsersTable extends Migration
+class CreateUsersTableMigration extends Migration
 {
     public function up(): void
     {

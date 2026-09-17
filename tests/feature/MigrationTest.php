@@ -31,8 +31,8 @@ class MigrationTest extends TestCase
 
     public function test_get_migrations_discovers_php_files(): void
     {
-        $this->createMigrationFile('20240101000000_create_users_table.php', 'CreateUsersTable');
-        $this->createMigrationFile('20240102000000_create_posts_table.php', 'CreatePostsTable');
+        $this->createMigrationFile('20240101000000_create_users_table.php', 'CreateUsersTableMigration');
+        $this->createMigrationFile('20240102000000_create_posts_table.php', 'CreatePostsTableMigration');
 
         $pdo     = $this->createMock(PDO::class);
         $manager = new MigrationManager($pdo, $this->migrationPath, $this->seederPath);
@@ -42,8 +42,8 @@ class MigrationTest extends TestCase
         $this->assertCount(2, $migrations);
         $this->assertArrayHasKey('20240101000000', $migrations);
         $this->assertArrayHasKey('20240102000000', $migrations);
-        $this->assertSame('CreateUsersTable', $migrations['20240101000000']['class']);
-        $this->assertSame('CreatePostsTable', $migrations['20240102000000']['class']);
+        $this->assertSame('CreateUsersTableMigration', $migrations['20240101000000']['class']);
+        $this->assertSame('CreatePostsTableMigration', $migrations['20240102000000']['class']);
     }
 
     public function test_get_migrations_ignores_non_standard_files(): void
