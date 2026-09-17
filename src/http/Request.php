@@ -15,6 +15,16 @@ class Request
     /** 当前登录用户 ID（由认证中间件设置） */
     private ?int $loginId = null;
 
+    /** @var array<string, UploadedFile|UploadedFile[]> */
+    private array $files;
+
+    /**
+     * @param array<string, mixed>               $query
+     * @param array<string, mixed>               $body
+     * @param array<string, string>              $headers
+     * @param array<string, string>              $cookies
+     * @param array<string, UploadedFile|UploadedFile[]> $files
+     */
     public function __construct(
         public readonly string $method,
         public readonly string $path,
@@ -25,7 +35,9 @@ class Request
         public readonly string $rawBody = '',
         public readonly string $ip = '',
         public readonly string $scheme = 'http',
+        array $files = [],
     ) {
+        $this->files = $files;
     }
 
     public static function capture(): self
@@ -51,6 +63,7 @@ class Request
             rawBody: $rawBody,
             ip: self::resolveIp($headers),
             scheme: self::resolveScheme($headers),
+            files: self::normalizeFiles($_FILES),
         );
     }
 
@@ -203,6 +216,31 @@ class Request
     public function has(string $name): bool
     {
         return array_key_exists($name, array_merge($this->query, $this->body, $this->routeParams));
+    }
+
+    // ── 上传文件 ────────────────────────────────────────────────────
+
+    /**
+     * 获取上传文件。
+     *
+     * @param  string|null $name 字段名，为 null 时返回全部上传文件
+     * @return UploadedFile|UploadedFile[]|null
+     */
+    public function file(?string $name = null): UploadedFile|array|null
+    {
+        if ($name === null) {
+            return $this->files;
+        }
+
+        return $this->files[$name] ?? null;
+    }
+
+    /**
+     * 判断是否存在指定上传文件。
+     */
+    public function hasFile(string $name): bool
+    {
+        return isset($this->files[$name]);
     }
 
     public function header(string $key, ?string $default = null): ?string
@@ -361,5 +399,42 @@ class Request
         }
 
         return $_POST;
+    }
+
+    /**
+     * 将 $_FILES 规范化为 UploadedFile 实例结构。
+     *
+     * PHP 的 $_FILES 在多文件同名字段下结构较为特殊：
+     *   ['name' => ['a.jpg', 'b.jpg'], 'tmp_name' => [...], ...]
+     * 本方法将其统一为：
+     *   ['field' => [UploadedFile, UploadedFile]]   （多文件）
+     *   ['field' => UploadedFile]                  （单文件）
+     *
+     * @param  array<string, array> $raw $_FILES 原始结构
+     * @return array<string, UploadedFile|UploadedFile[]>
+     */
+    private static function normalizeFiles(array $raw): array
+    {
+        $files = [];
+
+        foreach ($raw as $field => $info) {
+            if (!is_array($info['name'] ?? null)) {
+                $files[$field] = UploadedFile::create($info);
+                continue;
+            }
+
+            $files[$field] = [];
+            foreach ($info['name'] as $i => $name) {
+                $files[$field][] = UploadedFile::create([
+                    'name'     => $name,
+                    'type'     => $info['type'][$i],
+                    'tmp_name' => $info['tmp_name'][$i],
+                    'error'    => $info['error'][$i],
+                    'size'     => $info['size'][$i],
+                ]);
+            }
+        }
+
+        return $files;
     }
 }

@@ -41,6 +41,44 @@ $host   = $request->host();     // example.com:8080
 $domain = $request->domain();   // https://example.com:8080
 ```
 
+## 文件上传 Upload
+
+`Request` 仅负责读取上传文件的信息，文件的存储由 `filesystem` 模块处理（见 [文件系统](filesystem.md#上传文件)）。
+
+```php
+use Lychee\http\UploadedFile;
+
+$request = request();
+
+// 判断是否有上传文件
+if ($request->hasFile('avatar')) {
+    $file = $request->file('avatar');
+
+    // 文件元信息
+    $file->getOriginalName(); // 原始文件名，如 photo.jpg
+    $file->extension();       // 扩展名，如 jpg
+    $file->getSize();         // 文件大小（字节）
+    $file->getMimeType();     // MIME 类型
+    $file->getTempName();     // 服务器临时路径
+    $file->isValid();         // 上传是否成功
+    $file->getContent();      // 文件内容字符串
+
+    // 交给 filesystem 模块存储
+    $path = storage()->putFile('uploads/avatar', $file);
+}
+
+// 多文件上传（同一字段名，如 <input type="file" name="photos[]" multiple>）
+$photos = $request->file('photos'); // 返回 UploadedFile[] 数组
+foreach ($photos as $photo) {
+    storage()->putFile('uploads/photos', $photo);
+}
+
+// 获取全部上传文件
+$all = $request->file();
+```
+
+前端表单需设置 `enctype="multipart/form-data"`。
+
 ## 响应 Response
 
 ```php
