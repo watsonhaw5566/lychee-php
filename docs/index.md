@@ -26,7 +26,7 @@ features:
   - title: 模板引擎
     details: 内置 Twig 模板引擎，支持继承、宏、过滤器
   - title: 数据迁移
-    details: 内置迁移与数据填充，支持 SQLite 兜底
+    details: 内置轻量级的迁移与数据填充
   - title: 丰富生态
     details: 队列、定时任务、会话、认证、文件系统、缓存、日志
 ---
