@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Lychee\routing;
 
-use Lychee\container\Container;
+use Lychee\http\Controller;
 use Lychee\http\JsonResponse;
-use Lychee\http\Request;
 use ReflectionClass;
 use think\db\Query;
 use think\exception\ValidateException;
@@ -17,8 +16,7 @@ use Throwable;
 use ReflectionException;
 
 /**
- * 资源控制器：提供请求注入、initialize 生命周期、统一响应、验证快捷方式，
- * 以及基于模型类的零代码 CRUD（base* 方法）。
+ * 资源控制器：基于模型类的零代码 CRUD（base* 方法）。
  *
  * 配合 #[Resource] 路由注解使用，子类只需声明 $model / $validate。
  *
@@ -27,13 +25,10 @@ use ReflectionException;
  *   - 查询条件支持后缀 DSL：_like / _range / _between / _in
  *   - use HasDataPermission 可开启数据权限过滤
  *
- * 不需要 CRUD 的控制器无需继承此类，可直接使用全局助手 success()/fail()/json()。
+ * 不需要 CRUD 的控制器请继承 {@see \Lychee\http\Controller}。
  */
-abstract class ResourceController
+abstract class ResourceController extends Controller
 {
-    protected Container $app;
-    protected Request $request;
-
     /** 是否批量验证 */
     protected bool $batchValidate = false;
 
@@ -49,43 +44,7 @@ abstract class ResourceController
     /** 数据不存在时的提示信息 */
     protected string $notExistMessage = '数据不存在';
 
-    final public function __construct(Container $container)
-    {
-        $this->app     = $container;
-        $this->request = $container->get(Request::class);
-    }
-
-    /**
-     * 控制器初始化钩子。
-     *
-     * 由 Kernel 在中间件执行完毕后、方法调用前调用。
-     * 子类覆盖此方法做初始化，无需调用 parent。
-     */
-    protected function initialize(): void
-    {
-    }
-
     // ── 统一 JSON 响应（格式可被子类覆盖）──────────────────────────
-
-    protected function success(mixed $data = null, string $msg = 'success', int $code = 200): JsonResponse
-    {
-        return new JsonResponse([
-            'errno' => 0,
-            'code'  => $code,
-            'msg'   => $msg,
-            'data'  => $data,
-        ], $code);
-    }
-
-    protected function fail(string $msg = 'fail', int $code = 400): JsonResponse
-    {
-        return new JsonResponse([
-            'errno' => 0,
-            'code'  => $code,
-            'msg'   => $msg,
-            'data'  => null,
-        ], $code);
-    }
 
     /**
      * 分页响应。

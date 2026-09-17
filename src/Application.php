@@ -160,6 +160,7 @@ class Application
             $console->addCommand(\Lychee\console\command\RunCommand::class);
             $console->addCommand(\Lychee\console\command\RouteListCommand::class);
             $console->addCommand(\Lychee\console\command\MakeRestCommand::class);
+            $console->addCommand(\Lychee\console\command\MakeBaseCommand::class);
 
             return $console;
         });
