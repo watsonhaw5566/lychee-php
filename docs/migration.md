@@ -58,10 +58,10 @@ class CreateUsersTable extends Migration
 $table = $this->table('table_name');
 
 // 字段
-$table->addColumn('name', 'varchar', ['length' => 100]);
+$table->addColumn('name', 'string', ['length' => 100]);
 $table->addColumn('age', 'integer', ['unsigned' => true]);
-$table->addColumn('price', 'decimal', ['precision' => 10, 'scale' => 2]);
-$table->addColumn('status', 'boolean');
+$table->addColumn('price', 'decimal', ['precision' => 10, 'scale' => 2]); // 默认为10位数字，2位小数
+$table->addColumn('status', 'boolean', ['default' => 0]); // 默认值为0
 $table->addColumn('content', 'text');
 $table->addColumn('data', 'json');
 
