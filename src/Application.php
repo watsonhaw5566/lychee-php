@@ -492,7 +492,7 @@ class Application
         }
 
         $debug        = (bool) config('app.debug', env('APP_DEBUG', false));
-        $errorMessage = (string) config('app.error_message', '页面错误！请稍后再试~');
+        $errorMessage = error_message();
         $showErrorMsg = (bool) config('app.show_error_msg', false);
 
         $e      = new ErrorException($error['message'], 0, $error['type'], $error['file'], $error['line']);

@@ -11,7 +11,7 @@ return [
     'default_timezone' => 'Asia/Shanghai',
 
     // 错误显示信息，非调试模式有效
-    'error_message'    => '页面错误！请稍后再试~',
+    'error_message'    => '页面错误，请稍后再试~',
 
     // 是否显示错误信息（非调试模式下是否暴露真实异常信息）
     'show_error_msg'   => false,
@@ -30,7 +30,45 @@ date_default_timezone_set((string) config('app.default_timezone', 'Asia/Shanghai
 
 ### error_message
 
-非调试模式下展示给用户的通用错误文案，同时作用于 HTML 页面与 JSON 响应的 `msg` 字段。默认值为 `页面错误,请稍后再试~`。
+非调试模式下展示给用户的通用错误文案，同时作用于 HTML 页面与 JSON 响应的 `msg` 字段。默认值为 `页面错误，请稍后再试~`。
+
+该配置支持多语言：当 i18n 模块已启用时，框架会将此配置值作为翻译键去查找翻译；若存在对应翻译则使用翻译值，否则原样返回该配置值。
+
+你可以直接硬编码中文字符串作为默认文案，也可以将其设为任意翻译键以支持多语言。
+
+#### 用法一：硬编码中文（默认）
+
+```php
+// config/app.php
+'error_message' => '页面错误，请稍后再试~',
+```
+
+不配置 i18n 时直接使用该文案；配置了 i18n 但找不到对应翻译时也原样返回。
+
+#### 用法二：使用翻译键支持多语言
+
+```php
+// config/app.php
+'error_message' => 'errors.server_error',
+```
+
+在各语言目录下创建对应的翻译文件：
+
+```php
+// app/lang/zh-CN/errors.php
+return [
+    'server_error' => '页面错误，请稍后再试~',
+];
+
+// app/lang/en/errors.php
+return [
+    'server_error' => 'Page error, please try again later~',
+];
+```
+
+请求会根据当前语言（由 `I18nMiddleware` 自动检测）返回对应翻译；若当前语言未定义该键，则回退到 `fallback_locale` 的翻译。
+
+详见 [国际化 i18n](./i18n)。
 
 ### show_error_msg
 

@@ -216,7 +216,7 @@ class Kernel
         }
 
         $debug        = (bool) config('app.debug', env('APP_DEBUG', false));
-        $errorMessage = (string) config('app.error_message', '页面错误,请稍后再试~');
+        $errorMessage = error_message();
         $showErrorMsg = (bool) config('app.show_error_msg', false);
 
         // 非调试模式下，show_error_msg 决定是否暴露真实异常信息

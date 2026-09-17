@@ -337,6 +337,33 @@ if (!function_exists('lang')) {
     }
 }
 
+if (!function_exists('error_message')) {
+    /**
+     * 获取通用错误提示文案，支持多语言。
+     *
+     * 将 config/app.php 中的 error_message 配置值作为 i18n 翻译键：
+     * - i18n 模块已启用且该键存在翻译时，返回对应语言的翻译；
+     * - 否则原样返回配置值（默认中文「页面错误，请稍后再试~」）。
+     *
+     * 因此用户可将 error_message 设为任意翻译键（如 'errors.server_error'），
+     * 也可直接硬编码中文字符串作为默认文案。
+     */
+    function error_message(): string
+    {
+        $message = (string) config('app.error_message', '页面错误，请稍后再试~');
+
+        if (app()->has('i18n')) {
+            /** @var \Lychee\i18n\I18n $i18n */
+            $i18n = app('i18n');
+
+            // lang() 在找不到翻译时返回键本身，因此中文默认值会原样返回
+            return $i18n->lang($message);
+        }
+
+        return $message;
+    }
+}
+
 if (!function_exists('view')) {
     /**
      * 渲染 Twig 模板。
