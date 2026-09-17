@@ -190,7 +190,6 @@ class Application
                 router: $c->get(Router::class),
                 container: $c,
                 pipeline: $c->get(MiddlewarePipeline::class),
-                validator: $c->get(Validate::class),
                 exceptionHandler: $c->get(ExceptionHandler::class),
             );
         });
