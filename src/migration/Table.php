@@ -33,8 +33,8 @@ class Table
 
     public function __construct(
         private readonly string $name,
-        private readonly PDO $pdo,
-        array $options = [],
+        private readonly PDO    $pdo,
+        array                   $options = [],
     ) {
         $this->options = array_merge($this->options, $options);
     }
@@ -58,7 +58,7 @@ class Table
         }
 
         if (!empty($this->options['primary_key'])) {
-            $pk        = (array) $this->options['primary_key'];
+            $pk        = (array)$this->options['primary_key'];
             $columns[] = 'PRIMARY KEY (' . implode(', ', array_map(fn ($c) => "`{$c}`", $pk)) . ')';
         }
 
@@ -75,7 +75,7 @@ class Table
         );
 
         if (!empty($this->options['comment'])) {
-            $sql .= " COMMENT='" . addslashes((string) $this->options['comment']) . "'";
+            $sql .= " COMMENT='" . addslashes((string)$this->options['comment']) . "'";
         }
 
         $this->pdo->exec($sql);
@@ -99,15 +99,15 @@ class Table
         );
         $stmt->execute([$this->name]);
 
-        return (int) $stmt->fetchColumn() > 0;
+        return (int)$stmt->fetchColumn() > 0;
     }
 
     /**
      * 添加列。
      *
-     * @param  string               $name
-     * @param  string               $type
-     * @param  array<string, mixed> $options
+     * @param string $name
+     * @param string $type
+     * @param array<string, mixed> $options
      */
     public function addColumn(string $name, string $type, array $options = []): static
     {
@@ -119,9 +119,9 @@ class Table
     /**
      * 修改列。
      *
-     * @param  string               $name
-     * @param  string               $type
-     * @param  array<string, mixed> $options
+     * @param string $name
+     * @param string $type
+     * @param array<string, mixed> $options
      */
     public function changeColumn(string $name, string $type, array $options = []): static
     {
@@ -153,13 +153,13 @@ class Table
     /**
      * 添加索引。
      *
-     * @param  array<int, string>|string $columns
-     * @param  array<string, mixed>      $options
+     * @param array<int, string>|string $columns
+     * @param array<string, mixed> $options
      */
     public function addIndex(array|string $columns, array $options = []): static
     {
         $this->indexes[] = [
-            'columns' => (array) $columns,
+            'columns' => (array)$columns,
             'options' => $options,
         ];
 
@@ -270,7 +270,7 @@ class Table
     }
 
     /**
-     * @param  array<string, mixed> $options
+     * @param array<string, mixed> $options
      */
     private function buildColumnDefinition(string $name, string $type, array $options): string
     {
@@ -289,12 +289,12 @@ class Table
 
         if (array_key_exists('default', $options)) {
             $default = $options['default'];
-            if (strtoupper((string) $default) === 'CURRENT_TIMESTAMP') {
+            if (strtoupper((string)$default) === 'CURRENT_TIMESTAMP') {
                 $def .= ' DEFAULT CURRENT_TIMESTAMP';
             } elseif ($default === null) {
                 $def .= ' DEFAULT NULL';
             } else {
-                $def .= " DEFAULT '" . addslashes((string) $default) . "'";
+                $def .= " DEFAULT '" . addslashes((string)$default) . "'";
             }
         }
 
@@ -303,10 +303,10 @@ class Table
         }
 
         if (!empty($options['comment'])) {
-            $def .= " COMMENT '" . addslashes((string) $options['comment']) . "'";
+            $def .= " COMMENT '" . addslashes((string)$options['comment']) . "'";
         }
 
-        if (!empty($options['update']) && strtoupper((string) $options['update']) === 'CURRENT_TIMESTAMP') {
+        if (!empty($options['update']) && strtoupper((string)$options['update']) === 'CURRENT_TIMESTAMP') {
             $def .= ' ON UPDATE CURRENT_TIMESTAMP';
         }
 
@@ -314,14 +314,14 @@ class Table
     }
 
     /**
-     * @param  array<string, mixed> $options
+     * @param array<string, mixed> $options
      */
     private function mapType(string $type, array $options): string
     {
         $length = $options['length'] ?? null;
 
         return match (strtolower($type)) {
-            'varchar'                  => 'VARCHAR(' . ($length ?? 255) . ')',
+            'string', 'varchar'        => 'VARCHAR(' . ($length ?? 255) . ')',
             'char'                     => 'CHAR(' . ($length ?? 255) . ')',
             'text'                     => 'TEXT',
             'mediumtext'               => 'MEDIUMTEXT',
@@ -339,7 +339,7 @@ class Table
             'timestamp'                => 'TIMESTAMP' . ($length ? "({$length})" : ''),
             'time'                     => 'TIME',
             'json'                     => 'JSON',
-            'enum'                     => "ENUM('" . implode("','", array_map('addslashes', (array) ($options['values'] ?? []))) . "')",
+            'enum'                     => "ENUM('" . implode("','", array_map('addslashes', (array)($options['values'] ?? []))) . "')",
             'binary'                   => 'BLOB',
             'uuid'                     => 'CHAR(36)',
             default                    => strtoupper($type),
@@ -347,14 +347,14 @@ class Table
     }
 
     /**
-     * @param  array<int, string>  $columns
-     * @param  array<string, mixed> $options
+     * @param array<int, string> $columns
+     * @param array<string, mixed> $options
      */
     private function buildIndexDefinition(array $columns, array $options): string
     {
         $cols = implode(', ', array_map(fn ($c) => "`{$c}`", $columns));
 
-        $type = strtoupper((string) ($options['type'] ?? 'INDEX'));
+        $type = strtoupper((string)($options['type'] ?? 'INDEX'));
 
         if ($type === 'PRIMARY') {
             return "PRIMARY KEY ({$cols})";
