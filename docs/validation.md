@@ -30,7 +30,7 @@ use think\Validate;
 
 public function save(Request $request): JsonResponse
 {
-    $data = $request->all();
+    $data = $request->param();
 
     $validate = new Validate();
     $validate->rule([

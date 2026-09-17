@@ -44,7 +44,7 @@ class UserController
 
     public function save(Request $request): JsonResponse
     {
-        $data = $request->all();
+        $data = $request->param();
 
         $validate = new Validate();
         $validate->rule([
@@ -82,7 +82,7 @@ class UserController
             return new JsonResponse(['message' => 'User not found.'], 404);
         }
 
-        $data = $request->all();
+        $data = $request->param();
         $user->save($data);
 
         return new JsonResponse(['data' => $user->refresh()]);
@@ -103,7 +103,7 @@ class UserController
 
     public function batch_delete(Request $request): JsonResponse
     {
-        $ids = (array) ($request->all()['ids'] ?? []);
+        $ids = (array) ($request->param()['ids'] ?? []);
 
         if (!empty($ids)) {
             $this->user->whereIn('id', $ids)->delete();

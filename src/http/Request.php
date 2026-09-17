@@ -61,25 +61,13 @@ class Request
      * @param mixed       $default 默认值
      * @return array<string, mixed>|mixed
      */
-    public function query(?string $key = null, mixed $default = null): mixed
+    public function get(?string $key = null, mixed $default = null): mixed
     {
         if ($key === null) {
             return $this->query;
         }
 
         return $this->query[$key] ?? $default;
-    }
-
-    /**
-     * 获取 GET 参数（query() 的别名）。
-     *
-     * @param string|null $key     参数名，为 null 时返回全部查询参数
-     * @param mixed       $default 默认值
-     * @return array<string, mixed>|mixed
-     */
-    public function get(?string $key = null, mixed $default = null): mixed
-    {
-        return $this->query($key, $default);
     }
 
     /**
@@ -191,13 +179,8 @@ class Request
         );
     }
 
-    public function all(): array
-    {
-        return array_merge($this->query, $this->body, $this->routeParams);
-    }
-
     /**
-     * 获取请求变量（兼容 ThinkPHP，合并 query / body / 路由参数）
+     * 获取请求变量（合并 query / body / 路由参数）
      *
      * @param  string|null $name    变量名，为 null 时返回全部
      * @param  mixed       $default 默认值
@@ -205,7 +188,7 @@ class Request
      */
     public function param(?string $name = null, mixed $default = null): mixed
     {
-        $data = $this->all();
+        $data = array_merge($this->query, $this->body, $this->routeParams);
 
         if (is_null($name)) {
             return $data;
@@ -219,7 +202,7 @@ class Request
      */
     public function has(string $name): bool
     {
-        return array_key_exists($name, $this->all());
+        return array_key_exists($name, array_merge($this->query, $this->body, $this->routeParams));
     }
 
     public function header(string $key, ?string $default = null): ?string

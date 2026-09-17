@@ -115,8 +115,8 @@ class Kernel
             return $this->castScalar($value, $type);
         }
 
-        if (array_key_exists($name, $request->all())) {
-            return $this->castScalar($request->all()[$name], $type);
+        if (array_key_exists($name, $request->param())) {
+            return $this->castScalar($request->param()[$name], $type);
         }
 
         if ($param->isDefaultValueAvailable()) {
@@ -147,7 +147,7 @@ class Kernel
         if ($constructor === null) {
             $dto = new $dtoClass();
         } else {
-            $data = array_merge($request->all(), $this->routeParamsArray($request));
+            $data = array_merge($request->param(), $this->routeParamsArray($request));
             $args = [];
             foreach ($constructor->getParameters() as $param) {
                 $name = $param->getName();
