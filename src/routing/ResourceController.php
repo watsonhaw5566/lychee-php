@@ -351,9 +351,9 @@ abstract class ResourceController
         array|string|null $order = null,
     ): JsonResponse {
         try {
-            $current  ??= (int) $this->request->param('current', 1);
-            $pageSize ??= (int) $this->request->param('pageSize', 20);
-            $order    ??= $this->request->param('order', ['create_time' => 'desc']);
+            $current  = (int) $this->request->param('current', 1);
+            $pageSize = (int) $this->request->param('pageSize', 20);
+            $order ??= $this->request->param('order', ['create_time' => 'desc']);
 
             $model = $this->getModel();
             $this->applyWhere($model, $where);
