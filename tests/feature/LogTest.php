@@ -138,4 +138,68 @@ class LogTest extends TestCase
 
         $this->assertStringContainsString('User 42 logged in from 127.0.0.1', $content);
     }
+
+    public function test_max_files_cleans_up_old_logs(): void
+    {
+        $logDir = sys_get_temp_dir() . '/lychee-test-maxfiles';
+
+        // 清理可能残留的测试目录
+        if (is_dir($logDir)) {
+            array_map('unlink', glob($logDir . '/*.log'));
+        } else {
+            mkdir($logDir, 0755, true);
+        }
+
+        // 手动创建 5 个旧日志文件（模拟不同日期）
+        for ($i = 0; $i < 5; $i++) {
+            $date = date('Y-m-d', strtotime("-{$i} days"));
+            file_put_contents($logDir . '/' . $date . '.log', "log content {$i}\n");
+        }
+
+        // 使用 max_files=2 的 File 驱动写入一条日志
+        $driver = new \Lychee\log\driver\File(['path' => $logDir, 'max_files' => 2]);
+        $driver->write("new log\n");
+
+        // 现在目录下应该只有 2 个日志文件（最近 2 天）
+        $remaining = glob($logDir . '/*.log');
+        $this->assertCount(2, $remaining);
+
+        // 最新的两个文件应保留
+        $dates = array_map(fn ($f) => basename($f, '.log'), $remaining);
+        sort($dates);
+        $this->assertEquals(date('Y-m-d'), end($dates));
+
+        // 清理测试目录
+        array_map('unlink', glob($logDir . '/*.log'));
+        rmdir($logDir);
+    }
+
+    public function test_max_files_zero_keeps_all_files(): void
+    {
+        $logDir = sys_get_temp_dir() . '/lychee-test-nolimit';
+
+        if (is_dir($logDir)) {
+            array_map('unlink', glob($logDir . '/*.log'));
+        } else {
+            mkdir($logDir, 0755, true);
+        }
+
+        // 创建 3 个旧日志文件
+        for ($i = 0; $i < 3; $i++) {
+            $date = date('Y-m-d', strtotime("-{$i} days"));
+            file_put_contents($logDir . '/' . $date . '.log', "log {$i}\n");
+        }
+
+        // max_files=0 表示不限制
+        $driver = new \Lychee\log\driver\File(['path' => $logDir, 'max_files' => 0]);
+        $driver->write("new log\n");
+
+        // 所有文件都应保留
+        $remaining = glob($logDir . '/*.log');
+        $this->assertCount(3, $remaining);
+
+        // 清理
+        array_map('unlink', glob($logDir . '/*.log'));
+        rmdir($logDir);
+    }
 }
