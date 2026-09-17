@@ -23,6 +23,7 @@ use League\Flysystem\UnableToRetrieveMetadata;
 use League\Flysystem\UnableToSetVisibility;
 use League\Flysystem\UnableToWriteFile;
 use League\Flysystem\Visibility;
+use Lychee\http\UploadedFile;
 use ReflectionObject;
 use RuntimeException;
 use Throwable;
@@ -205,7 +206,7 @@ abstract class Driver
         return $this->filesystem->lastModified($path);
     }
 
-    public function readStream(string $path): mixed
+    protected function readStream(string $path): mixed
     {
         try {
             return $this->filesystem->readStream($path);
@@ -214,7 +215,7 @@ abstract class Driver
         }
     }
 
-    public function writeStream(string $path, mixed $resource, array $options = []): bool
+    protected function writeStream(string $path, mixed $resource, array $options = []): bool
     {
         try {
             $this->filesystem->writeStream($path, $resource, $options);
@@ -242,6 +243,60 @@ abstract class Driver
         }
 
         return true;
+    }
+
+    /**
+     * 存储上传文件。
+     *
+     * 自动生成唯一文件名（保留原始扩展名），返回存储后的相对路径。
+     *
+     * @param  string      $path    存储目录（相对于磁盘根目录）
+     * @param  UploadedFile $file   上传文件实例
+     * @param  mixed       $options 写入选项
+     * @return string|false 存储后的相对路径，失败返回 false
+     */
+    public function putFile(string $path, UploadedFile $file, mixed $options = []): string|false
+    {
+        $name = $this->generateUploadedName($file);
+
+        return $this->putFileAs($path, $file, $name, $options);
+    }
+
+    /**
+     * 以指定文件名存储上传文件。
+     *
+     * @param  string      $path    存储目录（相对于磁盘根目录）
+     * @param  UploadedFile $file   上传文件实例
+     * @param  string      $name    保存的文件名
+     * @param  mixed       $options 写入选项
+     * @return string|false 存储后的相对路径，失败返回 false
+     */
+    public function putFileAs(string $path, UploadedFile $file, string $name, mixed $options = []): string|false
+    {
+        if (!$file->isValid()) {
+            return false;
+        }
+
+        $stream = $file->getStream();
+        if ($stream === null) {
+            return false;
+        }
+
+        $target = trim($path, '/\\') . '/' . ltrim($name, '/\\');
+        $result = $this->put($target, $stream, $options);
+
+        if (is_resource($stream)) {
+            fclose($stream);
+        }
+
+        return $result ? $target : false;
+    }
+
+    private function generateUploadedName(UploadedFile $file): string
+    {
+        $ext = $file->extension();
+
+        return bin2hex(random_bytes(16)) . ($ext !== '' ? '.' . $ext : '');
     }
 
     /**

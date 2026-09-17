@@ -8,6 +8,7 @@ use Lychee\Application;
 use Lychee\filesystem\Driver;
 use Lychee\filesystem\driver\Local;
 use Lychee\filesystem\FilesystemManager;
+use Lychee\http\UploadedFile;
 use PHPUnit\Framework\TestCase;
 use InvalidArgumentException;
 
@@ -58,6 +59,62 @@ class FilesystemTest extends TestCase
         $disk = $this->manager->disk();
 
         $this->assertInstanceOf(Driver::class, $disk);
+    }
+
+    public function test_put_file_stores_uploaded_file(): void
+    {
+        $disk = $this->manager->disk('local');
+
+        // 创建一个临时文件作为上传源
+        $tmpFile = tempnam(sys_get_temp_dir(), 'upl_');
+        file_put_contents($tmpFile, 'uploaded content');
+
+        $file = $this->createMock(UploadedFile::class);
+        $file->method('isValid')->willReturn(true);
+        $file->method('getStream')->willReturn(fopen($tmpFile, 'r'));
+        $file->method('extension')->willReturn('txt');
+
+        $stored = $disk->putFile('uploads', $file);
+
+        $this->assertNotFalse($stored);
+        $this->assertStringStartsWith('uploads/', $stored);
+        $this->assertStringEndsWith('.txt', $stored);
+        $this->assertTrue($disk->exists($stored));
+        $this->assertSame('uploaded content', $disk->get($stored));
+
+        $disk->delete($stored);
+        unlink($tmpFile);
+    }
+
+    public function test_put_file_as_stores_with_custom_name(): void
+    {
+        $disk = $this->manager->disk('local');
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'upl_');
+        file_put_contents($tmpFile, 'custom named file');
+
+        $file = $this->createMock(UploadedFile::class);
+        $file->method('isValid')->willReturn(true);
+        $file->method('getStream')->willReturn(fopen($tmpFile, 'r'));
+
+        $stored = $disk->putFileAs('uploads', $file, 'avatar.png');
+
+        $this->assertSame('uploads/avatar.png', $stored);
+        $this->assertTrue($disk->exists($stored));
+        $this->assertSame('custom named file', $disk->get($stored));
+
+        $disk->delete($stored);
+        unlink($tmpFile);
+    }
+
+    public function test_put_file_returns_false_for_invalid_file(): void
+    {
+        $disk = $this->manager->disk('local');
+
+        $file = $this->createMock(UploadedFile::class);
+        $file->method('isValid')->willReturn(false);
+
+        $this->assertFalse($disk->putFile('uploads', $file));
     }
 
     public function test_aliyun_driver_validates_required_config(): void
