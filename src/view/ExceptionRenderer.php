@@ -54,6 +54,23 @@ class ExceptionRenderer
     }
 
     /**
+     * 渲染非调试模式下的通用错误页面。
+     *
+     * 用于生产环境，仅展示状态码与通用描述，不暴露异常详情。
+     *
+     * @param int    $status  HTTP 状态码
+     * @param string $message 状态描述
+     */
+    public function renderError(int $status, string $message): string
+    {
+        return $this->view->render('error', [
+            'status'  => $status,
+            'message' => $message,
+            'logo'    => $this->logoDataUri(),
+        ]);
+    }
+
+    /**
      * 读取框架内置 Logo 并转为 base64 Data URI，使异常页自包含、不依赖外部静态资源。
      */
     protected function logoDataUri(): string

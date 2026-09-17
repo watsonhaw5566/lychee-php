@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ status }} · {{ message|e }}</title>
+    <script>
+        // 防闪烁：在 CSS 渲染前确定主题
+        (function () {
+            try {
+                var saved = localStorage.getItem('lychee-theme');
+                if (saved === 'light' || saved === 'dark') {
+                    document.documentElement.setAttribute('data-theme', saved);
+                    return;
+                }
+            } catch (e) {}
+            var h = new Date().getHours();
+            if (h >= 19 || h < 7) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
+    <style>
+        :root {
+            --lychee: #D6336C;
+            --lychee-soft: #FDEEF0;
+            --leaf: #7CB342;
+            --bg: #FAF7F4;
+            --surface: #FFFFFF;
+            --text: #3D2B2E;
+            --text-muted: #9A8A8A;
+            --border: #F5E3E0;
+            --shadow: 0 10px 40px rgba(214, 51, 108, 0.10);
+        }
+
+        [data-theme="dark"] {
+            --lychee: #E8508A;
+            --lychee-soft: rgba(232, 80, 138, 0.10);
+            --leaf: #8BC34A;
+            --bg: #1A1416;
+            --surface: #241B1E;
+            --text: #F5E8EA;
+            --text-muted: #9A8A8A;
+            --border: #3D2B2E;
+            --shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        .card {
+            width: 100%;
+            max-width: 540px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            text-align: center;
+        }
+
+        .card__head {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 28px 32px 20px;
+            background: linear-gradient(135deg, var(--lychee-soft) 0%, var(--surface) 100%);
+            border-bottom: 1px solid var(--border);
+        }
+
+        [data-theme="dark"] .card__head {
+            background: linear-gradient(135deg, rgba(232, 80, 138, 0.14) 0%, var(--surface) 100%);
+        }
+
+        .logo {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: var(--surface);
+            box-shadow: 0 4px 12px rgba(214, 51, 108, 0.20);
+        }
+
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        .head__title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .card__body {
+            padding: 36px 32px 32px;
+        }
+
+        .status {
+            font-size: 48px;
+            font-weight: 800;
+            line-height: 1;
+            color: var(--lychee);
+            letter-spacing: -1px;
+            margin-bottom: 16px;
+        }
+
+        .message {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .card__foot {
+            padding: 14px 32px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .card__foot .dot {
+            color: var(--leaf);
+            font-weight: 700;
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 12px; }
+            .card__head, .card__body { padding-left: 20px; padding-right: 20px; }
+            .status { font-size: 36px; }
+            .message { font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <header class="card__head">
+            <div class="logo" aria-hidden="true">
+                {% if logo %}<img src="{{ logo }}" alt="Lychee PHP">{% endif %}
+            </div>
+            <div class="head__title">页面错误</div>
+        </header>
+
+        <section class="card__body">
+            <div class="status">{{ status }}</div>
+            <p class="message">{{ message|e }}</p>
+        </section><footer class="card__foot">
+            Lychee PHP <span class="dot">●</span>
+        </footer>
+    </main>
+</body>
+</html>
