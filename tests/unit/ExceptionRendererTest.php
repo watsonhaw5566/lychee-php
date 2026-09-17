@@ -84,7 +84,7 @@ class ExceptionRendererTest extends TestCase
         $this->assertSame('text/html; charset=utf-8', $response->headers['Content-Type']);
         $this->assertNotEmpty($response->content);
         $this->assertStringContainsString('404', $response->content);
-        $this->assertStringContainsString('页面错误！请稍后再试~', $response->content);
+        $this->assertStringContainsString('页面错误，请稍后再试~', $response->content);
     }
 
     public function test_json_request_returns_json_response(): void
@@ -128,7 +128,7 @@ class ExceptionRendererTest extends TestCase
 
         $data = json_decode($response->content, true);
         $this->assertSame(404, $data['code']);
-        $this->assertSame('页面错误！请稍后再试~', $data['msg']);
+        $this->assertSame('页面错误，请稍后再试~', $data['msg']);
         $this->assertArrayNotHasKey('trace', $data);
     }
 }
