@@ -107,4 +107,4 @@ class UserSeeder extends Seeder
 
 ## 数据库连接
 
-优先使用 `config/database.php` 配置的数据库；不可用时兜底到 SQLite（`runtime/migration.sqlite`）。
+使用 `config/database.php` 中默认连接配置的数据库。若数据库未配置或连接失败，迁移命令会提示 `Database connection is not available. Please configure database first`。
