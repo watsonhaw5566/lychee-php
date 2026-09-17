@@ -162,6 +162,19 @@ abstract class ResourceController
         return $v->failException()->check($data);
     }
 
+    /**
+     * 将校验异常的错误信息格式化为字符串。
+     *
+     * think\Validate 的 getError() 在批量验证时返回数组，
+     * 此处统一拼接为分号分隔的字符串，避免 fail(string) 类型不匹配。
+     *
+     * @param array|string $error
+     */
+    protected function formatValidateError(array|string $error): string
+    {
+        return is_array($error) ? implode('；', $error) : (string) $error;
+    }
+
     // ── 模型解析 ────────────────────────────────────────────────────
 
     protected function getModel(): Model
@@ -413,7 +426,7 @@ abstract class ResourceController
 
             return $this->success($ret);
         } catch (ValidateException $e) {
-            return $this->fail($e->getError());
+            return $this->fail($this->formatValidateError($e->getError()));
         } catch (Throwable $e) {
             return $this->fail($e->getMessage());
         }
@@ -495,7 +508,7 @@ abstract class ResourceController
 
             return $this->success($info);
         } catch (ValidateException $e) {
-            return $this->fail($e->getError());
+            return $this->fail($this->formatValidateError($e->getError()));
         } catch (Throwable $e) {
             return $this->fail($e->getMessage());
         }
