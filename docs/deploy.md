@@ -154,19 +154,7 @@ server
 }
 ```
 
-## 六、目录权限
-
-框架需要写入 `runtime/` 目录（缓存、日志、Twig 编译缓存等）：
-
-```bash
-cd /www/wwwroot/example.com
-chown -R www:www runtime
-chmod -R 755 runtime
-```
-
-> 宝塔默认 PHP-FPM 运行用户是 `www`，如果你的环境不同请相应调整。
-
-## 七、配置 .env
+## 六、配置 .env
 
 复制 `.env.example` 为 `.env`，修改数据库等配置：
 
@@ -181,7 +169,7 @@ APP_DEBUG=false
 APP_URL=https://example.com
 ```
 
-## 八、配置文件
+## 七、配置文件
 
 确保 `config/session.php` 中的 session 路径正确（避免 open_basedir 问题）：
 
@@ -189,7 +177,7 @@ APP_URL=https://example.com
 'path' => runtime_path('session'),
 ```
 
-## 九、验证部署
+## 八、验证部署
 
 1. 访问首页，确认能正常打开
 2. 请求一个不存在的路由，应返回框架的 404 JSON：
@@ -201,7 +189,7 @@ APP_URL=https://example.com
 3. 查看 `runtime/log/` 目录是否有日志生成
 4. 查看 Nginx 错误日志 `/www/wwwlogs/example.com.error.log` 是否有异常
 
-## 十、SSL / HTTPS
+## 九、SSL / HTTPS
 
 宝塔面板 → 网站 → 设置 → **SSL**，可申请 Let's Encrypt 免费证书或上传已有证书。开启后建议勾选 **强制 HTTPS**。
 
