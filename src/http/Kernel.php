@@ -7,8 +7,6 @@ namespace Lychee\http;
 use Lychee\container\Container;
 use Lychee\routing\RouteMatch;
 use Lychee\routing\Router;
-use think\Validate as Validator;
-use ReflectionClass;
 use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionParameter;
@@ -25,7 +23,6 @@ class Kernel
         private readonly Router $router,
         private readonly Container $container,
         private readonly MiddlewarePipeline $pipeline,
-        private readonly Validator $validator,
         private readonly ExceptionHandler $exceptionHandler,
     ) {
     }
@@ -98,10 +95,6 @@ class Kernel
                 return $request;
             }
 
-            if ($this->isDto($className)) {
-                return $this->resolveDto($className, $request);
-            }
-
             if ($this->container->has($className)) {
                 return $this->container->get($className);
             }
@@ -130,54 +123,6 @@ class Kernel
         throw new RuntimeException(
             "Cannot resolve parameter \${$name} of " . $controller::class . '::' . $param->getDeclaringFunction()->getName()
         );
-    }
-
-    private function isDto(string $class): bool
-    {
-        return class_exists($class)
-            && !is_subclass_of($class, Request::class)
-            && (new ReflectionClass($class))->isInstantiable();
-    }
-
-    private function resolveDto(string $dtoClass, Request $request): object
-    {
-        $ref         = new ReflectionClass($dtoClass);
-        $constructor = $ref->getConstructor();
-
-        if ($constructor === null) {
-            $dto = new $dtoClass();
-        } else {
-            $data = array_merge($request->param(), $this->routeParamsArray($request));
-            $args = [];
-            foreach ($constructor->getParameters() as $param) {
-                $name = $param->getName();
-                $type = $param->getType();
-
-                if (array_key_exists($name, $data)) {
-                    $args[] = $this->castScalar($data[$name], $type);
-                } elseif ($param->isDefaultValueAvailable()) {
-                    $args[] = $param->getDefaultValue();
-                } elseif ($param->allowsNull()) {
-                    $args[] = null;
-                } else {
-                    throw new RuntimeException("Missing field '{$name}' for DTO {$dtoClass}.");
-                }
-            }
-            $dto = $ref->newInstanceArgs($args);
-        }
-
-        $this->validator->validate($dto);
-
-        return $dto;
-    }
-
-    private function routeParamsArray(Request $request): array
-    {
-        $ref  = new ReflectionClass($request);
-        $prop = $ref->getProperty('routeParams');
-        $prop->setAccessible(true);
-
-        return $prop->getValue($request);
     }
 
     private function castScalar(mixed $value, ?ReflectionType $type): mixed
