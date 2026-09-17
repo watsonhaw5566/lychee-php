@@ -64,6 +64,14 @@ class Env
             $_ENV[$name]    = $value;
             $_SERVER[$name] = $value;
             putenv("{$name}={$value}");
+
+            // 同时以大写形式写入，支持大小写不敏感读取（env('app_debug') 与 env('APP_DEBUG') 均可）
+            $upper = strtoupper($name);
+            if ($upper !== $name) {
+                $_ENV[$upper]    = $value;
+                $_SERVER[$upper] = $value;
+                putenv("{$upper}={$value}");
+            }
         }
     }
 

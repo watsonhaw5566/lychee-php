@@ -9,11 +9,21 @@ use Lychee\http\Response;
 if (!function_exists('env')) {
     /**
      * 读取环境变量，支持默认值。
+     *
+     * 查找时大小写不敏感：env('app_debug') 与 env('APP_DEBUG') 等价。
      */
     function env(string $key, mixed $default = null): mixed
     {
         // 优先从超全局变量读取（由 Env::load 写入），再回退到 getenv()
         $value = $_ENV[$key] ?? $_SERVER[$key] ?? getenv($key);
+
+        // 大小写不敏感回退：尝试大写形式（Env::load 会同时写入大写键）
+        if ($value === false || $value === null) {
+            $upper = strtoupper($key);
+            if ($upper !== $key) {
+                $value = $_ENV[$upper] ?? $_SERVER[$upper] ?? getenv($upper);
+            }
+        }
 
         if ($value === false || $value === null) {
             return $default;
