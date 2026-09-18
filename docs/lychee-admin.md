@@ -288,9 +288,34 @@ protected bool $canDelete = true;   // 是否允许删除
 
 ## 前端资源
 
-插件复用项目中已有的 pear-admin 前端资源，静态文件位于 `lychee-admin/` 目录下。
+插件复用 pear-admin 前端资源，静态文件统一位于 `lychee-admin/asset/` 目录下，发布后对应项目的 `public/admin/` 目录。
 
-生产环境建议通过 Nginx 将静态资源映射到 `public/admin/`，或使用 `plugin:publish` 命令发布到项目公开目录。
+### 发布静态资源
+
+使用 `admin:publish` 命令将静态资源发布到 `public/admin/`：
+
+```bash
+# 复制静态资源到 public/admin/
+php lee admin:publish
+
+# 强制覆盖已存在的文件
+php lee admin:publish --force
+
+# 创建符号链接（开发环境推荐，修改资源即时生效）
+php lee admin:publish --link
+```
+
+也可以手动操作：
+
+```bash
+# 符号链接（开发环境）
+ln -s vendor/watsonhaw/lychee-admin/asset public/admin
+
+# 复制（生产环境）
+cp -r vendor/watsonhaw/lychee-admin/asset/* public/admin/
+```
+
+生产环境也可通过 Nginx 将 `lychee-admin/asset/` 直接映射到 `/admin/` 路径。
 
 ## 数据库表
 
