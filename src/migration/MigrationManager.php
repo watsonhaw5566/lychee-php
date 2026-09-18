@@ -19,12 +19,40 @@ class MigrationManager
 {
     public const MIGRATION_TABLE = 'migrations';
 
+    /** @var array<int, string> 迁移目录路径列表 */
+    private array $migrationPaths;
+
+    /** @var array<int, string> Seeder 目录路径列表 */
+    private array $seederPaths;
+
     public function __construct(
         private readonly PDO $pdo,
-        private readonly string $migrationPath,
-        private readonly string $seederPath,
+        string $migrationPath,
+        string $seederPath,
         private readonly string $prefix = '',
     ) {
+        $this->migrationPaths = [$migrationPath];
+        $this->seederPaths    = [$seederPath];
+    }
+
+    /**
+     * 追加迁移目录（供插件注册自身的迁移文件）。
+     */
+    public function addMigrationPath(string $path): void
+    {
+        if (!in_array($path, $this->migrationPaths, true)) {
+            $this->migrationPaths[] = $path;
+        }
+    }
+
+    /**
+     * 追加 Seeder 目录（供插件注册自身的 seed 文件）。
+     */
+    public function addSeederPath(string $path): void
+    {
+        if (!in_array($path, $this->seederPaths, true)) {
+            $this->seederPaths[] = $path;
+        }
     }
 
     /**
@@ -190,35 +218,38 @@ class MigrationManager
     }
 
     /**
-     * 获取所有迁移文件。
+     * 获取所有迁移文件（扫描所有已注册的迁移目录）。
      *
      * @return array<string, array{name: string, class: string, file: string}>
      */
     public function getMigrations(): array
     {
-        if (!is_dir($this->migrationPath)) {
-            return [];
-        }
-
-        $files      = glob($this->migrationPath . DIRECTORY_SEPARATOR . '*.php') ?: [];
         $migrations = [];
 
-        foreach ($files as $file) {
-            $basename = basename($file, '.php');
-
-            if (!preg_match('/^(\d{14})_(.+)$/', $basename, $matches)) {
+        foreach ($this->migrationPaths as $path) {
+            if (!is_dir($path)) {
                 continue;
             }
 
-            $version = $matches[1];
-            $name    = $matches[2];
-            $class   = self::toMigrationClassName($name);
+            $files = glob($path . DIRECTORY_SEPARATOR . '*.php') ?: [];
 
-            $migrations[$version] = [
-                'name'  => $basename,
-                'class' => $class,
-                'file'  => $file,
-            ];
+            foreach ($files as $file) {
+                $basename = basename($file, '.php');
+
+                if (!preg_match('/^(\d{14})_(.+)$/', $basename, $matches)) {
+                    continue;
+                }
+
+                $version = $matches[1];
+                $name    = $matches[2];
+                $class   = self::toMigrationClassName($name);
+
+                $migrations[$version] = [
+                    'name'  => $basename,
+                    'class' => $class,
+                    'file'  => $file,
+                ];
+            }
         }
 
         ksort($migrations);
@@ -227,28 +258,31 @@ class MigrationManager
     }
 
     /**
-     * 获取所有 Seeder 文件。
+     * 获取所有 Seeder 文件（扫描所有已注册的 Seeder 目录）。
      *
      * @return array<int, array{name: string, class: string, file: string}>
      */
     public function getSeeders(): array
     {
-        if (!is_dir($this->seederPath)) {
-            return [];
-        }
-
-        $files   = glob($this->seederPath . DIRECTORY_SEPARATOR . '*.php') ?: [];
         $seeders = [];
 
-        foreach ($files as $file) {
-            $basename = basename($file, '.php');
-            $class    = self::toSeederClassName($basename);
+        foreach ($this->seederPaths as $path) {
+            if (!is_dir($path)) {
+                continue;
+            }
 
-            $seeders[] = [
-                'name'  => $basename,
-                'class' => $class,
-                'file'  => $file,
-            ];
+            $files = glob($path . DIRECTORY_SEPARATOR . '*.php') ?: [];
+
+            foreach ($files as $file) {
+                $basename = basename($file, '.php');
+                $class    = self::toSeederClassName($basename);
+
+                $seeders[] = [
+                    'name'  => $basename,
+                    'class' => $class,
+                    'file'  => $file,
+                ];
+            }
         }
 
         return $seeders;
