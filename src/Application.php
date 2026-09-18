@@ -22,6 +22,7 @@ use Lychee\http\Request;
 use Lychee\i18n\I18n;
 use Lychee\log\LogManager;
 use Lychee\migration\command\MigrateCreateCommand;
+use Lychee\plugin\PluginManager;
 use Lychee\migration\command\MigrateRollbackCommand;
 use Lychee\migration\command\MigrateRunCommand;
 use Lychee\migration\command\SeedCreateCommand;
@@ -117,6 +118,34 @@ class Application
 
         // 校验器语言：注册 maker 闭包，使所有 Validate 实例默认中文（含全局 validate() 函数）
         $this->bootValidateLang();
+
+        // 插件系统：在所有核心模块就绪后，加载并启动已配置的插件
+        $this->bootPlugins();
+    }
+
+    /**
+     * 加载并启动插件。
+     *
+     * 插件列表从 config/plugin.php 的 providers 配置读取，按声明顺序注册并启动。
+     * 此时框架核心服务（Router、View、Console、Config 等）均已就绪，
+     * 插件可在 boot() 中安全地注册路由、视图、命令、中间件等。
+     */
+    private function bootPlugins(): void
+    {
+        /** @var Config $config */
+        $config = $this->container->get('config');
+
+        $manager = new PluginManager($this->container);
+        $this->container->instance(PluginManager::class, $manager);
+        $this->container->instance('plugins', $manager);
+
+        $providers = (array) $config->get('plugin.providers', []);
+
+        foreach ($providers as $provider) {
+            $manager->register((string) $provider);
+        }
+
+        $manager->boot();
     }
 
     /**
