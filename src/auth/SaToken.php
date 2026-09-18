@@ -20,13 +20,21 @@ class SaToken implements SatokenInterface
 {
     /** @var array<string, mixed> 默认配置 */
     protected array $config = [
-        'token_name'      => '',
-        'store'           => null,
-        'timeout'         => 86400 * 7,
-        'auto_renew'      => true,
-        'renew_before'    => 3600,
-        'max_login_count' => 10,
+        // 请求头中的 token 字段名（空则只认 Authorization: Bearer）
+        'token_name'        => '',
+        // Cookie 中的 token 字段名
+        'token_cookie_name' => 'satoken',
+        // Token 读取驱动：header / cookie / chain / 自定义类名
+        // chain 表示先 header 后 cookie，兼顾 SPA 与传统页面跳转
+        'token_reader'      => 'chain',
+        'store'             => null,
+        'timeout'           => 86400 * 7,
+        'auto_renew'        => true,
+        'renew_before'      => 3600,
+        'max_login_count'   => 10,
     ];
+
+    protected ?TokenReaderInterface $tokenReader = null;
 
     public function __construct(protected Container $app)
     {
@@ -212,27 +220,45 @@ class SaToken implements SatokenInterface
 
     private function getToken(): ?string
     {
-        $config = $this->getConfig();
-        if (!empty($config['token_name'])) {
-            $headerValue = $this->getHeader((string) $config['token_name']);
-            if (is_string($headerValue) && $headerValue !== '') {
-                return $headerValue;
-            }
-        }
-
-        $authorization = $this->getHeader('Authorization');
-        if (is_string($authorization) && $authorization !== '') {
-            return preg_match('/^Bearer\s+(\S+)$/i', $authorization, $m) === 1 ? (string) $m[1] : null;
-        }
-
-        return null;
+        return $this->getTokenReader()->read();
     }
 
-    private function getHeader(string $name): ?string
+    /**
+     * 根据配置解析 TokenReader 实例。
+     */
+    protected function getTokenReader(): TokenReaderInterface
     {
-        $key = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
+        if ($this->tokenReader !== null) {
+            return $this->tokenReader;
+        }
 
-        return $_SERVER[$key] ?? null;
+        $config     = $this->getConfig();
+        $reader     = $config['token_reader'] ?? 'chain';
+        $tokenName  = (string) ($config['token_name'] ?? '');
+        $cookieName = (string) ($config['token_cookie_name'] ?? 'satoken');
+
+        if ($reader instanceof TokenReaderInterface) {
+            return $this->tokenReader = $reader;
+        }
+
+        $reader = (string) $reader;
+
+        $this->tokenReader = match ($reader) {
+            'header' => new HeaderTokenReader($tokenName),
+            'cookie' => new CookieTokenReader($cookieName),
+            'chain'  => new ChainTokenReader(
+                new HeaderTokenReader($tokenName),
+                new CookieTokenReader($cookieName),
+            ),
+            default  => class_exists($reader) && is_subclass_of($reader, TokenReaderInterface::class)
+                ? new $reader()
+                : new ChainTokenReader(
+                    new HeaderTokenReader($tokenName),
+                    new CookieTokenReader($cookieName),
+                ),
+        };
+
+        return $this->tokenReader;
     }
 
     public function validateTokenFormat(string $token): bool
