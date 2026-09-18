@@ -54,7 +54,7 @@ export default defineConfig({
             {
                 text: '生态',
                 items: [
-                    {text: 'lychee-admin', link: '/lychee-admin'},
+                    {text: 'lychee-admin', link: 'https://github.com/watsonhaw5566/lychee-admin'},
                 ],
             },
             {text: '宝塔部署', link: '/deploy'},
