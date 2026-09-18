@@ -472,6 +472,7 @@ class Application
                 pdo: $pdo,
                 migrationPath: $migrationPath,
                 seederPath: $seederPath,
+                prefix: $this->resolveDbPrefix(),
             );
 
             $this->container->instance(MigrationManager::class, $manager);
@@ -485,6 +486,24 @@ class Application
         $console->addCommand(MigrateCreateCommand::class);
         $console->addCommand(SeedRunCommand::class);
         $console->addCommand(SeedCreateCommand::class);
+    }
+
+    /**
+     * 从数据库配置中解析表前缀。
+     *
+     * 前缀位于 database.connections.{default}.prefix，迁移和 Seeder 创建业务表时自动应用，
+     * 框架内部的 migrations 记录表不受此前缀影响。
+     */
+    private function resolveDbPrefix(): string
+    {
+        /** @var Config $config */
+        $config = $this->container->get('config');
+
+        $dbConfig  = (array) $config->get('database', []);
+        $default   = (string) ($dbConfig['default'] ?? '');
+        $conn      = (array) ($dbConfig['connections'][$default] ?? []);
+
+        return (string) ($conn['prefix'] ?? '');
     }
 
     /**

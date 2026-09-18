@@ -15,6 +15,7 @@ abstract class Migration
 {
     public function __construct(
         protected readonly PDO $pdo,
+        protected readonly string $prefix = '',
     ) {
     }
 
@@ -29,13 +30,13 @@ abstract class Migration
     abstract public function down(): void;
 
     /**
-     * 获取表构建器。
+     * 获取表构建器（自动应用表前缀）。
      *
      * @param  array<string, mixed> $options
      */
     protected function table(string $name, array $options = []): Table
     {
-        return new Table($name, $this->pdo, $options);
+        return new Table($this->prefix . $name, $this->pdo, $options);
     }
 
     /**
