@@ -50,6 +50,9 @@ abstract class Controller
 
     /**
      * 失败响应。
+     *
+     * HTTP 状态码固定为 200，业务错误码通过 body 中的 code 字段传递，
+     * 以便前端 AJAX 统一走 success 回调处理。
      */
     protected function fail(string $msg = 'fail', int $code = 400): JsonResponse
     {
@@ -58,6 +61,6 @@ abstract class Controller
             'code'  => $code,
             'msg'   => $msg,
             'data'  => null,
-        ], $code);
+        ]);
     }
 }
