@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Lychee;
 
 use Lychee\auth\SaToken;
+use Lychee\captcha\Captcha;
 use Lychee\config\Config;
 use Lychee\config\Env;
 use Lychee\console\Application as ConsoleApplication;
@@ -92,6 +93,7 @@ class Application
             'cache'      => $this->bootCache(...),
             'filesystem' => $this->bootFilesystem(...),
             'satoken'    => $this->bootSaToken(...),
+            'captcha'    => $this->bootCaptcha(...),
             'cron'       => $this->bootCron(...),
             'queue'      => $this->bootQueue(...),
             'session'    => $this->bootSession(...),
@@ -310,6 +312,14 @@ class Application
 
         $this->container->instance(SaToken::class, $saToken);
         $this->container->instance('satoken', $saToken);
+    }
+
+    private function bootCaptcha(): void
+    {
+        $captcha = new Captcha($this->container);
+
+        $this->container->instance(Captcha::class, $captcha);
+        $this->container->instance('captcha', $captcha);
     }
 
     private function bootCron(): void
