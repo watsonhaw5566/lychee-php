@@ -232,9 +232,9 @@ class SaToken implements SatokenInterface
             return $this->tokenReader;
         }
 
-        $config    = $this->getConfig();
-        $reader    = $config['token_reader'] ?? 'chain';
-        $tokenName = (string) ($config['token_name'] ?? '');
+        $config     = $this->getConfig();
+        $reader     = $config['token_reader'] ?? 'chain';
+        $tokenName  = (string) ($config['token_name'] ?? '');
         $cookieName = (string) ($config['token_cookie_name'] ?? 'satoken');
 
         if ($reader instanceof TokenReaderInterface) {
