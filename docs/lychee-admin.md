@@ -126,7 +126,7 @@ class ArticleAdmin extends AdminResource
 
     /** 表单字段：字段名 => 类型（或完整配置数组） */
     protected array $formFields = [
-        'title'       => 'text',
+        'title'       => ['type' => 'text', 'required' => true],
         'category_id' => ['type' => 'select', 'options' => [1 => '技术', 2 => '生活']],
         'content'     => 'textarea',
         'status'      => ['type' => 'radio', 'options' => [1 => '发布', 0 => '草稿']],
@@ -167,6 +167,26 @@ protected array $fieldLabels = [
 ### 支持的表单字段类型
 
 `text`、`textarea`、`number`、`password`、`select`、`radio`、`checkbox`、`switch`、`image`、`file`、`richtext`、`date`。
+
+### 表单校验
+
+表单字段支持 `required` 和 `rules` 两个配置项，同时驱动前端 layui 校验与后端 think-validate 校验。
+
+```php
+protected array $formFields = [
+    'username' => ['type' => 'text', 'required' => true, 'rules' => 'length:2,20'],
+    'email'    => ['type' => 'text', 'required' => true, 'rules' => 'email'],
+    'password' => ['type' => 'password', 'required' => true, 'rules' => 'length:6,20'],
+    'status'   => ['type' => 'select', 'options' => [1 => '启用', 0 => '禁用'], 'required' => true],
+];
+```
+
+- **`required`**：是否必填。必填字段的 label 会显示红色 `*`，前端通过 `lay-verify="required"` 拦截空提交，后端通过 `require` 规则校验。
+- **`rules`**：think-validate 规则字符串，多个规则用 `|` 分隔，如 `email`、`length:6,20`、`number|between:1,120`。框架会自动将 `email`、`url`、`number`、`date` 等常用规则映射到 layui 的 `lay-verify`，其余规则由后端兜底。
+
+**编辑时的特殊处理**：编辑时若某字段未提交（如留空的密码字段、未重新上传的文件），框架会跳过该字段的 `required` 校验，保留原有值。
+
+常用规则速查：`require`、`email`、`url`、`number`、`integer`、`date`、`length:min,max`、`max:n`、`min:n`、`between:a,b`、`in:a,b,c`、`regex:/pattern/`。更多规则参见 [think-validate 文档](https://doc.thinkphp.cn/@think-validate)。
 
 ## License
 
