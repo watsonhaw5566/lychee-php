@@ -62,7 +62,7 @@ class MyPluginServiceProvider implements PluginInterface
 return [
     'providers' => [
         \MyPlugin\MyPluginServiceProvider::class,
-        \LycheeAdmin\AdminServiceProvider::class,
+        src\AdminServiceProvider::class,
         // ... 其他插件
     ],
 ];
