@@ -25,10 +25,11 @@ return [
 
     // 图形验证码配置
     'image' => [
-        'chars'  => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', // 去掉易混淆的 0/O/1/I/L
-        'length' => 4,
-        'width'  => 120,
-        'height' => 40,
+        'chars'     => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', // 去掉易混淆的 0/O/1/I/L
+        'length'    => 4,
+        'width'     => 120,
+        'height'    => 40,
+        'font_size' => 20,
     ],
 
     // 短信验证码配置
@@ -59,6 +60,22 @@ return [
 | `clear(string $type, string $key): void` | 手动作废验证码 |
 
 ## 图形验证码
+
+图形验证码使用 `src/captcha/assets/` 下的资源文件生成：
+- `bgs/` — 背景图片（jpg），每次随机选取一张
+- `ttfs/` — TTF 字体文件，每次随机选取一个，字符支持随机倾斜
+
+如需自定义背景或字体，直接替换对应目录下的文件即可。
+
+### 配置项
+
+| 配置 | 默认值 | 说明 |
+| --- | --- | --- |
+| `chars` | `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` | 字符集 |
+| `length` | `4` | 验证码长度 |
+| `width` | `120` | 图片宽度 |
+| `height` | `40` | 图片高度 |
+| `font_size` | `20` | 字体大小 |
 
 ### 生成图片
 

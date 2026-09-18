@@ -33,10 +33,11 @@ class Captcha
         'prefix'       => 'captcha:',
         // 驱动配置
         'image'        => [
-            'chars'  => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789',
-            'length' => 4,
-            'width'  => 120,
-            'height' => 40,
+            'chars'     => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789',
+            'length'    => 4,
+            'width'     => 120,
+            'height'    => 40,
+            'font_size' => 20,
         ],
         'sms'          => [
             'length' => 6,
