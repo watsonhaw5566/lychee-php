@@ -105,7 +105,7 @@ export default defineConfig({
             {
                 text: '生态',
                 items: [
-                    {text: 'lychee-admin 后台管理', link: '/lychee-admin'},
+                    {text: 'lychee-admin', link: '/lychee-admin'},
                 ],
             },
         ],
