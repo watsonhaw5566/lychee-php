@@ -499,9 +499,9 @@ class Application
         /** @var Config $config */
         $config = $this->container->get('config');
 
-        $dbConfig  = (array) $config->get('database', []);
-        $default   = (string) ($dbConfig['default'] ?? '');
-        $conn      = (array) ($dbConfig['connections'][$default] ?? []);
+        $dbConfig = (array) $config->get('database', []);
+        $default  = (string) ($dbConfig['default'] ?? '');
+        $conn     = (array) ($dbConfig['connections'][$default] ?? []);
 
         return (string) ($conn['prefix'] ?? '');
     }
