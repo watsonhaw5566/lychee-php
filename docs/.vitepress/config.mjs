@@ -45,6 +45,7 @@ export default defineConfig({
                     {text: 'WebSocket', link: '/websocket'},
                     {text: '定时任务', link: '/cron'},
                     {text: '认证', link: '/auth'},
+                    {text: '限速', link: '/throttle'},
                     {text: '命令行', link: '/console'},
                 ],
             },
