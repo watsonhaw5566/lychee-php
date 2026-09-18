@@ -11,6 +11,7 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Tests\stub\plugin\RecordingPlugin;
 use Tests\stub\plugin\ServiceBindingPlugin;
+use stdClass;
 
 class PluginManagerTest extends TestCase
 {
@@ -70,7 +71,7 @@ class PluginManagerTest extends TestCase
         $manager = new PluginManager($this->container);
 
         $this->expectException(RuntimeException::class);
-        $manager->register(\stdClass::class);
+        $manager->register(stdClass::class);
     }
 
     public function test_plugins_booted_in_registration_order(): void
