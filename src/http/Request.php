@@ -398,6 +398,13 @@ class Request
             return is_array($data) ? $data : [];
         }
 
+        if (str_contains($contentType, 'application/x-www-form-urlencoded')) {
+            $data = [];
+            parse_str($raw, $data);
+
+            return $data;
+        }
+
         return $_POST;
     }
 
