@@ -189,6 +189,19 @@ if (!function_exists('satoken')) {
     }
 }
 
+if (!function_exists('captcha')) {
+    /**
+     * 获取验证码实例。
+     *
+     *   captcha()->generate('image', $id);  // 生成图形验证码
+     *   captcha()->verify('sms', $phone, $code); // 校验短信验证码
+     */
+    function captcha(): \Lychee\captcha\Captcha
+    {
+        return app('captcha');
+    }
+}
+
 if (!function_exists('ws')) {
     /**
      * 获取 WebSocket 服务实例。
