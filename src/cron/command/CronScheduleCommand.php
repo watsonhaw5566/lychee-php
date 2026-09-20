@@ -46,7 +46,10 @@ class CronScheduleCommand extends Command
                 $output->writeln('<error>cron:run exited with code ' . $exitCode . '</error>');
             }
 
-            sleep(60);
+            // 对齐到下一分钟边界休眠，避免子进程耗时累积导致触发时刻漂移，
+            // 进而漏过 * * * * * 等整分钟任务
+            $sleepSeconds = 60 - (time() % 60);
+            sleep($sleepSeconds);
         }
     }
 

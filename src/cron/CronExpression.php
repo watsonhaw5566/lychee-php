@@ -13,7 +13,7 @@ use InvalidArgumentException;
  * 支持标准 5 段格式：分 时 日 月 周
  *   * * * * *
  *   | | | | |
- *   | | | | +--- 星期 (0-6, 0=周日)
+ *   | | | | +--- 星期 (0-7, 0 和 7 都是周日)
  *   | | | +----- 月份 (1-12)
  *   | | +------- 日期 (1-31)
  *   | +--------- 小时 (0-23)
@@ -21,6 +21,11 @@ use InvalidArgumentException;
  *
  * 支持语法：* 任意值 , 列表 - 范围 / 步长
  * 支持月份和星期的英文缩写（jan-dec / sun-sat）。
+ *
+ * 日期与星期的匹配遵循标准 cron（Vixie）语义：
+ *   - 任一字段为通配（星号 或 星号/n 步长）时，两者按「与」匹配
+ *   - 两者都被限制时，按「或」匹配（日期或星期任一命中即可），
+ *     例如 '30 4 1,15 * 5' 表示每月 1 号、15 号以及每周五
  */
 class CronExpression
 {
@@ -30,7 +35,7 @@ class CronExpression
         1 => [0, 23],   // hour
         2 => [1, 31],   // day of month
         3 => [1, 12],   // month
-        4 => [0, 6],    // day of week
+        4 => [0, 7],    // day of week（7 在解析后归一为 0，均表示周日）
     ];
 
     /** 月份英文缩写到数字的映射 */
@@ -48,6 +53,9 @@ class CronExpression
 
     /** @var array<int, list<int>> 各字段允许的取值集合 */
     private array $values = [];
+
+    /** @var array<int, bool> 各字段原始值是否为通配，用于日/星期 OR 判定 */
+    private array $wildcards = [];
 
     public function __construct(private readonly string $expression)
     {
@@ -68,8 +76,27 @@ class CronExpression
         }
 
         foreach ($parts as $index => $part) {
-            $this->values[$index] = $this->parseField($part, $index);
+            $this->wildcards[$index] = $this->isWildcard($part);
+            $this->values[$index]    = $this->parseField($part, $index);
         }
+    }
+
+    /**
+     * 判断字段是否为通配形式。
+     *
+     * 仅当所有逗号分隔段均为通配符（或带步长的通配符）时视为通配，
+     * 与 Vixie cron 的 STAR 标志一致；显式枚举如 '0-6' 即使覆盖
+     * 完整范围也不算通配。
+     */
+    private function isWildcard(string $field): bool
+    {
+        foreach (explode(',', $field) as $segment) {
+            if (trim(explode('/', $segment)[0]) !== '*') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -123,6 +150,11 @@ class CronExpression
             }
         }
 
+        // 星期 7 与 0 均表示周日，统一归一为 0，保证 '1-7'、'5,7' 等写法正确展开
+        if ($index === 4) {
+            $values = array_map(static fn (int $v): int => $v === 7 ? 0 : $v, $values);
+        }
+
         return array_values(array_unique($values));
     }
 
@@ -147,11 +179,22 @@ class CronExpression
      */
     public function isDue(DateTimeInterface $time): bool
     {
-        return in_array((int) $time->format('i'), $this->values[0], true)
-            && in_array((int) $time->format('G'), $this->values[1], true)
-            && in_array((int) $time->format('j'), $this->values[2], true)
-            && in_array((int) $time->format('n'), $this->values[3], true)
-            && in_array((int) $time->format('w'), $this->values[4], true);
+        if (!in_array((int) $time->format('i'), $this->values[0], true)
+            || !in_array((int) $time->format('G'), $this->values[1], true)
+            || !in_array((int) $time->format('n'), $this->values[3], true)
+        ) {
+            return false;
+        }
+
+        $dayOfMonth = in_array((int) $time->format('j'), $this->values[2], true);
+        $dayOfWeek  = in_array((int) $time->format('w'), $this->values[4], true);
+
+        // 日期与星期均被限制时按「或」匹配；任一为通配时按「与」匹配
+        $dayMatches = ($this->wildcards[2] || $this->wildcards[4])
+            ? $dayOfMonth && $dayOfWeek
+            : $dayOfMonth || $dayOfWeek;
+
+        return $dayMatches;
     }
 
     /**

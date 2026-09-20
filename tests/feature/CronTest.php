@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\feature;
 
-use DateTimeImmutable;
 use Lychee\Application;
 use Lychee\cron\Scheduler;
 use PHPUnit\Framework\TestCase;
@@ -59,12 +58,8 @@ class CronTest extends TestCase
     public function test_run_skips_non_due_tasks(): void
     {
         $executed = false;
-        // 使用一年后的同一时刻构造表达式：月/日/时/分与当前相同，
-        // 但星期必然不同（365/366 天模 7 余 1 或 2），因此不会匹配当前时间
-        $future = (new DateTimeImmutable())->modify('+1 year');
-        $expr   = $future->format('i G j n w');
-
-        $this->scheduler->call('future-task', $expr, function () use (&$executed) {
+        // 2 月 31 日在日历上不存在，因此该表达式永不匹配，任务不会被执行
+        $this->scheduler->call('future-task', '0 0 31 2 *', function () use (&$executed) {
             $executed = true;
         });
 
@@ -76,7 +71,8 @@ class CronTest extends TestCase
     public function test_get_due_tasks_filters_correctly(): void
     {
         $this->scheduler->call('due', '* * * * *', fn () => null);
-        $this->scheduler->call('not-due', '0 0 1 1 0', fn () => null); // Jan 1 midnight Sunday
+        // 2 月 31 日不存在，永不到期
+        $this->scheduler->call('not-due', '0 0 31 2 *', fn () => null);
 
         $due = $this->scheduler->getDueTasks();
 
