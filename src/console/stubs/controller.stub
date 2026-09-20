@@ -7,26 +7,29 @@ namespace {{namespace}}\controller;
 use {{namespace}}\model\{{model}};
 use {{namespace}}\validate\{{model}}Validate;
 use Lychee\http\JsonResponse;
+use Lychee\http\Request;
 use Lychee\routing\Resource;
 use Lychee\routing\ResourceController;
 
 #[Resource('{{resource}}')]
 class {{class}} extends ResourceController
 {
-    protected string $model = {{model}}::class;
+    protected string $modelClass = {{model}}::class;
 
-    protected string $validate = {{model}}Validate::class;
+    protected string $validateClass = {{model}}Validate::class;
 
     public function index(): JsonResponse
     {
-        $where = [];
+        $where    = [];
+        $current  = (int) $this->request->param('current', 1);
+        $pageSize = (int) $this->request->param('pageSize', 20);
 
-        return $this->baseIndex($where);
+        return $this->baseIndex($where, $current, $pageSize);
     }
 
-    public function save(): JsonResponse
+    public function save(Request $request): JsonResponse
     {
-        return $this->baseSave($this->request->post());
+        return $this->baseSave($request);
     }
 
     public function read(int $id): JsonResponse
@@ -34,9 +37,9 @@ class {{class}} extends ResourceController
         return $this->baseRead($id);
     }
 
-    public function update(int $id): JsonResponse
+    public function update(Request $request, int $id): JsonResponse
     {
-        return $this->baseUpdate($id, $this->request->post());
+        return $this->baseUpdate($request, $id);
     }
 
     public function delete(int $id): JsonResponse
@@ -44,10 +47,8 @@ class {{class}} extends ResourceController
         return $this->baseDelete($id);
     }
 
-    public function batch_delete(): JsonResponse
+    public function batch_delete(Request $request): JsonResponse
     {
-        $ids = (array) ($this->request->post()['ids'] ?? []);
-
-        return $this->baseBatchDelete($ids);
+        return $this->baseBatchDelete($request);
     }
 }

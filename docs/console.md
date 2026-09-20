@@ -86,15 +86,15 @@ php lee make:rest User
 #[Resource('/user')]
 class UserController extends ResourceController
 {
-    protected string $model = User::class;
-    protected string $validate = UserValidate::class;
+    protected string $modelClass = User::class;
+    protected string $validateClass = UserValidate::class;
 
-    public function index(): JsonResponse          // → $this->baseIndex($where)
-    public function save(): JsonResponse           // → $this->baseSave($this->request->post())
-    public function read(int $id): JsonResponse    // → $this->baseRead($id)
-    public function update(int $id): JsonResponse  // → $this->baseUpdate($id, $this->request->post())
-    public function delete(int $id): JsonResponse  // → $this->baseDelete($id)
-    public function batch_delete(): JsonResponse   // → $this->baseBatchDelete($ids)
+    public function index(): JsonResponse                  // → $this->baseIndex($where, $current, $pageSize)
+    public function save(Request $request): JsonResponse   // → $this->baseSave($request)
+    public function read(int $id): JsonResponse            // → $this->baseRead($id)
+    public function update(Request $request, int $id): JsonResponse  // → $this->baseUpdate($request, $id)
+    public function delete(int $id): JsonResponse          // → $this->baseDelete($id)
+    public function batch_delete(Request $request): JsonResponse  // → $this->baseBatchDelete($request)
 }
 ```
 
