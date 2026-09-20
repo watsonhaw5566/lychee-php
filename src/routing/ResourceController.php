@@ -58,20 +58,19 @@ abstract class ResourceController extends Controller
         int         $pageSize = 10,
         string      $msg = 'success',
         int         $code = 200,
-    ): JsonResponse
-    {
-        $current = max(1, $current);
+    ): JsonResponse {
+        $current  = max(1, $current);
         $pageSize = max(1, min(200, $pageSize));
 
         $paginator = $query->paginate(['list_rows' => $pageSize, 'page' => $current]);
 
         return new JsonResponse([
             'errno' => 0,
-            'code' => $code,
-            'msg' => $msg,
-            'data' => [
+            'code'  => $code,
+            'msg'   => $msg,
+            'data'  => [
                 'total' => $paginator->total(),
-                'list' => $paginator->items(),
+                'list'  => $paginator->items(),
             ],
         ], $code);
     }
@@ -94,8 +93,7 @@ abstract class ResourceController extends Controller
         array|string $validate,
         array        $message = [],
         bool         $batch = false,
-    ): true
-    {
+    ): true {
         if (is_array($validate)) {
             $v = new Validate();
             $v->rule($validate);
@@ -154,7 +152,7 @@ abstract class ResourceController extends Controller
     protected function guessModelClass(): string
     {
         $short = (new ReflectionClass($this))->getShortName();
-        $name = preg_replace('/Controller$/', '', $short);
+        $name  = preg_replace('/Controller$/', '', $short);
 
         return $this->app->getNamespace() . '\\model\\' . $name;
     }
@@ -180,11 +178,11 @@ abstract class ResourceController extends Controller
             }
 
             match (true) {
-                str_ends_with($field, '_like') => $query->whereLike(
+                str_ends_with($field, '_like')    => $query->whereLike(
                     $this->stripSuffix($field, '_like'),
                     "%{$value}%"
                 ),
-                str_ends_with($field, '_range') => $query->whereBetweenTime(
+                str_ends_with($field, '_range')   => $query->whereBetweenTime(
                     $this->stripSuffix($field, '_range'),
                     $value[0],
                     $value[1]
@@ -193,13 +191,13 @@ abstract class ResourceController extends Controller
                     $this->stripSuffix($field, '_between'),
                     $value
                 ),
-                str_ends_with($field, '_in') => $this->applyInClause(
+                str_ends_with($field, '_in')      => $this->applyInClause(
                     $query,
                     $this->stripSuffix($field, '_in'),
                     $value,
                     $jsonFields
                 ),
-                default => $query->where($field, $value),
+                default                           => $query->where($field, $value),
             };
         }
 
@@ -241,7 +239,7 @@ abstract class ResourceController extends Controller
                 foreach ($value as $idx => $id) {
                     $clause = $idx === 0 ? 'where' : 'whereOr';
                     $q->$clause(
-                        fn($subQ) => $subQ->whereRaw(
+                        fn ($subQ) => $subQ->whereRaw(
                             "JSON_CONTAINS(`{$field}`, ?)",
                             [json_encode((int)$id)]
                         )
@@ -330,8 +328,7 @@ abstract class ResourceController extends Controller
         array             $append = [],
         array             $with = [],
         array|string|null $order = null,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         try {
             $order ??= $this->request->param('order', ['create_time' => 'desc']);
 
@@ -417,7 +414,7 @@ abstract class ResourceController extends Controller
             $model = $this->getModelClass();
             $query = $this->applyDataPermission($model);
             $query = $this->applyTenantScope($query);
-            $data = $query->find($id);
+            $data  = $query->find($id);
 
             if (!$data) {
                 return $this->fail($this->notExistMessage);
@@ -457,7 +454,7 @@ abstract class ResourceController extends Controller
 
             $query = $this->applyDataPermission($model);
             $query = $this->applyTenantScope($query);
-            $info = $query->find($id);
+            $info  = $query->find($id);
 
             if (!$info) {
                 return $this->fail($this->notExistMessage);
@@ -497,7 +494,7 @@ abstract class ResourceController extends Controller
             $model = $this->getModelClass();
             $query = $this->applyDataPermission($model);
             $query = $this->applyTenantScope($query);
-            $data = $query->find($id);
+            $data  = $query->find($id);
 
             if (!$data) {
                 return $this->fail($this->notExistMessage);
