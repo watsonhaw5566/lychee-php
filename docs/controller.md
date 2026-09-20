@@ -23,8 +23,8 @@ use Lychee\routing\ResourceController;
 #[Resource('/users')]
 class UserController extends ResourceController
 {
-    protected string $model = User::class;
-    protected string $validate = UserValidate::class;
+    protected string $modelClass = User::class;
+    protected string $validateClass = UserValidate::class;
 }
 ```
 
@@ -33,11 +33,11 @@ class UserController extends ResourceController
 | 方法 | 路由 | 说明 |
 | --- | --- | --- |
 | `index()` | `GET /users` | 列表（分页 + 查询 DSL） |
-| `save()` | `POST /users` | 新建（验证 + 唯一校验） |
+| `save(Request $request)` | `POST /users` | 新建（验证 + 唯一校验） |
 | `read($id)` | `GET /users/{id}` | 详情 |
-| `update($id)` | `PUT /users/{id}` | 更新 |
+| `update(Request $request, $id)` | `PUT /users/{id}` | 更新 |
 | `delete($id)` | `DELETE /users/{id}` | 删除 |
-| `batch_delete()` | `DELETE /users` | 批量删除 |
+| `batch_delete(Request $request)` | `DELETE /users` | 批量删除 |
 
 ### 依赖注入
 
@@ -174,7 +174,7 @@ $this->validate($data, [
 
 ### 模型自动推断
 
-若未声明 `$model`，框架按控制器名自动推断：
+若未声明 `$modelClass`，框架按控制器名自动推断：
 `UserController` → `app\model\User`，`OrderController` → `app\model\Order`。
 
 ### 查询 DSL
@@ -198,7 +198,7 @@ $this->validate($data, [
 ```php
 class UserController extends ResourceController
 {
-    protected string $model = User::class;
+    protected string $modelClass = User::class;
 
     // 邮箱唯一
     protected array $uniqueFields = ['email'];
@@ -218,9 +218,9 @@ class UserController extends ResourceController
 ```php
 class UserController extends ResourceController
 {
-    protected string $model = User::class;
+    protected string $modelClass = User::class;
 
-    public function index(int $page = 1, int $pageSize = 10, ?string $name = null, ?int $status = null): JsonResponse
+    public function index(int $current = 1, int $pageSize = 20, ?string $name = null, ?int $status = null): JsonResponse
     {
         $where = [];
         if ($name !== null) {
@@ -230,7 +230,7 @@ class UserController extends ResourceController
             $where['status'] = $status;
         }
 
-        return $this->baseIndex($where, $page, $pageSize);
+        return $this->baseIndex($where, $current, $pageSize);
     }
 }
 ```
@@ -240,37 +240,42 @@ class UserController extends ResourceController
 ```php
 protected function baseIndex(
     array $where = [],                       // 查询条件（支持 _like / _range / _between / _in 后缀）
-    ?int $current = null,                    // 当前页码，为 null 时从请求 page 参数自动读取
-    ?int $pageSize = null,                   // 每页条数，为 null 时从请求 page_size 参数自动读取
+    int $current = 1,                        // 当前页码（调用方显式传入）
+    int $pageSize = 20,                      // 每页条数（调用方显式传入）
     array $append = [],                      // 追加属性
     array $with = [],                        // 关联预加载
     array|string|null $order = null,         // 排序，为 null 时从请求 order 参数自动读取
 ): JsonResponse
 ```
 
-> 分页与排序参数默认从请求中自动获取，通常只需传入 `$where` 即可。
+> 分页参数 `current` / `pageSize` 需由调用方显式传入；排序参数默认从请求中自动获取。
 
 #### 自定义新建/更新
 
 ```php
 class UserController extends ResourceController
 {
-    protected string $model = User::class;
+    protected string $modelClass = User::class;
 
-    public function save(): JsonResponse
+    // 请求体即为落库数据时，直接复用 baseSave / baseUpdate
+    public function save(Request $request): JsonResponse
     {
-        $data = $this->request->post();
-        $data['created_by'] = request()->loginId();  // 补充字段
-
-        return $this->baseSave($data);
+        return $this->baseSave($request);
     }
 
-    public function update(int $id): JsonResponse
+    public function update(Request $request, int $id): JsonResponse
     {
-        $data = $this->request->post();
-        $data['updated_by'] = request()->loginId();
+        return $this->baseUpdate($request, $id);
+    }
 
-        return $this->baseUpdate($id, $data);
+    // 需要补充字段（如 created_by）时，直接操作模型
+    public function saveWithAudit(Request $request): JsonResponse
+    {
+        $data                = $request->post();
+        $data['created_by']  = request()->loginId();
+
+        $model = $this->getModelClass();
+        return $this->success($model->create($data));
     }
 }
 ```
@@ -280,7 +285,7 @@ class UserController extends ResourceController
 ```php
 class UserController extends ResourceController
 {
-    protected string $model = User::class;
+    protected string $modelClass = User::class;
 
     public function read(int $id): JsonResponse
     {
@@ -377,7 +382,7 @@ class OrderController extends ResourceController
 {
     use HasDataPermission;
 
-    protected string $model = Order::class;
+    protected string $modelClass = Order::class;
 
     protected array $dataPermission = [
         'enabled'     => true,
@@ -459,7 +464,7 @@ class OrderController extends ResourceController
 {
     use HasTenant;
 
-    protected string $model = Order::class;
+    protected string $modelClass = Order::class;
 
     protected array $tenantConfig = [
         'enabled'        => true,
@@ -534,7 +539,7 @@ class OrderController extends ResourceController
 {
     use HasDataPermission, HasTenant;
 
-    protected string $model = Order::class;
+    protected string $modelClass = Order::class;
 
     protected function getTenantId(): ?int
     {

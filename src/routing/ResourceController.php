@@ -6,6 +6,7 @@ namespace Lychee\routing;
 
 use Lychee\http\Controller;
 use Lychee\http\JsonResponse;
+use Lychee\http\Request;
 use ReflectionClass;
 use think\db\Query;
 use think\exception\ValidateException;
@@ -33,10 +34,10 @@ abstract class ResourceController extends Controller
     protected bool $batchValidate = false;
 
     /** 模型类名，留空则按控制器名自动推断 */
-    protected string $model = '';
+    protected string $modelClass = '';
 
     /** 验证器类名 */
-    protected string $validate = '';
+    protected string $validateClass = '';
 
     /** 唯一约束字段，支持联合唯一 */
     protected array $uniqueFields = [];
@@ -53,10 +54,10 @@ abstract class ResourceController extends Controller
      */
     protected function paginate(
         Model|Query $query,
-        int $current = 1,
-        int $pageSize = 10,
-        string $msg = 'success',
-        int $code = 200,
+        int         $current = 1,
+        int         $pageSize = 10,
+        string      $msg = 'success',
+        int         $code = 200,
     ): JsonResponse {
         $current  = max(1, $current);
         $pageSize = max(1, min(200, $pageSize));
@@ -79,19 +80,19 @@ abstract class ResourceController extends Controller
     /**
      * 验证数据。
      *
-     * @param array        $data     数据
+     * @param array $data 数据
      * @param array|string $validate 验证器类名或规则数组（支持 "Class.scene" 场景语法）
-     * @param array        $message  提示信息
-     * @param bool         $batch    是否批量验证
+     * @param array $message 提示信息
+     * @param bool $batch 是否批量验证
      * @return true
      *
      * @throws \think\exception\ValidateException
      */
     protected function validate(
-        array $data,
+        array        $data,
         array|string $validate,
-        array $message = [],
-        bool $batch = false,
+        array        $message = [],
+        bool         $batch = false,
     ): true {
         if (is_array($validate)) {
             $v = new Validate();
@@ -131,14 +132,14 @@ abstract class ResourceController extends Controller
      */
     protected function formatValidateError(array|string $error): string
     {
-        return is_array($error) ? implode('；', $error) : (string) $error;
+        return is_array($error) ? implode('；', $error) : (string)$error;
     }
 
     // ── 模型解析 ────────────────────────────────────────────────────
 
-    protected function getModel(): Model
+    protected function getModelClass(): Model
     {
-        $class = $this->model !== '' ? $this->model : $this->guessModelClass();
+        $class = $this->modelClass !== '' ? $this->modelClass : $this->guessModelClass();
 
         if (!class_exists($class)) {
             throw new RuntimeException("模型类 {$class} 不存在");
@@ -215,7 +216,7 @@ abstract class ResourceController extends Controller
             $prop = $ref->getProperty('json');
             $prop->setAccessible(true);
 
-            return (array) $prop->getValue($model);
+            return (array)$prop->getValue($model);
         } catch (ReflectionException) {
             return [];
         }
@@ -228,7 +229,7 @@ abstract class ResourceController extends Controller
             $value = array_filter(explode(',', $value), 'strlen');
         }
 
-        $value = (array) $value;
+        $value = (array)$value;
         if (empty($value)) {
             return;
         }
@@ -240,7 +241,7 @@ abstract class ResourceController extends Controller
                     $q->$clause(
                         fn ($subQ) => $subQ->whereRaw(
                             "JSON_CONTAINS(`{$field}`, ?)",
-                            [json_encode((int) $id)]
+                            [json_encode((int)$id)]
                         )
                     );
                 }
@@ -297,37 +298,41 @@ abstract class ResourceController extends Controller
     /**
      * 列表查询。
      *
-     * 默认从请求 query 中读取所有参数作为查询条件，
+     * 默认从请求 query 中读取查询条件与分页参数，
      * 子类可覆盖此方法，手动构建 where 后调用 baseIndex()。
      */
     public function index(): JsonResponse
     {
-        return $this->baseIndex($this->request->get());
+        $current  = (int)$this->request->param('current', 1);
+        $pageSize = (int)$this->request->param('pageSize', 20);
+
+        return $this->baseIndex($this->request->get(), $current, $pageSize);
     }
 
     /**
      * 通用列表查询（可被子类复用）。
      *
-     * 分页参数（current / pageSize）与排序（order）默认从请求中自动获取，
-     * 子类调用时通常只需传入 $where 即可。
+     * 分页参数由调用方显式传入；排序（order）默认从请求中自动获取。
      *
-     * @param array              $where    查询条件（支持 _like / _range / _between / _in 后缀 DSL）
-     * @param array              $append   追加属性
-     * @param array              $with     关联预加载
-     * @param array|string|null  $order    排序，为 null 时从请求 order 参数读取
+     * @param array $where 查询条件（支持 _like / _range / _between / _in 后缀 DSL）
+     * @param int $current 当前页码
+     * @param int $pageSize 每页条数
+     * @param array $append 追加属性
+     * @param array $with 关联预加载
+     * @param array|string|null $order 排序，为 null 时从请求 order 参数读取
      */
     protected function baseIndex(
-        array $where = [],
-        array $append = [],
-        array $with = [],
+        array             $where = [],
+        int               $current = 1,
+        int               $pageSize = 20,
+        array             $append = [],
+        array             $with = [],
         array|string|null $order = null,
     ): JsonResponse {
         try {
-            $current  = (int) $this->request->param('current', 1);
-            $pageSize = (int) $this->request->param('pageSize', 20);
             $order ??= $this->request->param('order', ['create_time' => 'desc']);
 
-            $model = $this->getModel();
+            $model = $this->getModelClass();
             $this->applyWhere($model, $where);
 
             if (!empty($append)) {
@@ -351,24 +356,25 @@ abstract class ResourceController extends Controller
         }
     }
 
-    public function save(): JsonResponse
+    public function save(Request $request): JsonResponse
     {
-        return $this->baseSave($this->request->post());
+        return $this->baseSave($request);
     }
 
     /**
      * 通用新建方法（可被子类复用）。
      *
-     * @param array $postData 请求数据
+     * @param Request $request 请求对象，内部取 $request->post() 作为写入数据
      * @param array $uniqueFields 唯一约束字段（为空时使用 $this->uniqueFields）
      */
-    protected function baseSave(array $postData, array $uniqueFields = []): JsonResponse
+    protected function baseSave(Request $request, array $uniqueFields = []): JsonResponse
     {
         try {
-            $model = $this->getModel();
+            $postData = $request->post();
+            $model    = $this->getModelClass();
 
-            if ($this->validate !== '') {
-                $this->validate($postData, $this->validate);
+            if ($this->validateClass !== '') {
+                $this->validate($postData, $this->validateClass);
             }
 
             $fields = empty($uniqueFields) ? $this->uniqueFields : $uniqueFields;
@@ -399,13 +405,13 @@ abstract class ResourceController extends Controller
     /**
      * 通用读取方法（可被子类复用）。
      *
-     * @param int   $id     主键 ID
+     * @param int $id 主键 ID
      * @param array $append 追加属性
      */
     protected function baseRead(int $id, array $append = []): JsonResponse
     {
         try {
-            $model = $this->getModel();
+            $model = $this->getModelClass();
             $query = $this->applyDataPermission($model);
             $query = $this->applyTenantScope($query);
             $data  = $query->find($id);
@@ -424,25 +430,26 @@ abstract class ResourceController extends Controller
         }
     }
 
-    public function update(int $id): JsonResponse
+    public function update(Request $request, int $id): JsonResponse
     {
-        return $this->baseUpdate($id, $this->request->post());
+        return $this->baseUpdate($request, $id);
     }
 
     /**
      * 通用更新方法（可被子类复用）。
      *
-     * @param int   $id           主键 ID
-     * @param array $postData     请求数据
+     * @param Request $request 请求对象，内部取 $request->post() 作为写入数据
+     * @param int $id 主键 ID
      * @param array $uniqueFields 唯一约束字段（为空时使用 $this->uniqueFields）
      */
-    protected function baseUpdate(int $id, array $postData, array $uniqueFields = []): JsonResponse
+    protected function baseUpdate(Request $request, int $id, array $uniqueFields = []): JsonResponse
     {
         try {
-            $model = $this->getModel();
+            $postData = $request->post();
+            $model    = $this->getModelClass();
 
-            if ($this->validate !== '') {
-                $this->validate($postData, $this->validate);
+            if ($this->validateClass !== '') {
+                $this->validate($postData, $this->validateClass);
             }
 
             $query = $this->applyDataPermission($model);
@@ -484,7 +491,7 @@ abstract class ResourceController extends Controller
     protected function baseDelete(int $id): JsonResponse
     {
         try {
-            $model = $this->getModel();
+            $model = $this->getModelClass();
             $query = $this->applyDataPermission($model);
             $query = $this->applyTenantScope($query);
             $data  = $query->find($id);
@@ -499,26 +506,32 @@ abstract class ResourceController extends Controller
         }
     }
 
-    public function batch_delete(): JsonResponse
+    public function batch_delete(Request $request): JsonResponse
     {
-        $ids = (array) ($this->request->post()['ids'] ?? []);
-
-        return $this->baseBatchDelete($ids);
+        return $this->baseBatchDelete($request);
     }
 
     /**
      * 通用批量删除方法（可被子类复用）。
      *
-     * @param array $ids 主键 ID 列表
+     * 从请求体的 ids 字段读取待删除 ID 列表，并校验不能为空。
+     *
+     * @param Request $request 请求对象，内部取 $request->post('ids')
      */
-    protected function baseBatchDelete(array $ids): JsonResponse
+    protected function baseBatchDelete(Request $request): JsonResponse
     {
         try {
-            if (empty($ids)) {
-                return $this->fail('ids 参数不能为空');
-            }
+            $data = ['ids' => $request->post('ids', [])];
 
-            $model = $this->getModel();
+            $this->validate(
+                $data,
+                ['ids' => 'require'],
+                ['ids.require' => 'ids 参数不能为空']
+            );
+
+            $ids = (array) $data['ids'];
+
+            $model = $this->getModelClass();
             $query = $this->applyDataPermission($model);
             $query = $this->applyTenantScope($query);
             $list  = $query->whereIn('id', $ids)->select();
@@ -528,6 +541,8 @@ abstract class ResourceController extends Controller
             }
 
             return $this->success($list->delete());
+        } catch (ValidateException $e) {
+            return $this->fail($this->formatValidateError($e->getError()));
         } catch (Throwable $e) {
             return $this->fail($e->getMessage());
         }
