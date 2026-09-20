@@ -34,7 +34,7 @@ class MigrationTest extends TestCase
         $this->createMigrationFile('20240101000000_create_users_table.php', 'CreateUsersTableMigration');
         $this->createMigrationFile('20240102000000_create_posts_table.php', 'CreatePostsTableMigration');
 
-        $pdo     = $this->createMock(PDO::class);
+        $pdo     = $this->createStub(PDO::class);
         $manager = new MigrationManager($pdo, $this->migrationPath, $this->seederPath);
 
         $migrations = $manager->getMigrations();
@@ -51,7 +51,7 @@ class MigrationTest extends TestCase
         file_put_contents($this->migrationPath . '/invalid.php', '<?php echo "not a migration";');
         $this->createMigrationFile('20240101000000_create_users_table.php', 'CreateUsersTable');
 
-        $pdo     = $this->createMock(PDO::class);
+        $pdo     = $this->createStub(PDO::class);
         $manager = new MigrationManager($pdo, $this->migrationPath, $this->seederPath);
 
         $migrations = $manager->getMigrations();
@@ -64,7 +64,7 @@ class MigrationTest extends TestCase
         $this->createSeederFile('UserSeeder.php', 'UserSeeder');
         $this->createSeederFile('PostSeeder.php', 'PostSeeder');
 
-        $pdo     = $this->createMock(PDO::class);
+        $pdo     = $this->createStub(PDO::class);
         $manager = new MigrationManager($pdo, $this->migrationPath, $this->seederPath);
 
         $seeders = $manager->getSeeders();
@@ -78,7 +78,7 @@ class MigrationTest extends TestCase
         $this->createMigrationFile('20240101000000_first.php', 'First');
         $this->createMigrationFile('20240102000000_second.php', 'Second');
 
-        $pdo     = $this->createMock(PDO::class);
+        $pdo     = $this->createStub(PDO::class);
         $manager = new MigrationManager($pdo, $this->migrationPath, $this->seederPath);
 
         $versions = array_map('strval', array_keys($manager->getMigrations()));

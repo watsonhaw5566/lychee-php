@@ -59,9 +59,10 @@ class CronTest extends TestCase
     public function test_run_skips_non_due_tasks(): void
     {
         $executed = false;
-        // 每分钟的第 0 秒才触发，使用一个肯定不会匹配当前分钟的表达式
+        // 使用一年后的同一时刻构造表达式：月/日/时/分与当前相同，
+        // 但星期必然不同（365/366 天模 7 余 1 或 2），因此不会匹配当前时间
         $future = (new DateTimeImmutable())->modify('+1 year');
-        $expr   = $future->format('i G j n ') . '0'; // 未来的某个时间
+        $expr   = $future->format('i G j n w');
 
         $this->scheduler->call('future-task', $expr, function () use (&$executed) {
             $executed = true;

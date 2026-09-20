@@ -69,7 +69,7 @@ class FilesystemTest extends TestCase
         $tmpFile = tempnam(sys_get_temp_dir(), 'upl_');
         file_put_contents($tmpFile, 'uploaded content');
 
-        $file = $this->createMock(UploadedFile::class);
+        $file = $this->createStub(UploadedFile::class);
         $file->method('isValid')->willReturn(true);
         $file->method('getStream')->willReturn(fopen($tmpFile, 'r'));
         $file->method('extension')->willReturn('txt');
@@ -93,7 +93,7 @@ class FilesystemTest extends TestCase
         $tmpFile = tempnam(sys_get_temp_dir(), 'upl_');
         file_put_contents($tmpFile, 'custom named file');
 
-        $file = $this->createMock(UploadedFile::class);
+        $file = $this->createStub(UploadedFile::class);
         $file->method('isValid')->willReturn(true);
         $file->method('getStream')->willReturn(fopen($tmpFile, 'r'));
 
@@ -111,7 +111,7 @@ class FilesystemTest extends TestCase
     {
         $disk = $this->manager->disk('local');
 
-        $file = $this->createMock(UploadedFile::class);
+        $file = $this->createStub(UploadedFile::class);
         $file->method('isValid')->willReturn(false);
 
         $this->assertFalse($disk->putFile('uploads', $file));
