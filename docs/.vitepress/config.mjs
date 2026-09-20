@@ -46,7 +46,7 @@ export default defineConfig({
                     {text: '定时任务', link: '/cron'},
                     {text: '认证', link: '/auth'},
                     {text: '限速', link: '/throttle'},
-                    {text: '跨域 CORS', link: '/cors'},
+                    {text: '跨域', link: '/cors'},
                     {text: '验证码', link: '/captcha'},
                     {text: '命令行', link: '/console'},
                     {text: '插件', link: '/plugin'},
