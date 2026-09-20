@@ -6,6 +6,7 @@ namespace Lychee\http;
 
 use Lychee\container\Container;
 use Lychee\routing\RouteMatch;
+use Lychee\routing\RouteNotFoundException;
 use Lychee\routing\Router;
 use ReflectionMethod;
 use ReflectionNamedType;
@@ -31,6 +32,14 @@ class Kernel
     {
         try {
             $route = $this->router->dispatch($request->method, $request->path);
+        } catch (RouteNotFoundException $e) {
+            // 跨域预检（OPTIONS）通常不会逐路由注册：未命中路由时仍交给全局
+            // 中间件管道处理，由 CORS 中间件短路返回预检响应
+            if ($request->method === 'OPTIONS') {
+                return $this->handlePreflight($request);
+            }
+
+            return $this->exceptionResponse($request, $e);
         } catch (Throwable $e) {
             return $this->exceptionResponse($request, $e);
         }
@@ -48,6 +57,27 @@ class Kernel
                 function (Request $req) use ($route): Response {
                     return $this->callController($req, $route);
                 }
+            );
+        } catch (Throwable $e) {
+            return $this->exceptionResponse($request, $e);
+        }
+    }
+
+    /**
+     * 处理未命中路由的 OPTIONS 预检请求。
+     *
+     * 仅经过全局中间件管道（CORS 等跨域中间件通常注册于此），
+     * 管道终点返回 204 No Content。
+     */
+    private function handlePreflight(Request $request): Response
+    {
+        $globalMiddlewares = (array) config('middleware', []);
+
+        try {
+            return $this->pipeline->handle(
+                $request,
+                $globalMiddlewares,
+                static fn (Request $_request): Response => new Response('', 204),
             );
         } catch (Throwable $e) {
             return $this->exceptionResponse($request, $e);

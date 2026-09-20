@@ -4,7 +4,8 @@
 开发者可按需选择：
 
 - **需要 CRUD 的控制器**：继承 `Lychee\routing\ResourceController`，获得请求注入、统一响应、验证快捷方式和零代码 CRUD 能力
-- **不需要 CRUD 的控制器**：直接写普通类，使用全局助手 `success()` / `fail()` / `json()` 返回响应
+- **不需要 CRUD 但想便捷响应**：继承 `Lychee\http\Controller`，获得请求注入与 `success()` / `fail()` 响应快捷方法
+- **完全自定义**：直接写普通类，使用全局助手 `success()` / `fail()` / `json()` 返回响应
 
 ## 资源控制器 ResourceController
 
@@ -294,9 +295,45 @@ class UserController extends ResourceController
 }
 ```
 
+## 基础控制器 Controller
+
+继承 `Lychee\http\Controller` 可获得请求注入、`initialize()` 生命周期钩子与统一 JSON 响应快捷方法，
+适用于不需要 CRUD、但希望使用 `$this->request` 和 `$this->success()` / `$this->fail()` 的场景。
+
+```php
+namespace App\controller;
+
+use Lychee\http\Controller;
+use Lychee\http\JsonResponse;
+use Lychee\routing\Route;
+
+#[Route('/upload')]
+class UploadController extends Controller
+{
+    public function index(): JsonResponse
+    {
+        $file = $this->request->file('file');
+
+        return $this->success(['name' => $file?->getOriginalName()]);
+    }
+}
+```
+
+### 提供的能力
+
+| 成员 | 说明 |
+| --- | --- |
+| `$this->app` | 容器实例 |
+| `$this->request` | 请求实例 |
+| `initialize()` | 初始化钩子，在中间件之后、方法调用前执行 |
+| `$this->success($data, $msg, $code)` | 成功 JSON 响应 |
+| `$this->fail($msg, $code)` | 失败 JSON 响应 |
+
+> `Lychee\routing\ResourceController` 继承自此基类，因此资源控制器同样拥有以上能力。
+
 ## 不继承基类的控制器
 
-如果控制器不需要 CRUD，可以不继承任何基类，直接使用全局助手返回响应：
+如果控制器不需要 CRUD，也不需要基类提供的便捷能力，可以不继承任何基类，直接使用全局助手返回响应：
 
 ```php
 namespace App\controller;
