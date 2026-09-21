@@ -10,6 +10,7 @@ use Lychee\http\Request;
 use Lychee\http\Response;
 use PHPUnit\Framework\TestCase;
 use think\DbManager;
+use RuntimeException;
 
 /**
  * Lychee 测试基类。
@@ -91,7 +92,7 @@ abstract class LycheeTestCase extends TestCase
             return $cwd;
         }
 
-        throw new \RuntimeException('请设置 protected string $basePath = ...');
+        throw new RuntimeException('请设置 protected string $basePath = ...');
     }
 
     // ── 请求模拟 ──
