@@ -8,6 +8,16 @@
 
 ## 安装
 
+推荐使用项目模板一键创建完整的应用骨架：
+
+```bash
+composer create-project watsonhaw/lychee-php-project your-app
+```
+
+模板仓库地址：[lychee-php-project](https://github.com/watsonhaw5566/lychee-php-project)，已包含推荐的目录结构、入口文件和示例配置。
+
+如需手动安装到已有项目：
+
 ```bash
 composer require watsonhaw/lychee-php
 ```
@@ -25,7 +35,7 @@ use Lychee\Application;
 
 $app = new Application(
     basePath: dirname(__DIR__),
-    controllerNamespace: 'App\\controller',
+    controllerNamespace: 'app\\controller',
 );
 
 $app->run();
@@ -44,7 +54,7 @@ use Lychee\Application;
 
 $app = new Application(
     basePath: __DIR__,
-    controllerNamespace: 'App\\controller',
+    controllerNamespace: 'app\\controller',
 );
 
 $console = $app->container->get(Console::class);
