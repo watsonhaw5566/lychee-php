@@ -163,7 +163,7 @@ abstract class ResourceController extends Controller
     // ── 查询 DSL ────────────────────────────────────────────────────
 
     /**
-     * 应用查询条件到模型。
+     * 应用查询条件到查询对象。
      *
      * 支持的字段后缀：
      *   - _like:    模糊匹配（LIKE %value%）
@@ -171,9 +171,10 @@ abstract class ResourceController extends Controller
      *   - _between: 数值范围（whereBetween）
      *   - _in:      集合匹配（JSON 数组字段自动使用 JSON_CONTAINS）
      */
-    protected function applyWhere(Model $query, array $where): Model
+    protected function applyWhere(Model|Query $query, array $where): Model|Query
     {
-        $jsonFields = $this->getJsonFields($query);
+        $model      = $query instanceof Model ? $query : $query->getModel();
+        $jsonFields = $this->getJsonFields($model);
 
         foreach ($where as $field => $value) {
             if ($value === null || $value === '') {
@@ -226,7 +227,7 @@ abstract class ResourceController extends Controller
     }
 
     /** 处理 _in 查询，JSON 数组字段使用 JSON_CONTAINS */
-    protected function applyInClause(Model $query, string $field, mixed $value, array $jsonFields): void
+    protected function applyInClause(Model|Query $query, string $field, mixed $value, array $jsonFields): void
     {
         if (is_string($value)) {
             $value = array_filter(explode(',', $value), 'strlen');
@@ -339,22 +340,25 @@ abstract class ResourceController extends Controller
                 $order = $this->order;
             }
 
-            $model = $this->getModelClass();
-            $this->applyWhere($model, $where);
+            // 注意：必须先通过 db() 拿到 Query 对象。
+            // Model::__call 每次都会创建新的 Query，直接在 Model 上调用
+            // where/order/append/with 返回值会被丢弃，导致条件不生效。
+            $query = $this->getModelClass()->db();
+            $this->applyWhere($query, $where);
 
             if (!empty($append)) {
-                $model->append($append);
+                $query->append($append);
             }
             if (!empty($with)) {
-                $model->with($with);
+                $query->with($with);
             }
 
             if (is_string($order)) {
                 $order = [$order => 'desc'];
             }
-            $model->order($order);
+            $query->order($order);
 
-            $query = $this->applyDataPermission($model);
+            $query = $this->applyDataPermission($query);
             $query = $this->applyTenantScope($query);
 
             return $this->paginate($query, $current, $pageSize);
@@ -418,8 +422,8 @@ abstract class ResourceController extends Controller
     protected function baseRead(int $id, array $append = []): JsonResponse
     {
         try {
-            $model = $this->getModelClass();
-            $query = $this->applyDataPermission($model);
+            $query = $this->getModelClass()->db();
+            $query = $this->applyDataPermission($query);
             $query = $this->applyTenantScope($query);
             $data  = $query->find($id);
 
@@ -453,13 +457,15 @@ abstract class ResourceController extends Controller
     {
         try {
             $postData = $request->post();
-            $model    = $this->getModelClass();
 
             if ($this->validateClass !== '') {
                 $this->validate($postData, $this->validateClass);
             }
 
-            $query = $this->applyDataPermission($model);
+            $model = $this->getModelClass();
+
+            $query = $model->db();
+            $query = $this->applyDataPermission($query);
             $query = $this->applyTenantScope($query);
             $info  = $query->find($id);
 
@@ -498,8 +504,8 @@ abstract class ResourceController extends Controller
     protected function baseDelete(int $id): JsonResponse
     {
         try {
-            $model = $this->getModelClass();
-            $query = $this->applyDataPermission($model);
+            $query = $this->getModelClass()->db();
+            $query = $this->applyDataPermission($query);
             $query = $this->applyTenantScope($query);
             $data  = $query->find($id);
 
@@ -539,7 +545,8 @@ abstract class ResourceController extends Controller
             $ids = (array) $data['ids'];
 
             $model = $this->getModelClass();
-            $query = $this->applyDataPermission($model);
+            $query = $model->db();
+            $query = $this->applyDataPermission($query);
             $query = $this->applyTenantScope($query);
             $list  = $query->whereIn('id', $ids)->select();
 
