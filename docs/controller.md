@@ -208,6 +208,36 @@ class UserController extends ResourceController
 }
 ```
 
+### 列表搜索与排序（零代码配置）
+
+继承 `ResourceController` 后，`index()` 无需重写即可自动支持搜索与排序，通过三个属性配置：
+
+```php
+class UserController extends ResourceController
+{
+    protected string $modelClass = User::class;
+
+    /** 搜索字段白名单：只允许这些字段作为查询条件（支持 _like 等后缀 DSL） */
+    protected array $searchFields = ['username_like', 'status'];
+
+    /** 分页参数名：[当前页, 每页条数]，默认 ['current', 'pageSize'] */
+    protected array $pageFields = ['page', 'limit'];
+
+    /** 默认排序，请求未传 order 时使用 */
+    protected array $order = ['create_time' => 'desc'];
+}
+```
+
+- `searchFields`：白名单内的字段才会从 GET 参数中提取为查询条件，避免前端传任意字段触发异常查询；为空（默认）时取全部 GET 参数。
+- `pageFields`：分页参数名，默认 `['current', 'pageSize']`，可自定义为 `['page', 'limit']` 等。
+- `order`：列表默认排序，请求传了 `order` 参数时以请求为准。
+
+请求示例：
+
+```
+GET /api/users?username_like=张&status=1&current=1&pageSize=10
+```
+
 ### 自定义方法与 base* 复用
 
 需要自定义逻辑时，可覆盖对应方法。框架提供了 `baseIndex` / `baseSave` / `baseRead` / `baseUpdate` / `baseDelete` / `baseBatchDelete` 六个 protected 方法，

@@ -48,6 +48,19 @@ abstract class ResourceController extends Controller
     /** 默认排序，列表查询未指定 order 时使用 */
     protected array $order = ['create_time' => 'desc'];
 
+    /**
+     * 列表搜索字段白名单（支持 _like / _range / _between / _in 后缀）。
+     * 为空时从全部 GET 参数中提取查询条件。
+     * @var array<int, string>
+     */
+    protected array $searchFields = [];
+
+    /**
+     * 分页参数名，[当前页, 每页条数]。
+     * @var array{0: string, 1: string}
+     */
+    protected array $pageFields = ['current', 'pageSize'];
+
     // ── 统一 JSON 响应（格式可被子类覆盖）──────────────────────────
 
     /**
@@ -302,15 +315,32 @@ abstract class ResourceController extends Controller
     /**
      * 列表查询。
      *
-     * 默认从请求 query 中读取查询条件与分页参数，
+     * 分页参数名由 $pageFields 指定（默认 current / pageSize）；
+     * 查询条件按 $searchFields 白名单从 GET 参数中提取，
+     * 白名单为空时取全部 GET 参数。
      * 子类可覆盖此方法，手动构建 where 后调用 baseIndex()。
      */
     public function index(): JsonResponse
     {
-        $current  = (int)$this->request->param('current', 1);
-        $pageSize = (int)$this->request->param('pageSize', 20);
+        [$pageKey, $sizeKey] = $this->pageFields;
 
-        return $this->baseIndex($this->request->get(), $current, $pageSize);
+        $current  = (int)$this->request->param($pageKey, 1);
+        $pageSize = (int)$this->request->param($sizeKey, 20);
+
+        $all = $this->request->get();
+
+        if (!empty($this->searchFields)) {
+            $where = [];
+            foreach ($this->searchFields as $field) {
+                if (array_key_exists($field, $all) && $all[$field] !== '' && $all[$field] !== null) {
+                    $where[$field] = $all[$field];
+                }
+            }
+        } else {
+            $where = $all;
+        }
+
+        return $this->baseIndex($where, $current, $pageSize);
     }
 
     /**
