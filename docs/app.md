@@ -19,6 +19,10 @@ return [
     // 自定义异常处理器类名，需继承 Lychee\http\ExceptionHandler
     'exception_handler' => '',
 
+    // 异常渲染模式：auto（按 Accept 自动判断）/ html（始终渲染 HTML）/ json（始终返回 JSON）
+    // 纯 API 应用建议设为 'json'
+    'exception_render'  => 'auto',
+
     // 校验提示语言：'zh'（默认）中文 | 'en' 英文
     'validate_lang' => 'zh',
 ];
@@ -98,6 +102,23 @@ $message = $debug || $showErrorMsg
 ```php
 // config/app.php
 'exception_handler' => \App\exception\Handler::class,
+```
+
+### exception_render
+
+异常响应的渲染模式，控制未捕获异常返回 HTML 还是 JSON。
+
+| 取值 | 行为 | 适用场景 |
+| --- | --- | --- |
+| `'auto'`（默认） | 按 `Accept` header 判断：`application/json` 返回 JSON，`text/html`/`*/*` 渲染 HTML | 混合应用 |
+| `'html'` | 始终渲染 HTML 异常页 | 传统 Web 应用（服务端渲染） |
+| `'json'` | 始终返回 JSON 错误响应 | 纯 API 应用（前后端分离） |
+
+纯 API 应用建议设为 `'json'`，避免 curl/Postman 等客户端因默认 `Accept: */*` 收到 HTML 页面：
+
+```php
+// config/app.php
+'exception_render' => 'json',
 ```
 
 #### 自定义异常处理器

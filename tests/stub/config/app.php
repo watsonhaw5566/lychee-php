@@ -18,4 +18,8 @@ return [
     // 异常处理器类名，需继承 Lychee\http\ExceptionHandler
     // 留空或不配置时使用框架默认处理器
     'exception_handler' => '',
+
+    // 异常渲染模式：auto（按 Accept 自动判断）/ html（始终渲染 HTML）/ json（始终返回 JSON）
+    // 纯 API 应用建议设为 'json'
+    'exception_render'  => 'auto',
 ];
