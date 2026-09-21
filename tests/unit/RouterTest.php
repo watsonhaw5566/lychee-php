@@ -172,8 +172,8 @@ class RouterTest extends TestCase
         // 若方法显式设置 prefix，则以方法级为准
         // 这里 OrderController 的方法没有显式 #[Route]，所以都使用类级 prefix: ''
         // 验证类级 prefix: '' 生效
-        $routes = $router->getRoutes();
-        $orderRoutes = array_filter($routes, fn($r) => $r['controller'] === \Tests\stub\app\prefix\OrderController::class);
+        $routes      = $router->getRoutes();
+        $orderRoutes = array_filter($routes, fn ($r) => $r['controller'] === \Tests\stub\app\prefix\OrderController::class);
         foreach ($orderRoutes as $route) {
             $this->assertStringStartsNotWith('/api', $route['path']);
         }

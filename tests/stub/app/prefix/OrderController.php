@@ -6,7 +6,6 @@ namespace Tests\stub\app\prefix;
 
 use Lychee\http\JsonResponse;
 use Lychee\routing\Resource;
-use Lychee\routing\Route;
 
 /**
  * 资源路由 + prefix 覆盖测试。

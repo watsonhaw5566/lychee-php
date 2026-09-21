@@ -51,9 +51,9 @@ class Router
     {
         $ref = new ReflectionClass($controllerClass);
 
-        $prefix           = $this->resolvePrefix($ref);
-        $classPrefix      = $this->resolveClassPrefixOverride($ref);
-        $isResource       = !empty($ref->getAttributes(Resource::class));
+        $prefix      = $this->resolvePrefix($ref);
+        $classPrefix = $this->resolveClassPrefixOverride($ref);
+        $isResource  = !empty($ref->getAttributes(Resource::class));
 
         $classMiddlewares = $this->collectMiddlewares($ref);
 
