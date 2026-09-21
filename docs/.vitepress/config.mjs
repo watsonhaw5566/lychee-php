@@ -50,6 +50,7 @@ export default defineConfig({
                     {text: '验证码', link: '/captcha'},
                     {text: '命令行', link: '/console'},
                     {text: '插件', link: '/plugin'},
+                    {text: '测试', link: '/testing'},
                 ],
             },
             {
@@ -102,6 +103,7 @@ export default defineConfig({
                     {text: '验证码 Captcha', link: '/captcha'},
                     {text: '命令行 Console', link: '/console'},
                     {text: '插件 Plugin', link: '/plugin'},
+                    {text: '测试 Testing', link: '/testing'},
                 ],
             },
             {
