@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\feature;
 
 use Lychee\migration\MigrationManager;
+use Lychee\migration\Table;
 use PHPUnit\Framework\TestCase;
 use PDO;
 
@@ -13,6 +14,7 @@ class MigrationTest extends TestCase
     private string $tempDir;
     private string $migrationPath;
     private string $seederPath;
+    private PDO $pdo;
 
     protected function setUp(): void
     {
@@ -22,6 +24,9 @@ class MigrationTest extends TestCase
 
         mkdir($this->migrationPath, 0777, true);
         mkdir($this->seederPath, 0777, true);
+
+        $this->pdo = new PDO('sqlite::memory:');
+        $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     }
 
     protected function tearDown(): void
@@ -134,5 +139,107 @@ PHP;
             }
         }
         rmdir($dir);
+    }
+
+    /**
+     * 获取表的列信息。
+     *
+     * @return array<string, array{name: string, type: string, notnull: int, dflt_value: string|null}>
+     */
+    private function getColumns(string $table): array
+    {
+        $stmt = $this->pdo->query(sprintf('PRAGMA table_info(`%s`)', $table));
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+
+        $columns = [];
+        foreach ($rows as $row) {
+            $columns[$row['name']] = [
+                'name'       => $row['name'],
+                'type'       => $row['type'],
+                'notnull'    => (int)$row['notnull'],
+                'dflt_value' => $row['dflt_value'],
+            ];
+        }
+
+        return $columns;
+    }
+
+    public function test_add_datetimes_creates_create_and_update_time_as_datetime(): void
+    {
+        $table = new Table('test_datetimes', $this->pdo);
+        $table->addDatetimes()->create();
+
+        $columns = $this->getColumns('test_datetimes');
+
+        $this->assertArrayHasKey('create_time', $columns);
+        $this->assertArrayHasKey('update_time', $columns);
+        $this->assertSame('DATETIME', strtoupper($columns['create_time']['type']));
+        $this->assertSame('DATETIME', strtoupper($columns['update_time']['type']));
+    }
+
+    public function test_add_datetimes_create_time_is_not_null(): void
+    {
+        $table = new Table('test_datetimes_notnull', $this->pdo);
+        $table->addDatetimes()->create();
+
+        $columns = $this->getColumns('test_datetimes_notnull');
+
+        $this->assertSame(1, $columns['create_time']['notnull']);
+    }
+
+    public function test_add_datetimes_update_time_is_nullable(): void
+    {
+        $table = new Table('test_datetimes_nullable', $this->pdo);
+        $table->addDatetimes()->create();
+
+        $columns = $this->getColumns('test_datetimes_nullable');
+
+        $this->assertSame(0, $columns['update_time']['notnull']);
+    }
+
+    public function test_add_datetimes_supports_custom_field_names(): void
+    {
+        $table = new Table('test_datetimes_custom', $this->pdo);
+        $table->addDatetimes('created_at', 'updated_at')->create();
+
+        $columns = $this->getColumns('test_datetimes_custom');
+
+        $this->assertArrayHasKey('created_at', $columns);
+        $this->assertArrayHasKey('updated_at', $columns);
+        $this->assertArrayNotHasKey('create_time', $columns);
+        $this->assertArrayNotHasKey('update_time', $columns);
+    }
+
+    public function test_add_timestamps_uses_timestamp_type(): void
+    {
+        $table = new Table('test_timestamps', $this->pdo);
+        $table->addTimestamps()->create();
+
+        $columns = $this->getColumns('test_timestamps');
+
+        $this->assertSame('TIMESTAMP', strtoupper($columns['create_time']['type']));
+        $this->assertSame('TIMESTAMP', strtoupper($columns['update_time']['type']));
+    }
+
+    public function test_add_soft_delete_creates_nullable_delete_time(): void
+    {
+        $table = new Table('test_soft_delete', $this->pdo);
+        $table->addSoftDelete()->create();
+
+        $columns = $this->getColumns('test_soft_delete');
+
+        $this->assertArrayHasKey('delete_time', $columns);
+        $this->assertSame(0, $columns['delete_time']['notnull']);
+    }
+
+    public function test_add_soft_delete_supports_custom_name(): void
+    {
+        $table = new Table('test_soft_delete_custom', $this->pdo);
+        $table->addSoftDelete('deleted_at')->create();
+
+        $columns = $this->getColumns('test_soft_delete_custom');
+
+        $this->assertArrayHasKey('deleted_at', $columns);
+        $this->assertArrayNotHasKey('delete_time', $columns);
     }
 }

@@ -234,6 +234,24 @@ class Table
     }
 
     /**
+     * 添加 create_time / update_time 时间字段（DATETIME 类型）。
+     *
+     * 与 addTimestamps() 的区别在于字段类型为 DATETIME，可存储更大范围的日期，
+     * 且不受 TIMESTAMP 的时区与 2038 年问题影响。
+     */
+    public function addDatetimes(string $createTime = 'create_time', string $updateTime = 'update_time'): static
+    {
+        $this->addColumn($createTime, 'datetime', ['null' => false, 'default' => 'CURRENT_TIMESTAMP']);
+        $this->addColumn($updateTime, 'datetime', [
+            'null'    => true,
+            'default' => 'CURRENT_TIMESTAMP',
+            'update'  => 'CURRENT_TIMESTAMP',
+        ]);
+
+        return $this;
+    }
+
+    /**
      * 添加软删除字段 delete_time。
      */
     public function addSoftDelete(string $name = 'delete_time'): static
