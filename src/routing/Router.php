@@ -33,7 +33,7 @@ class Router
         'batch_delete' => ['methods' => ['DELETE'],          'path' => '/'],
     ];
     private string $routePrefix;
-    /** @var array<int, array{method:string, path:string, pattern:string, controller:class-string, action:string, middlewares:array<class-string>}> */
+    /** @var array<int, array{method:string, path:string, pattern:string, controller:class-string, action:string, middlewares:array<class-string>, cache:?int}> */
     private array $routes = [];
 
     /** @var array<string, string> */
@@ -54,6 +54,7 @@ class Router
         $prefix      = $this->resolvePrefix($ref);
         $classPrefix = $this->resolveClassPrefixOverride($ref);
         $isResource  = !empty($ref->getAttributes(Resource::class));
+        $classCache  = $this->resolveClassCache($ref);
 
         $classMiddlewares = $this->collectMiddlewares($ref);
 
@@ -67,6 +68,8 @@ class Router
             $globalPrefix      = $route->prefix ?? $classPrefix ?? $this->routePrefix;
             $path              = $this->joinPath($prefix, $route->path, $globalPrefix);
             $methodMiddlewares = $this->resolveMethodMiddlewares($method, $classMiddlewares);
+            // 方法级 cache 优先，否则回退到类级
+            $cache             = $route->cache ?? $classCache;
 
             $this->routes[] = [
                 'method'      => strtoupper($route->method),
@@ -75,6 +78,7 @@ class Router
                 'controller'  => $controllerClass,
                 'action'      => $method->getName(),
                 'middlewares' => $methodMiddlewares,
+                'cache'       => $cache,
             ];
 
             if ($route->name !== '') {
@@ -83,7 +87,7 @@ class Router
         }
 
         if ($isResource) {
-            $this->registerResourceRoutes($ref, $controllerClass, $prefix, $classPrefix, $classMiddlewares);
+            $this->registerResourceRoutes($ref, $controllerClass, $prefix, $classPrefix, $classMiddlewares, $classCache);
         }
     }
 
@@ -101,6 +105,7 @@ class Router
         string $prefix,
         ?string $classPrefix,
         array $classMiddlewares,
+        ?int $classCache,
     ): void {
         $globalPrefix = $classPrefix ?? $this->routePrefix;
 
@@ -130,6 +135,7 @@ class Router
                     'controller'  => $controllerClass,
                     'action'      => $action,
                     'middlewares' => $middlewares,
+                    'cache'       => $classCache,
                 ];
             }
         }
@@ -179,6 +185,7 @@ class Router
                     action: $route['action'],
                     params: $params,
                     middlewares: $route['middlewares'],
+                    cache: $route['cache'],
                 );
             }
         }
@@ -189,7 +196,7 @@ class Router
     /**
      * 获取所有已注册的路由。
      *
-     * @return array<int, array{method:string, path:string, pattern:string, controller:class-string, action:string, middlewares:array<class-string>}>
+     * @return array<int, array{method:string, path:string, pattern:string, controller:class-string, action:string, middlewares:array<class-string>, cache:?int}>
      */
     public function getRoutes(): array
     {
@@ -232,6 +239,27 @@ class Router
         $routeAttrs = $ref->getAttributes(Route::class);
         if (!empty($routeAttrs)) {
             return $routeAttrs[0]->newInstance()->prefix;
+        }
+
+        return null;
+    }
+
+    /**
+     * 解析控制器类级别的缓存 TTL。
+     *
+     * 优先使用 #[Resource] 的 cache，其次回退到类级 #[Route] 的 cache。
+     * 返回 null 表示未设置缓存。
+     */
+    private function resolveClassCache(ReflectionClass $ref): ?int
+    {
+        $resourceAttrs = $ref->getAttributes(Resource::class);
+        if (!empty($resourceAttrs)) {
+            return $resourceAttrs[0]->newInstance()->cache;
+        }
+
+        $routeAttrs = $ref->getAttributes(Route::class);
+        if (!empty($routeAttrs)) {
+            return $routeAttrs[0]->newInstance()->cache;
         }
 
         return null;

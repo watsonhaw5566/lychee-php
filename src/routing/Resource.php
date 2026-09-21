@@ -26,11 +26,17 @@ use Attribute;
  *   ''：不使用任何前缀
  *   'custom'：使用指定前缀替代全局前缀
  *
+ * cache 用于启用路由级响应缓存（仅对 GET 请求生效），作用于所有资源动作：
+ *   null（默认）：不缓存
+ *   正整数：缓存响应内容的秒数
+ *   方法上显式 #[Route(cache: xxx)] 可覆盖类级配置
+ *
  * 示例：
  *   // 假设全局 route_prefix 为 'api'
  *   #[Resource('/users')]                      // 路由 => /api/users...
  *   #[Resource('/users', prefix: '')]          // 路由 => /users...（跳过全局前缀）
  *   #[Resource('/users', prefix: 'admin')]     // 路由 => /admin/users...
+ *   #[Resource('/users', cache: 300)]          // 所有资源动作缓存 5 分钟
  */
 #[Attribute(Attribute::TARGET_CLASS)]
 class Resource
@@ -38,6 +44,7 @@ class Resource
     public function __construct(
         public string $path,
         public ?string $prefix = null,
+        public ?int $cache = null,
     ) {
     }
 }
