@@ -1,0 +1,14 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    // 默认语言
+    'locale'          => 'zh-CN',
+
+    // 回退语言：当前语言找不到翻译时使用
+    'fallback_locale' => 'en',
+
+    // 翻译文件根目录（默认为 basePath/app/lang）
+    'path'            => base_path('app/lang'),
+];
