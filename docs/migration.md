@@ -66,7 +66,8 @@ $table->addColumn('content', 'text');
 $table->addColumn('data', 'json');
 
 // 便捷方法
-$table->addTimestamps();        // create_time, update_time
+$table->addTimestamps();        // create_time, update_time（TIMESTAMP 类型）
+$table->addDatetimes();         // create_time, update_time（DATETIME 类型，不受 2038 年与时区限制）
 $table->addSoftDelete();        // delete_time
 
 // 索引
