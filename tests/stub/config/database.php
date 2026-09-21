@@ -9,10 +9,10 @@ return [
     // 连接列表
     'connections' => [
         'sqlite' => [
-            'type'     => 'sqlite',
-            'database' => ':memory:',
-            'prefix'   => '',
-            'debug'    => false,
+            'type'          => 'sqlite',
+            'database'      => ':memory:',
+            'prefix'        => '',
+            'debug'         => false,
             // 是否严格检查字段是否存在（默认 true）
             // true：写入/更新时若包含数据表不存在的字段会抛出异常
             // false：忽略不存在的字段
@@ -20,15 +20,15 @@ return [
         ],
 
         'mysql'  => [
-            'type'     => 'mysql',
-            'hostname' => '127.0.0.1',
-            'hostport' => 3306,
-            'database' => '',
-            'username' => 'root',
-            'password' => '',
-            'charset'  => 'utf8mb4',
-            'prefix'   => '',
-            'debug'    => false,
+            'type'            => 'mysql',
+            'hostname'        => '127.0.0.1',
+            'hostport'        => 3306,
+            'database'        => '',
+            'username'        => 'root',
+            'password'        => '',
+            'charset'         => 'utf8mb4',
+            'prefix'          => '',
+            'debug'           => false,
             // 是否严格检查字段是否存在（默认 true）
             'fields_strict'   => true,
             // 是否需要断线重连
