@@ -210,7 +210,7 @@ class UserController extends ResourceController
 
 ### 列表搜索与排序（零代码配置）
 
-继承 `ResourceController` 后，`index()` 无需重写即可自动支持搜索与排序，通过三个属性配置：
+继承 `ResourceController` 后，`index()` 和 `read()` 无需重写即可自动支持搜索、排序、关联预加载与访问器追加，通过属性配置：
 
 ```php
 class UserController extends ResourceController
@@ -223,6 +223,12 @@ class UserController extends ResourceController
     /** 分页参数名：[当前页, 每页条数]，默认 ['current', 'pageSize'] */
     protected array $pageFields = ['page', 'limit'];
 
+    /** 关联预加载，index 和 read 均生效 */
+    protected array $with = ['profile', 'roles'];
+
+    /** 追加访问器属性，index 和 read 均生效 */
+    protected array $append = ['nickname', 'is_vip'];
+
     /** 默认排序，请求未传 order 时使用 */
     protected array $order = ['create_time' => 'desc'];
 }
@@ -230,7 +236,11 @@ class UserController extends ResourceController
 
 - `searchFields`：白名单内的字段才会从 GET 参数中提取为查询条件，避免前端传任意字段触发异常查询；为空（默认）时取全部 GET 参数。
 - `pageFields`：分页参数名，默认 `['current', 'pageSize']`，可自定义为 `['page', 'limit']` 等。
+- `with`：预加载关联，`index`（列表）和 `read`（详情）均生效。
+- `append`：追加访问器属性，`index` 和 `read` 均生效。
 - `order`：列表默认排序，请求传了 `order` 参数时以请求为准。
+
+> 若 `index` 与 `read` 需要不同的 `with`/`append`，重写对应方法并显式传入参数即可（`baseIndex` / `baseRead` 均接受 `$append` 和 `$with` 参数，优先级高于属性）。
 
 请求示例：
 

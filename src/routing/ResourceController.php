@@ -61,6 +61,18 @@ abstract class ResourceController extends Controller
      */
     protected array $pageFields = ['current', 'pageSize'];
 
+    /**
+     * index / read 时预加载的关联列表。
+     * @var array<int, string>
+     */
+    protected array $with = [];
+
+    /**
+     * index / read 时追加的访问器属性列表。
+     * @var array<int, string>
+     */
+    protected array $append = [];
+
     // ── 统一 JSON 响应（格式可被子类覆盖）──────────────────────────
 
     /**
@@ -340,7 +352,7 @@ abstract class ResourceController extends Controller
             $where = $all;
         }
 
-        return $this->baseIndex($where, $current, $pageSize);
+        return $this->baseIndex($where, $current, $pageSize, $this->append, $this->with);
     }
 
     /**
@@ -440,7 +452,7 @@ abstract class ResourceController extends Controller
 
     public function read(int $id): JsonResponse
     {
-        return $this->baseRead($id);
+        return $this->baseRead($id, $this->append, $this->with);
     }
 
     /**
@@ -448,11 +460,17 @@ abstract class ResourceController extends Controller
      *
      * @param int $id 主键 ID
      * @param array $append 追加属性
+     * @param array $with 关联预加载
      */
-    protected function baseRead(int $id, array $append = []): JsonResponse
+    protected function baseRead(int $id, array $append = [], array $with = []): JsonResponse
     {
         try {
             $query = $this->getModelClass()->db();
+
+            if (!empty($with)) {
+                $query->with($with);
+            }
+
             $query = $this->applyDataPermission($query);
             $query = $this->applyTenantScope($query);
             $data  = $query->find($id);
