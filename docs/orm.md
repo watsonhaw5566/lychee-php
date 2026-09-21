@@ -35,6 +35,11 @@ return [
             // 开启后执行的 SQL 会通过框架日志模块输出
             // 日志频道优先使用 config/log.php 中的 'sql' 频道，未配置则使用默认频道
             'trigger_sql' => true,
+
+            // 是否严格检查字段是否存在（默认 true）
+            // true：写入/更新时若包含数据表不存在的字段会抛出异常
+            // false：忽略不存在的字段
+            'fields_strict' => true,
         ],
         'sqlite' => [
             'type'     => 'sqlite',
@@ -67,11 +72,12 @@ return [
 | --- | --- | --- | --- |
 | `break_reconnect` | connections 内 | `false` | 断线重连开关，常驻进程建议开启 |
 | `trigger_sql` | connections 内 | `true` | SQL 监听开关，开启后 SQL 输出到日志 |
+| `fields_strict` | connections 内 | `true` | 严格检查字段是否存在，开启后写入不存在的字段会抛异常 |
 | `auto_timestamp` | 顶层 | `true` | 模型自动写入创建/更新时间 |
 | `datetime_format` | 顶层 | `Y-m-d H:i:s` | 时间字段读取时的格式化字符串 |
 | `datetime_field` | 顶层 | `''` | 全局时间字段名，格式 `create_time,update_time` |
 
-> `break_reconnect` 与 `trigger_sql` 是连接级配置，需写在 `connections` 数组的具体连接内；`auto_timestamp`、`datetime_format`、`datetime_field` 是全局配置，写在配置顶层。
+> `break_reconnect`、`trigger_sql`、`fields_strict` 是连接级配置，需写在 `connections` 数组的具体连接内；`auto_timestamp`、`datetime_format`、`datetime_field` 是全局配置，写在配置顶层。
 
 ## 获取数据库实例
 
