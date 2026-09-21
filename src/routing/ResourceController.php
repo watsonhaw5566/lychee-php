@@ -45,6 +45,9 @@ abstract class ResourceController extends Controller
     /** 数据不存在时的提示信息 */
     protected string $notExistMessage = '数据不存在';
 
+    /** 默认排序，列表查询未指定 order 时使用 */
+    protected array $order = ['create_time' => 'desc'];
+
     // ── 统一 JSON 响应（格式可被子类覆盖）──────────────────────────
 
     /**
@@ -312,25 +315,29 @@ abstract class ResourceController extends Controller
     /**
      * 通用列表查询（可被子类复用）。
      *
-     * 分页参数由调用方显式传入；排序（order）默认从请求中自动获取。
+     * 分页参数由调用方显式传入；排序优先从请求 order 参数读取，
+     * 未传或为空时使用 $this->order 属性（默认 create_time desc）。
      *
      * @param array $where 查询条件（支持 _like / _range / _between / _in 后缀 DSL）
      * @param int $current 当前页码
      * @param int $pageSize 每页条数
      * @param array $append 追加属性
      * @param array $with 关联预加载
-     * @param array|string|null $order 排序，为 null 时从请求 order 参数读取
      */
     protected function baseIndex(
-        array             $where = [],
-        int               $current = 1,
-        int               $pageSize = 20,
-        array             $append = [],
-        array             $with = [],
-        array|string|null $order = null,
+        array $where = [],
+        int   $current = 1,
+        int   $pageSize = 20,
+        array $append = [],
+        array $with = [],
     ): JsonResponse {
         try {
-            $order ??= $this->request->param('order', ['create_time' => 'desc']);
+            $order = $this->request->param('order', $this->order);
+
+            // order 为空时回退到默认排序
+            if (empty($order)) {
+                $order = $this->order;
+            }
 
             $model = $this->getModelClass();
             $this->applyWhere($model, $where);

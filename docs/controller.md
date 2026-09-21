@@ -244,11 +244,10 @@ protected function baseIndex(
     int $pageSize = 20,                      // 每页条数（调用方显式传入）
     array $append = [],                      // 追加属性
     array $with = [],                        // 关联预加载
-    array|string|null $order = null,         // 排序，为 null 时从请求 order 参数自动读取
 ): JsonResponse
 ```
 
-> 分页参数 `current` / `pageSize` 需由调用方显式传入；排序参数默认从请求中自动获取。
+> 分页参数 `current` / `pageSize` 需由调用方显式传入；排序优先从请求 `order` 参数读取，未传或为空时使用 `$this->order` 属性（默认 `['create_time' => 'desc']`）。子类可覆盖该属性自定义默认排序。
 
 #### 自定义新建/更新
 
