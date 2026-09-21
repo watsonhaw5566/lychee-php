@@ -21,23 +21,23 @@ use Attribute;
  *
  * 若某个方法已显式声明 #[Route]，则以显式声明为准，自动注册会跳过该方法。
  *
+ * prefix 用于覆盖全局 route_prefix（config/app.php 中的 route_prefix）：
+ *   null（默认）：使用全局 route_prefix
+ *   ''：不使用任何前缀
+ *   'custom'：使用指定前缀替代全局前缀
+ *
  * 示例：
- *   #[Resource('/users')]
- *   class UserController
- *   {
- *       public function index() {}          // GET    /users
- *       public function save() {}           // POST   /users
- *       public function read($id) {}        // GET    /users/{id}
- *       public function update($id) {}      // PUT    /users/{id}
- *       public function delete($id) {}      // DELETE /users/{id}
- *       public function batch_delete() {}   // DELETE /users
- *   }
+ *   // 假设全局 route_prefix 为 'api'
+ *   #[Resource('/users')]                      // 路由 => /api/users...
+ *   #[Resource('/users', prefix: '')]          // 路由 => /users...（跳过全局前缀）
+ *   #[Resource('/users', prefix: 'admin')]     // 路由 => /admin/users...
  */
 #[Attribute(Attribute::TARGET_CLASS)]
 class Resource
 {
     public function __construct(
         public string $path,
+        public ?string $prefix = null,
     ) {
     }
 }
