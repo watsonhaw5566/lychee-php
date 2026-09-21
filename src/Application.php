@@ -73,6 +73,7 @@ class Application
         $this->loadEnvironment();
         $this->registerBindings();
         $this->bootConfig();
+        $this->loadCommonFile();
         $this->bootTimezone();
         $this->bootOptionalModules();
     }
@@ -240,6 +241,24 @@ class Application
 
         $this->container->instance('config', $config);
         $this->container->instance(Config::class, $config);
+    }
+
+    /**
+     * 加载应用公共文件 app/common.php。
+     *
+     * 类似 ThinkPHP 的 common.php，用户可在其中定义全局辅助函数。
+     * 文件不存在时静默跳过，不影响应用启动。
+     *
+     * 加载时机在 bootConfig() 之后，因此 common.php 内可安全使用
+     * config()、app()、env() 等框架辅助函数。
+     */
+    private function loadCommonFile(): void
+    {
+        $commonFile = $this->basePath . '/app/common.php';
+
+        if (is_file($commonFile)) {
+            require_once $commonFile;
+        }
     }
 
     /**
