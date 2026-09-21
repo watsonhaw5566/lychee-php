@@ -253,6 +253,51 @@ return [
 设置后，`#[Resource('/users')]` 的实际访问路径变为 `/api/users`，`#[Route('/')]` 变为 `/api`。
 前缀会自动去除首尾斜杠，`'api'`、`'/api'`、`'api/'` 等效。留空或不配置则不添加前缀。
 
+### 跳过或覆盖全局前缀
+
+某些接口（如健康检查、第三方回调）不需要全局前缀，可通过 `#[Route]` 或 `#[Resource]` 的 `prefix` 参数覆盖：
+
+| `prefix` 值 | 效果 |
+| --- | --- |
+| 不设置（默认 `null`） | 使用全局 `route_prefix` |
+| `''`（空字符串） | 不使用任何前缀 |
+| `'admin'` 等非空字符串 | 用该值替代全局前缀 |
+
+方法级 `#[Route]` 的 `prefix` 优先级高于类级 `#[Resource]` / `#[Route]` 的 `prefix`。
+
+```php
+use Lychee\routing\Route;
+use Lychee\routing\Resource;
+
+// 假设全局 route_prefix 为 'api'
+
+// 1. 方法级跳过全局前缀
+class HealthController
+{
+    #[Route('/health', prefix: '')]      // GET /health（无 /api 前缀）
+    public function health() {}
+
+    #[Route('/ping')]                    // GET /api/ping（使用全局前缀）
+    public function ping() {}
+}
+
+// 2. 类级跳过全局前缀（作用于控制器所有路由）
+#[Resource('orders', prefix: '')]        // 所有资源路由都不带 /api 前缀
+class OrderController
+{
+    public function index() {}           // GET /orders
+    public function read($id) {}         // GET /orders/{id}
+}
+
+// 3. 自定义前缀替代全局前缀
+#[Route('/admin', prefix: 'manage')]      // 用 manage 替代 api
+class AdminController
+{
+    #[Route('/users')]                    // GET /manage/admin/users
+    public function users() {}
+}
+```
+
 ## 查看路由列表
 
 使用 `route:list` 命令查看所有已注册的路由：

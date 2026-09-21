@@ -51,8 +51,9 @@ class Router
     {
         $ref = new ReflectionClass($controllerClass);
 
-        $prefix     = $this->resolvePrefix($ref);
-        $isResource = !empty($ref->getAttributes(Resource::class));
+        $prefix      = $this->resolvePrefix($ref);
+        $classPrefix = $this->resolveClassPrefixOverride($ref);
+        $isResource  = !empty($ref->getAttributes(Resource::class));
 
         $classMiddlewares = $this->collectMiddlewares($ref);
 
@@ -63,7 +64,8 @@ class Router
             }
 
             $route             = $routeAttrs[0]->newInstance();
-            $path              = $this->joinPath($prefix, $route->path);
+            $globalPrefix      = $route->prefix ?? $classPrefix ?? $this->routePrefix;
+            $path              = $this->joinPath($prefix, $route->path, $globalPrefix);
             $methodMiddlewares = $this->resolveMethodMiddlewares($method, $classMiddlewares);
 
             $this->routes[] = [
@@ -81,7 +83,7 @@ class Router
         }
 
         if ($isResource) {
-            $this->registerResourceRoutes($ref, $controllerClass, $prefix, $classMiddlewares);
+            $this->registerResourceRoutes($ref, $controllerClass, $prefix, $classPrefix, $classMiddlewares);
         }
     }
 
@@ -97,8 +99,11 @@ class Router
         ReflectionClass $ref,
         string $controllerClass,
         string $prefix,
+        ?string $classPrefix,
         array $classMiddlewares,
     ): void {
+        $globalPrefix = $classPrefix ?? $this->routePrefix;
+
         foreach (self::RESOURCE_ACTIONS as $action => $definition) {
             if (!$ref->hasMethod($action)) {
                 continue;
@@ -114,7 +119,7 @@ class Router
                 continue;
             }
 
-            $path        = $this->joinPath($prefix, $definition['path']);
+            $path        = $this->joinPath($prefix, $definition['path'], $globalPrefix);
             $middlewares = $this->resolveMethodMiddlewares($method, $classMiddlewares);
 
             foreach ($definition['methods'] as $httpMethod) {
@@ -211,6 +216,27 @@ class Router
         return '';
     }
 
+    /**
+     * 解析控制器类级别的全局前缀覆盖。
+     *
+     * 优先使用 #[Resource] 的 prefix，其次回退到类级 #[Route] 的 prefix。
+     * 返回 null 表示未设置覆盖，应使用全局 route_prefix。
+     */
+    private function resolveClassPrefixOverride(ReflectionClass $ref): ?string
+    {
+        $resourceAttrs = $ref->getAttributes(Resource::class);
+        if (!empty($resourceAttrs)) {
+            return $resourceAttrs[0]->newInstance()->prefix;
+        }
+
+        $routeAttrs = $ref->getAttributes(Route::class);
+        if (!empty($routeAttrs)) {
+            return $routeAttrs[0]->newInstance()->prefix;
+        }
+
+        return null;
+    }
+
     private function compilePattern(string $path): string
     {
         $pattern = preg_replace('#\{(\w+)\}#', '(?P<$1>[^/]+)', $path);
@@ -218,12 +244,19 @@ class Router
         return '#^' . $pattern . '$#';
     }
 
-    private function joinPath(string $prefix, string $path): string
+    /**
+     * 拼接路由路径。
+     *
+     * @param string $prefix      控制器级前缀（来自 #[Resource] 或类级 #[Route] 的 path）
+     * @param string $path        方法级路径
+     * @param string $globalPrefix 全局前缀（route_prefix 或被 prefix 参数覆盖后的值）
+     */
+    private function joinPath(string $prefix, string $path, string $globalPrefix = ''): string
     {
         $path = '/' . trim($prefix . '/' . trim($path, '/'), '/');
 
-        if ($this->routePrefix !== '') {
-            $path = '/' . trim($this->routePrefix . $path, '/');
+        if ($globalPrefix !== '') {
+            $path = '/' . trim($globalPrefix . $path, '/');
         }
 
         return $path;
