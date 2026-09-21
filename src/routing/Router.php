@@ -69,7 +69,7 @@ class Router
             $path              = $this->joinPath($prefix, $route->path, $globalPrefix);
             $methodMiddlewares = $this->resolveMethodMiddlewares($method, $classMiddlewares);
             // 方法级 cache 优先，否则回退到类级
-            $cache             = $route->cache ?? $classCache;
+            $cache = $route->cache ?? $classCache;
 
             $this->routes[] = [
                 'method'      => strtoupper($route->method),

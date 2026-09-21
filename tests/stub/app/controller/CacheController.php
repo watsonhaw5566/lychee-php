@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\stub\app\controller;
 
 use Lychee\http\JsonResponse;
-use Lychee\routing\Resource;
 use Lychee\routing\Route;
 
 /**
