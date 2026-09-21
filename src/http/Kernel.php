@@ -46,12 +46,20 @@ class Kernel
 
         $request = $request->withRouteParams($route->params);
 
+        // 路由缓存：仅对 GET 请求且配置了 cache TTL 时生效
+        if ($route->cache !== null && $request->method === 'GET') {
+            $cached = $this->getCachedResponse($request, $route);
+            if ($cached !== null) {
+                return $cached;
+            }
+        }
+
         // 合并全局中间件与路由中间件：全局中间件先于路由中间件执行
         $globalMiddlewares = (array) config('middleware', []);
         $middlewares       = array_merge($globalMiddlewares, $route->middlewares);
 
         try {
-            return $this->pipeline->handle(
+            $response = $this->pipeline->handle(
                 $request,
                 $middlewares,
                 function (Request $req) use ($route): Response {
@@ -61,6 +69,70 @@ class Kernel
         } catch (Throwable $e) {
             return $this->exceptionResponse($request, $e);
         }
+
+        // 仅缓存 200 成功响应
+        if ($route->cache !== null && $request->method === 'GET' && $response->status === 200) {
+            $this->cacheResponse($request, $route, $response);
+        }
+
+        return $response;
+    }
+
+    /**
+     * 生成路由缓存的键名。
+     *
+     * 包含方法、路径与查询参数的哈希，确保不同查询条件对应不同缓存条目。
+     */
+    private function cacheKey(Request $request, RouteMatch $route): string
+    {
+        $query = $request->get();
+        ksort($query);
+        $queryHash = md5(json_encode($query, JSON_UNESCAPED_UNICODE) ?: '');
+
+        return 'route:' . $route->controller . '@' . $route->action . ':' . $request->method . ':' . $request->path . ':' . $queryHash;
+    }
+
+    /**
+     * 尝试从缓存读取响应。
+     *
+     * 缓存模块未启用时返回 null，不影响正常流程。
+     */
+    private function getCachedResponse(Request $request, RouteMatch $route): ?Response
+    {
+        if (!$this->container->bound('cache')) {
+            return null;
+        }
+
+        $key  = $this->cacheKey($request, $route);
+        $data = $this->container->get('cache')->get($key);
+
+        if (!is_array($data) || !isset($data['content'], $data['status'], $data['headers'])) {
+            return null;
+        }
+
+        return new Response(
+            content: (string) $data['content'],
+            status: (int) $data['status'],
+            headers: (array) $data['headers'],
+        );
+    }
+
+    /**
+     * 将响应写入缓存。
+     */
+    private function cacheResponse(Request $request, RouteMatch $route, Response $response): void
+    {
+        if (!$this->container->bound('cache')) {
+            return;
+        }
+
+        $key = $this->cacheKey($request, $route);
+
+        $this->container->get('cache')->set($key, [
+            'content' => $response->content,
+            'status'  => $response->status,
+            'headers' => $response->headers,
+        ], $route->cache);
     }
 
     /**

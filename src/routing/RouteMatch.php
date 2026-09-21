@@ -19,6 +19,7 @@ class RouteMatch
         public readonly string $action,
         public readonly array $params = [],
         public readonly array $middlewares = [],
+        public readonly ?int $cache = null,
     ) {
     }
 }

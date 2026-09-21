@@ -11,6 +11,8 @@ public function __construct(
     public string $path,              // 路由路径
     public string $method = 'GET',    // HTTP 方法，默认 GET
     public string $name = '',         // 路由名称（可选）
+    public ?string $prefix = null,    // 覆盖全局 route_prefix（null=使用全局，''=无前缀）
+    public ?int $cache = null,        // 路由缓存 TTL（秒），null 表示不缓存
 )
 ```
 
@@ -163,6 +165,16 @@ class UserController
 标注 `#[Resource]` 的控制器会自动注册资源动作路由，无需再为每个方法声明 `#[Route]`。
 仅当方法存在且为 `public` 时才会注册。
 
+`#[Resource]` 构造函数签名：
+
+```php
+public function __construct(
+    public string $path,              // 资源路径
+    public ?string $prefix = null,    // 覆盖全局 route_prefix（null=使用全局，''=无前缀）
+    public ?int $cache = null,        // 资源动作缓存 TTL（秒），null 表示不缓存
+)
+```
+
 | 方法 | 路由 | 说明 |
 | --- | --- | --- |
 | `index()` | `GET /path` | 列表 |
@@ -297,6 +309,104 @@ class AdminController
     public function users() {}
 }
 ```
+
+## 路由缓存
+
+通过 `#[Route]` 或 `#[Resource]` 的 `cache` 参数，可启用路由级响应缓存。缓存基于框架内置的 `cache` 模块（支持 file / redis 等驱动），将响应内容序列化后存入缓存，后续相同请求直接返回缓存结果，跳过控制器执行。
+
+### 基本用法
+
+```php
+use Lychee\routing\Route;
+
+class ArticleController
+{
+    // 缓存 1 小时（3600 秒）
+    #[Route('/articles', cache: 3600)]
+    public function index()
+    {
+        return ['articles' => [...]];
+    }
+
+    // 不缓存（默认）
+    #[Route('/articles/{id}')]
+    public function show(int $id) {}
+}
+```
+
+### 资源路由缓存
+
+在 `#[Resource]` 上设置 `cache`，对所有资源动作生效：
+
+```php
+use Lychee\routing\Resource;
+
+// 所有资源动作缓存 5 分钟
+#[Resource('/posts', cache: 300)]
+class PostController
+{
+    public function index() {}     // GET /posts      → 缓存 300 秒
+    public function read($id) {}   // GET /posts/{id} → 缓存 300 秒
+    public function save() {}      // POST /posts     → 不缓存（写操作）
+}
+```
+
+方法上的 `#[Route(cache: xxx)]` 可覆盖类级配置：
+
+```php
+#[Resource('/posts', cache: 300)]
+class PostController
+{
+    // 覆盖资源级缓存，仅缓存 60 秒
+    #[Route('/posts/hot', cache: 60)]
+    public function hot() {}
+}
+```
+
+### 工作原理
+
+- **仅缓存 GET 请求**：POST / PUT / DELETE 等写操作不受影响
+- **仅缓存 200 响应**：404 / 500 等错误响应不写入缓存
+- **缓存键**：基于 `控制器@动作 + HTTP 方法 + 路径 + 查询参数哈希`，不同查询条件对应不同缓存条目
+- **缓存模块未启用时自动跳过**：若项目未配置 `cache` 模块，路由缓存不生效但不影响正常请求
+- **命中缓存时跳过中间件与控制器**：直接返回缓存的响应内容、状态码与响应头
+
+### 缓存键构成
+
+缓存键格式为：
+
+```
+route:{Controller}@{action}:{METHOD}:{path}:{query_hash}
+```
+
+其中 `query_hash` 是对查询参数按 key 排序后做 JSON 编码再 MD5 的结果，确保 `?page=1&size=10` 与 `?size=10&page=1` 命中同一条缓存。
+
+### 缓存失效与清理
+
+路由缓存依赖框架的 `cache` 模块（见 [缓存 Cache](./cache.md)），可通过以下方式失效：
+
+1. **自然过期**：到达 `cache` 参数指定的 TTL 后自动失效
+2. **手动清理**：调用 `cache()` 助手清除指定键或全部缓存
+
+```php
+// 清除全部缓存
+cache()->clear();
+
+// 清除指定缓存键（需自行构造与内核一致的键名）
+cache()->delete('route:App\controller\ArticleController@index:GET:/articles:' . md5('[]'));
+```
+
+> 对于数据变更后需要立即刷新缓存的场景，建议在 `save` / `update` / `delete` 等写操作完成后
+> 调用 `cache()->clear()` 或针对性删除相关缓存键。
+
+### 前置条件
+
+路由缓存需要 `cache` 模块已配置。若项目根目录下不存在 `config/cache.php`，
+可通过 `php lee config:publish cache` 生成配置文件，详见 [缓存 Cache](./cache.md)。
+
+> **使用建议**：路由缓存命中时会跳过中间件管道与控制器执行，因此不适用于需要鉴权、
+> 会话、限流等动态处理的接口。建议仅用于公开、内容相对稳定的接口（如文章列表、
+> 商品详情、配置项等）。
 
 ## 查看路由列表
 
