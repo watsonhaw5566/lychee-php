@@ -96,7 +96,7 @@ class ExceptionHandler
             ? ($e->getMessage() ?: $this->statusText($status))
             : $errorMessage;
 
-        if ($this->wantsHtml($request)) {
+        if ($this->shouldRenderHtml($request)) {
             return $this->renderHtml($status, $e, $request, $debug, $message);
         }
 
@@ -151,6 +151,25 @@ class ExceptionHandler
         }
 
         return new Response($html, $status, ['Content-Type' => 'text/html; charset=utf-8']);
+    }
+
+    /**
+     * 判断是否渲染 HTML 异常页。
+     *
+     * 由 config/app.php 的 exception_render 控制：
+     *   - 'auto'（默认）：按 Accept header 判断，浏览器请求渲染 HTML，JSON 请求返回 JSON
+     *   - 'html'：始终渲染 HTML（传统 Web 应用）
+     *   - 'json'：始终返回 JSON（纯 API 应用）
+     */
+    protected function shouldRenderHtml(Request $request): bool
+    {
+        $render = (string) config('app.exception_render', 'auto');
+
+        return match ($render) {
+            'html'  => true,
+            'json'  => false,
+            default => $this->wantsHtml($request),
+        };
     }
 
     /**
