@@ -22,6 +22,7 @@ php lee run --host=0.0.0.0      # 指定监听地址
 | `route:list` | 列出所有已注册的路由 |
 | `make:rest` | 创建资源控制器（同时生成 Model 与 Validate） |
 | `make:base` | 创建基础控制器（不集成资源路由，含 `#[Route]` 注解） |
+| `config:publish` | 发布模块配置文件到 `config/` 目录 |
 | `migrate:run` | 执行数据库迁移 |
 | `migrate:rollback` | 回滚迁移 |
 | `seed:run` | 执行数据填充 |
@@ -135,6 +136,42 @@ class IndexController
 > 类上的 `#[Route('/index')]` 作为路由前缀，方法上的 `#[Route('/')]` 将该方法注册为路由（默认 GET），最终路由为 `GET /index`。
 > 控制器名支持省略 `Controller` 后缀，`php lee make:base Index` 与 `php lee make:base IndexController` 等效。
 > 若控制器文件已存在则命令中止并报错。
+
+### config:publish 发布模块配置
+
+`config:publish` 命令将框架内置模块的配置文件发布到项目的 `config/` 目录，方便开发者快速生成基础配置并按需修改。
+
+```bash
+# 发布所有模块的配置文件
+php lee config:publish
+
+# 发布指定模块的配置文件
+php lee config:publish cache
+
+# 覆盖已存在的配置文件（默认不会覆盖）
+php lee config:publish cache --force
+```
+
+支持的模块：
+
+| 模块 | 说明 |
+|------|------|
+| `app` | 应用基础配置（时区、路由前缀、异常渲染等） |
+| `cache` | 缓存驱动配置（file / redis） |
+| `captcha` | 验证码配置（图形、短信、邮箱） |
+| `cron` | 定时任务配置 |
+| `database` | 数据库连接配置（mysql / sqlite） |
+| `filesystem` | 文件系统磁盘配置 |
+| `i18n` | 国际化多语言配置 |
+| `log` | 日志频道配置 |
+| `plugin` | 插件注册配置 |
+| `queue` | 队列连接配置（sync / redis） |
+| `satoken` | SaToken 认证配置 |
+| `session` | 会话 Session 配置 |
+| `view` | Twig 模板引擎配置 |
+| `websocket` | WebSocket 服务配置 |
+
+> 若目标配置文件已存在，命令会跳过该模块并输出提示；使用 `--force`（或 `-f`）选项可强制覆盖。
 
 ## 自定义命令
 

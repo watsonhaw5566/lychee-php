@@ -1,0 +1,43 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    // 缓存 store，留空使用默认缓存驱动
+    'store'        => null,
+
+    // 验证码有效期（秒）
+    'expire'       => 300,
+
+    // 最大验证失败次数，超限自动作废
+    'max_attempts' => 5,
+
+    // 缓存键前缀
+    'prefix'       => 'captcha:',
+
+    // 图形验证码配置
+    'image' => [
+        'chars'     => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', // 去掉易混淆的 0/O/1/I/L
+        'length'    => 4,
+        'width'     => 120,
+        'height'    => 40,
+        'font_size' => 20,
+    ],
+
+    // 短信验证码配置
+    'sms' => [
+        'length' => 6,
+        // 发送器类名，需实现 send(string $code, string $phone): bool
+        // 留空则不实际发送（开发调试用）
+        'send'   => null,
+    ],
+
+    // 邮箱验证码配置
+    'email' => [
+        'length'  => 6,
+        'subject' => '您的验证码',
+        // 发送器类名，需实现 send(string $code, string $email, string $subject): bool
+        // 留空则不实际发送（开发调试用）
+        'send'    => null,
+    ],
+];

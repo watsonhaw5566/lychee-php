@@ -1,0 +1,20 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    // 模板根目录
+    'view_path'  => app_path('view'),
+
+    // 编译缓存目录
+    'cache_path' => runtime_path('twig'),
+
+    // 是否开启调试模式（开启后可使用 dump() 等调试函数）
+    'debug'      => false,
+
+    // 静态资源基础 URL，如配置 CDN 可填 'https://cdn.example.com'
+    'base_url'   => '',
+
+    // 允许的模板后缀，按查找优先级排序
+    'extensions' => ['.twig', '.html'],
+];
