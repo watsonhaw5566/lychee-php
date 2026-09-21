@@ -50,8 +50,10 @@ class Request
             ? getallheaders()
             : self::parseHeadersFromServer();
 
-        $rawBody = file_get_contents('php://input') ?: '';
-        $body    = self::parseBody($rawBody, $headers['Content-Type'] ?? '');
+        $rawBody     = file_get_contents('php://input') ?: '';
+        $contentType = self::getHeaderCaseInsensitive($headers, 'Content-Type')
+            ?? ($_SERVER['CONTENT_TYPE'] ?? '');
+        $body = self::parseBody($rawBody, $contentType);
 
         return new self(
             method: $method,
@@ -245,7 +247,14 @@ class Request
 
     public function header(string $key, ?string $default = null): ?string
     {
-        return $this->headers[$key] ?? $this->headers[strtolower($key)] ?? $default;
+        $lower = strtolower($key);
+        foreach ($this->headers as $name => $value) {
+            if (strtolower($name) === $lower) {
+                return $value;
+            }
+        }
+
+        return $default;
     }
 
     /**
@@ -327,7 +336,32 @@ class Request
             }
         }
 
+        // Content-Type / Content-Length 在 $_SERVER 中没有 HTTP_ 前缀，需单独处理
+        if (isset($_SERVER['CONTENT_TYPE'])) {
+            $headers['Content-Type'] = $_SERVER['CONTENT_TYPE'];
+        }
+        if (isset($_SERVER['CONTENT_LENGTH'])) {
+            $headers['Content-Length'] = $_SERVER['CONTENT_LENGTH'];
+        }
+
         return $headers;
+    }
+
+    /**
+     * 从 header 数组中大小写不敏感地取值。
+     *
+     * @param array<string, string> $headers
+     */
+    private static function getHeaderCaseInsensitive(array $headers, string $key): ?string
+    {
+        $lower = strtolower($key);
+        foreach ($headers as $name => $value) {
+            if (strtolower($name) === $lower) {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     /**
