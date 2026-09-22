@@ -74,7 +74,7 @@ abstract class ResourceController extends Controller
      */
     protected array $append = [];
 
-    // ── 统一 JSON 响应（格式可被子类覆盖）──────────────────────────
+    // ── 分页响应 ────────────────────────────────────────────────────
 
     /**
      * 分页响应。
@@ -159,7 +159,7 @@ abstract class ResourceController extends Controller
      * 将校验异常的错误信息格式化为字符串。
      *
      * think\Validate 的 getError() 在批量验证时返回数组，
-     * 此处统一拼接为分号分隔的字符串，避免 fail(string) 类型不匹配。
+     * 此处统一拼接为分号分隔的字符串，避免失败响应 msg 字段类型不匹配。
      *
      * @param array|string $error
      */
@@ -410,7 +410,12 @@ abstract class ResourceController extends Controller
 
             return $this->paginate($query, $current, $pageSize);
         } catch (Throwable $e) {
-            return $this->fail($e->getMessage());
+            return json([
+                'errno' => 0,
+                'code'  => 400,
+                'msg'   => $e->getMessage(),
+                'data'  => null,
+            ]);
         }
     }
 
@@ -439,7 +444,12 @@ abstract class ResourceController extends Controller
             if (!empty($fields)) {
                 $error = $this->checkUnique($model, $postData, null, $fields);
                 if ($error !== null) {
-                    return $this->fail($error);
+                    return json([
+                        'errno' => 0,
+                        'code'  => 400,
+                        'msg'   => $error,
+                        'data'  => null,
+                    ]);
                 }
             }
 
@@ -447,11 +457,26 @@ abstract class ResourceController extends Controller
 
             $ret = $model->create($postData);
 
-            return $this->success($ret);
+            return json([
+                'errno' => 0,
+                'code'  => 200,
+                'msg'   => 'success',
+                'data'  => $ret,
+            ]);
         } catch (ValidateException $e) {
-            return $this->fail($this->formatValidateError($e->getError()));
+            return json([
+                'errno' => 0,
+                'code'  => 400,
+                'msg'   => $this->formatValidateError($e->getError()),
+                'data'  => null,
+            ]);
         } catch (Throwable $e) {
-            return $this->fail($e->getMessage());
+            return json([
+                'errno' => 0,
+                'code'  => 400,
+                'msg'   => $e->getMessage(),
+                'data'  => null,
+            ]);
         }
     }
 
@@ -481,16 +506,31 @@ abstract class ResourceController extends Controller
             $data  = $query->find($id);
 
             if (!$data) {
-                return $this->fail($this->notExistMessage);
+                return json([
+                    'errno' => 0,
+                    'code'  => 400,
+                    'msg'   => $this->notExistMessage,
+                    'data'  => null,
+                ]);
             }
 
             if (!empty($append)) {
                 $data->append($append);
             }
 
-            return $this->success($data);
+            return json([
+                'errno' => 0,
+                'code'  => 200,
+                'msg'   => 'success',
+                'data'  => $data,
+            ]);
         } catch (Throwable $e) {
-            return $this->fail($e->getMessage());
+            return json([
+                'errno' => 0,
+                'code'  => 400,
+                'msg'   => $e->getMessage(),
+                'data'  => null,
+            ]);
         }
     }
 
@@ -523,14 +563,24 @@ abstract class ResourceController extends Controller
             $info  = $query->find($id);
 
             if (!$info) {
-                return $this->fail($this->notExistMessage);
+                return json([
+                    'errno' => 0,
+                    'code'  => 400,
+                    'msg'   => $this->notExistMessage,
+                    'data'  => null,
+                ]);
             }
 
             $fields = empty($uniqueFields) ? $this->uniqueFields : $uniqueFields;
             if (!empty($fields)) {
                 $error = $this->checkUnique($model, $postData, $id, $fields);
                 if ($error !== null) {
-                    return $this->fail($error);
+                    return json([
+                        'errno' => 0,
+                        'code'  => 400,
+                        'msg'   => $error,
+                        'data'  => null,
+                    ]);
                 }
             }
 
@@ -538,11 +588,26 @@ abstract class ResourceController extends Controller
 
             $info->save($postData);
 
-            return $this->success($info);
+            return json([
+                'errno' => 0,
+                'code'  => 200,
+                'msg'   => 'success',
+                'data'  => $info,
+            ]);
         } catch (ValidateException $e) {
-            return $this->fail($this->formatValidateError($e->getError()));
+            return json([
+                'errno' => 0,
+                'code'  => 400,
+                'msg'   => $this->formatValidateError($e->getError()),
+                'data'  => null,
+            ]);
         } catch (Throwable $e) {
-            return $this->fail($e->getMessage());
+            return json([
+                'errno' => 0,
+                'code'  => 400,
+                'msg'   => $e->getMessage(),
+                'data'  => null,
+            ]);
         }
     }
 
@@ -563,12 +628,27 @@ abstract class ResourceController extends Controller
             $data  = $query->find($id);
 
             if (!$data) {
-                return $this->fail($this->notExistMessage);
+                return json([
+                    'errno' => 0,
+                    'code'  => 400,
+                    'msg'   => $this->notExistMessage,
+                    'data'  => null,
+                ]);
             }
 
-            return $this->success($data->delete());
+            return json([
+                'errno' => 0,
+                'code'  => 200,
+                'msg'   => 'success',
+                'data'  => $data->delete(),
+            ]);
         } catch (Throwable $e) {
-            return $this->fail($e->getMessage());
+            return json([
+                'errno' => 0,
+                'code'  => 400,
+                'msg'   => $e->getMessage(),
+                'data'  => null,
+            ]);
         }
     }
 
@@ -604,14 +684,34 @@ abstract class ResourceController extends Controller
             $list  = $query->whereIn('id', $ids)->select();
 
             if ($list->isEmpty()) {
-                return $this->fail($this->notExistMessage);
+                return json([
+                    'errno' => 0,
+                    'code'  => 400,
+                    'msg'   => $this->notExistMessage,
+                    'data'  => null,
+                ]);
             }
 
-            return $this->success($list->delete());
+            return json([
+                'errno' => 0,
+                'code'  => 200,
+                'msg'   => 'success',
+                'data'  => $list->delete(),
+            ]);
         } catch (ValidateException $e) {
-            return $this->fail($this->formatValidateError($e->getError()));
+            return json([
+                'errno' => 0,
+                'code'  => 400,
+                'msg'   => $this->formatValidateError($e->getError()),
+                'data'  => null,
+            ]);
         } catch (Throwable $e) {
-            return $this->fail($e->getMessage());
+            return json([
+                'errno' => 0,
+                'code'  => 400,
+                'msg'   => $e->getMessage(),
+                'data'  => null,
+            ]);
         }
     }
 

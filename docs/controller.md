@@ -3,13 +3,13 @@
 控制器负责接收请求、调用业务逻辑、返回响应。框架不强制控制器继承基类，
 开发者可按需选择：
 
-- **需要 CRUD 的控制器**：继承 `Lychee\routing\ResourceController`，获得请求注入、统一响应、验证快捷方式和零代码 CRUD 能力
-- **不需要 CRUD 但想便捷响应**：继承 `Lychee\http\Controller`，获得请求注入与 `success()` / `fail()` / `paginate()` 响应快捷方法
-- **完全自定义**：直接写普通类，使用全局助手 `success()` / `fail()` / `json()` 返回响应
+- **需要 CRUD 的控制器**：继承 `Lychee\routing\ResourceController`，获得请求注入、验证快捷方式和零代码 CRUD 能力
+- **不需要 CRUD 的控制器**：继承 `Lychee\http\Controller`，获得请求注入、`initialize()` 生命周期与 `paginate()` 分页方法
+- **返回 JSON**：使用全局助手 `json()` 自行组装响应数据结构，框架不强制固定格式
 
 ## 资源控制器 ResourceController
 
-继承 `Lychee\routing\ResourceController` 可实现零代码 CRUD，同时获得请求注入、`initialize()` 生命周期钩子、统一响应与验证快捷方式。
+继承 `Lychee\routing\ResourceController` 可实现零代码 CRUD，同时获得请求注入、`initialize()` 生命周期钩子、分页响应与验证快捷方式。
 配合 `#[Resource]` 路由注解使用，子类只需声明模型与验证器。
 
 ```php
@@ -52,7 +52,7 @@ class UserController extends ResourceController
     public function index(User $user): JsonResponse
     {
         // $this->request 已自动注入
-        return $this->success($user->select());
+        return json(['data' => $user->select()]);
     }
 }
 ```
@@ -69,21 +69,21 @@ class UserController extends ResourceController
     public function index(int $page = 1, int $pageSize = 10): JsonResponse
     {
         // $page = 2, $pageSize = 20
-        return $this->success(['page' => $page, 'pageSize' => $pageSize]);
+        return json(['page' => $page, 'pageSize' => $pageSize]);
     }
 
     // GET /users/{id}?include=profile
     public function read(int $id, string $include = ''): JsonResponse
     {
         // $id 来自路由参数，$include 来自查询参数
-        return $this->success(['id' => $id, 'include' => $include]);
+        return json(['id' => $id, 'include' => $include]);
     }
 
     // POST /users  { "name": "Alice", "age": 30 }
     public function save(string $name, int $age = 0): JsonResponse
     {
         // $name, $age 自动从请求体注入
-        return $this->success(compact('name', 'age'));
+        return json(compact('name', 'age'));
     }
 }
 ```
@@ -110,23 +110,25 @@ class UserController extends ResourceController
 
 > 由于 `initialize()` 在中间件之后执行，认证、i18n、session 等中间件对请求的修改在此均已生效。
 
-### 统一响应
+### JSON 响应
 
-基类提供 `success()` / `fail()` / `paginate()` 三个 JSON 响应快捷方法，
-默认格式为 `{errno, code, msg, data}`。如需自定义格式，覆盖对应方法即可。
+框架不强制响应格式，也不提供 `success()` / `fail()` 之类的固定助手，
+统一使用全局助手 `json()` 自行组装数据结构：
 
 ```php
-// 成功响应
-return $this->success($data);
-return $this->success($data, '创建成功', 201);
+// 成功响应（结构自行约定）
+return json(['errno' => 0, 'code' => 200, 'msg' => 'success', 'data' => $data]);
 
-// 失败响应
-return $this->fail('参数错误');
-return $this->fail('未找到', 404);
+// 失败响应：第二个参数指定 HTTP 状态码
+return json(['errno' => 0, 'code' => 400, 'msg' => '参数错误', 'data' => null], 400);
 
 // 分页响应（资源控制器版本，第一个参数必须是 Query / Model）
 return $this->paginate($query, $current, $pageSize);
 ```
+
+> `ResourceController` 内置 CRUD 方法（`index` / `save` / `read` / `update` /
+> `delete` / `batch_delete`）统一返回 `{errno, code, msg, data}` 结构；
+> 覆盖这些方法时可用 `json()` 返回任意自定义结构。
 
 `paginate()` 的分页数据统一放在 `data.list`，总数放在 `data.total`：
 
@@ -148,7 +150,7 @@ return $this->paginate($query, $current, $pageSize);
 
 #### 非 JSON 响应
 
-`success()` / `fail()` 仅用于 JSON。若需返回 HTML、下载或重定向，
+`json()` 仅用于 JSON 响应。若需返回 HTML、下载或重定向，
 直接返回对应的响应对象，内核会原样输出：
 
 ```php
@@ -164,12 +166,11 @@ return redirect('/login');
 
 #### 全局助手函数
 
-未继承 `ResourceController` 的控制器或非控制器场景（如中间件）可使用全局助手：
+未继承控制器基类或处于非控制器场景（如中间件）时，同样使用全局助手 `json()`：
 
 ```php
-return success($data);
-return fail('错误', 400);
-return json(['custom' => 'structure']);
+return json(['errno' => 0, 'code' => 200, 'msg' => 'success', 'data' => $data]);
+return json(['errno' => 0, 'code' => 400, 'msg' => '错误', 'data' => null], 400);
 ```
 
 ### 验证快捷方式
@@ -332,7 +333,8 @@ class UserController extends ResourceController
         $data['created_by']  = request()->loginId();
 
         $model = $this->getModelClass();
-        return $this->success($model->create($data));
+
+        return json(['errno' => 0, 'code' => 200, 'msg' => 'success', 'data' => $model->create($data)]);
     }
 }
 ```
@@ -349,18 +351,19 @@ class UserController extends ResourceController
         $user = $this->getModel()->with('profile')->find($id);
 
         if (!$user) {
-            return $this->fail($this->notExistMessage);
+            return json(['errno' => 0, 'code' => 400, 'msg' => $this->notExistMessage, 'data' => null]);
         }
 
-        return $this->success($user);
+        return json(['errno' => 0, 'code' => 200, 'msg' => 'success', 'data' => $user]);
     }
 }
 ```
 
 ## 基础控制器 Controller
 
-继承 `Lychee\http\Controller` 可获得请求注入、`initialize()` 生命周期钩子与统一 JSON 响应快捷方法，
-适用于不需要 CRUD、但希望使用 `$this->request` 和 `$this->success()` / `$this->fail()` / `$this->paginate()` 的场景。
+继承 `Lychee\http\Controller` 可获得请求注入与 `initialize()` 生命周期钩子，
+适用于不需要 CRUD、但希望使用 `$this->request` 和 `$this->paginate()` 的场景。
+普通 JSON 响应直接使用全局助手 `json()`。
 
 ```php
 namespace App\controller;
@@ -376,7 +379,7 @@ class UploadController extends Controller
     {
         $file = $this->request->file('file');
 
-        return $this->success(['name' => $file?->getOriginalName()]);
+        return json(['data' => ['name' => $file?->getOriginalName()]]);
     }
 }
 ```
@@ -388,8 +391,7 @@ class UploadController extends Controller
 | `$this->app` | 容器实例 |
 | `$this->request` | 请求实例 |
 | `initialize()` | 初始化钩子，在中间件之后、方法调用前执行 |
-| `$this->success($data, $msg, $code)` | 成功 JSON 响应 |
-| `$this->fail($msg, $code)` | 失败 JSON 响应 |
+| `json($data, $status, $headers)` | 全局助手，组装任意结构的 JSON 响应 |
 | `$this->paginate($items, $page, $pageSize, $message, $httpStatus)` | 分页 JSON 响应 |
 
 > `Lychee\routing\ResourceController` 继承自此基类，因此资源控制器同样拥有以上能力。
@@ -490,14 +492,14 @@ class HomeController
 {
     public function index(): JsonResponse
     {
-        return success(['message' => 'hello']);
+        return json(['message' => 'hello']);
     }
 
     public function upload(Request $request): JsonResponse
     {
         $file = $request->file('file');
         // ... 处理上传
-        return success(['url' => $url]);
+        return json(['url' => $url]);
     }
 }
 ```
@@ -582,7 +584,7 @@ class OrderController extends ResourceController
 
 ```php
 if (!$this->canAccessData($order->user_id)) {
-    return $this->fail('无权操作', 403);
+    return json(['code' => 403, 'msg' => '无权操作'], 403);
 }
 ```
 
@@ -664,7 +666,7 @@ class OrderController extends ResourceController
 
 ```php
 if (!$this->isTenantData($order->tenant_id)) {
-    return $this->fail('无权操作', 403);
+    return json(['code' => 403, 'msg' => '无权操作'], 403);
 }
 ```
 
