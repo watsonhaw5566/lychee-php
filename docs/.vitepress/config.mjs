@@ -4,6 +4,7 @@ export default defineConfig({
     title: 'Lychee PHP',
     description: '轻量级、IDE 友好的 PHP Web 框架',
     lang: 'zh-CN',
+    lastUpdated: true,
 
     head: [
         ['link', {rel: 'icon', href: '/pure-logo.png', type: 'image/png'}],
@@ -12,6 +13,7 @@ export default defineConfig({
 
     themeConfig: {
         logo: '/pure-logo.png',
+        lastUpdatedText: '最后更新于',
 
         nav: [
             {text: '首页', link: '/'},
