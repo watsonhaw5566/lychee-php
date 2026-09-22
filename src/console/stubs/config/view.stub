@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 return [
+    // 模板驱动：twig（默认）或 liquid（需 composer require liquid/liquid）
+    'driver'     => 'twig',
+
     // 模板根目录
     'view_path'  => app_path('view'),
 
@@ -15,6 +18,6 @@ return [
     // 静态资源基础 URL，如配置 CDN 可填 'https://cdn.example.com'
     'base_url'   => '',
 
-    // 允许的模板后缀，按查找优先级排序
+    // 允许的模板后缀，按查找优先级排序（twig 驱动默认 ['.twig', '.html']，liquid 驱动默认 ['.liquid']）
     'extensions' => ['.twig', '.html'],
 ];

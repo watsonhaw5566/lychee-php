@@ -24,6 +24,7 @@
     "phpunit/phpunit": "^12.0"
   },
   "suggest": {
+    "liquid/liquid": "Required for the Liquid template driver (set view.driver to 'liquid').",
     "workerman/workerman": "Required for the WebSocket module (^5.0). Install when config/websocket.php is present."
   },
   "autoload": {

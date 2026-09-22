@@ -381,7 +381,7 @@ if (!function_exists('view')) {
      */
     function view(string $template, array $data = []): string
     {
-        /** @var \Lychee\view\View $view */
+        /** @var \Lychee\view\ViewInterface $view */
         $view = app('view');
 
         return $view->render($template, $data);
@@ -396,7 +396,7 @@ if (!function_exists('asset')) {
      */
     function asset(string $path): string
     {
-        /** @var \Lychee\view\View $view */
+        /** @var \Lychee\view\ViewInterface $view */
         $view = app('view');
 
         return $view->asset($path);
