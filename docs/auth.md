@@ -89,7 +89,7 @@ public function login(Request $request): JsonResponse
     $name    = config('satoken.token_cookie_name', 'satoken');
     $minutes = (int) ceil(config('satoken.timeout', 86400 * 7) / 60);
 
-    return $this->success(['token' => $token])
+    return json(['errno' => 0, 'code' => 200, 'msg' => 'success', 'data' => ['token' => $token]])
         ->cookie($name, $token, $minutes, '/', null, false, true, 'Lax');
 }
 
@@ -97,7 +97,8 @@ public function logout(): JsonResponse
 {
     satoken()->logout();
     $name = config('satoken.token_cookie_name', 'satoken');
-    return $this->success(null, '退出成功')->withoutCookie($name);
+    return json(['errno' => 0, 'code' => 200, 'msg' => '退出成功', 'data' => null])
+        ->withoutCookie($name);
 }
 ```
 
