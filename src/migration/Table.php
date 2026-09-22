@@ -499,6 +499,8 @@ class Table
                 $def .= ' DEFAULT CURRENT_TIMESTAMP';
             } elseif ($default === null) {
                 $def .= ' DEFAULT NULL';
+            } elseif (is_bool($default)) {
+                $def .= ' DEFAULT ' . ($default ? '1' : '0');
             } else {
                 $def .= " DEFAULT '" . addslashes((string)$default) . "'";
             }
