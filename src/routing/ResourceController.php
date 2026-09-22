@@ -15,6 +15,7 @@ use think\Validate;
 use RuntimeException;
 use Throwable;
 use ReflectionException;
+use InvalidArgumentException;
 
 /**
  * 资源控制器：基于模型类的零代码 CRUD（base* 方法）。
@@ -81,12 +82,16 @@ abstract class ResourceController extends Controller
      * @throws \think\db\exception\DbException
      */
     protected function paginate(
-        Model|Query $query,
-        int         $current = 1,
-        int         $pageSize = 10,
-        string      $msg = 'success',
-        int         $code = 200,
+        mixed  $query = null,
+        int    $current = 1,
+        int    $pageSize = 10,
+        string $msg = 'success',
+        int    $code = 200,
     ): JsonResponse {
+        if (!$query instanceof Model && !$query instanceof Query) {
+            throw new InvalidArgumentException('paginate() 第一个参数必须是 Query 或 Model 实例');
+        }
+
         $current  = max(1, $current);
         $pageSize = max(1, min(200, $pageSize));
 
