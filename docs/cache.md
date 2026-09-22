@@ -50,3 +50,35 @@ $cache->clear();
 $cache->inc('counter');
 $cache->dec('counter');
 ```
+
+## 助手函数
+
+框架基于 think-cache，自动提供全局 `cache()` 助手函数，可直接完成常用读写：
+
+```php
+// 写入（第三个参数为过期秒数，也支持 ['expire' => 3600]）
+cache('key', 'value');
+cache('key', 'value', 3600);
+
+// 读取，不存在时返回 null
+$value = cache('key');
+
+// 判断是否存在（键名以 ? 开头）
+cache('?key');
+
+// 删除
+cache('key', null);
+
+// 缓存标签（第四个参数）
+cache('key', 'value', 3600, 'tag');
+```
+
+注意：
+
+- `cache()` 不支持无参调用，需要获取管理器实例或切换驱动时仍使用 `app('cache')`：
+
+  ```php
+  app('cache')->store('redis')->get('key');
+  ```
+
+- `cache('key')` 读取时不支持默认值参数，需要默认值请使用 `app('cache')->get('key', '默认值')`。
