@@ -203,7 +203,7 @@ class Request
      */
     public function param(?string $name = null, mixed $default = null): mixed
     {
-        $data = array_merge($this->query, $this->body, $this->routeParams);
+        $data = array_merge($this->query, $this->body, $this->files, $this->routeParams);
 
         if (is_null($name)) {
             return $data;
