@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Lychee\http;
 
 use Lychee\container\Container;
+use think\db\Query;
+use think\Model;
 
 /**
  * 基础控制器：提供请求注入、initialize 生命周期与统一 JSON 响应。
@@ -62,5 +64,54 @@ abstract class Controller
             'msg'   => $msg,
             'data'  => null,
         ]);
+    }
+
+    /**
+     * 分页响应。
+     *
+     * 传入 Query / Model 时自动执行 count 统计与分页查询；
+     * 传入数组时直接作为当页数据返回（total 为 0）。
+     *
+     * @param mixed $items 查询构建器、模型或当页数据数组
+     * @param int $page 当前页码
+     * @param int $pageSize 每页条数（自动限制在 1~200）
+     * @param string $message 提示信息
+     * @param int $httpStatus HTTP 状态码
+     */
+    protected function paginate(
+        mixed  $items = [],
+        int    $page = 1,
+        int    $pageSize = 10,
+        string $message = 'success',
+        int    $httpStatus = 200,
+    ): JsonResponse {
+        $total = 0;
+
+        // 如果传入的是查询构建器对象
+        if ($items instanceof Query || $items instanceof Model) {
+            $query    = $items instanceof Model ? $items->db() : $items;
+            $pageSize = max(1, min(200, $pageSize)); // 限制每页记录数范围
+
+            // 自动计算总数
+            $total = $query->count();
+
+            // 获取当前页数据
+            $items = $query->page($page, $pageSize)->select()->toArray();
+        }
+
+        // 确保 $items 是数组
+        if (!is_array($items)) {
+            $items = [];
+        }
+
+        return new JsonResponse([
+            'errno' => 0,
+            'code'  => $httpStatus,
+            'msg'   => $message,
+            'data'  => [
+                'list'  => $items,
+                'total' => $total,
+            ],
+        ], $httpStatus);
     }
 }
