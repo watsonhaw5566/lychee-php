@@ -4,7 +4,7 @@
 开发者可按需选择：
 
 - **需要 CRUD 的控制器**：继承 `Lychee\routing\ResourceController`，获得请求注入、统一响应、验证快捷方式和零代码 CRUD 能力
-- **不需要 CRUD 但想便捷响应**：继承 `Lychee\http\Controller`，获得请求注入与 `success()` / `fail()` 响应快捷方法
+- **不需要 CRUD 但想便捷响应**：继承 `Lychee\http\Controller`，获得请求注入与 `success()` / `fail()` / `paginate()` 响应快捷方法
 - **完全自定义**：直接写普通类，使用全局助手 `success()` / `fail()` / `json()` 返回响应
 
 ## 资源控制器 ResourceController
@@ -124,9 +124,27 @@ return $this->success($data, '创建成功', 201);
 return $this->fail('参数错误');
 return $this->fail('未找到', 404);
 
-// 分页响应
+// 分页响应（资源控制器版本，第一个参数必须是 Query / Model）
 return $this->paginate($query, $current, $pageSize);
 ```
+
+`paginate()` 的分页数据统一放在 `data.list`，总数放在 `data.total`：
+
+```json
+{
+  "errno": 0,
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "list": [{ "id": 1 }, { "id": 2 }],
+    "total": 56
+  }
+}
+```
+
+> `ResourceController` 重写了 `paginate()`：只接受 `Query` / `Model`，内部调用 think-orm
+> 的分页器，供 `index()` 等 CRUD 方法使用。基础控制器 `Lychee\http\Controller` 提供的
+> 通用版本还支持直接传入数组，详见下文[基础控制器](#基础控制器-controller)章节。
 
 #### 非 JSON 响应
 
@@ -342,7 +360,7 @@ class UserController extends ResourceController
 ## 基础控制器 Controller
 
 继承 `Lychee\http\Controller` 可获得请求注入、`initialize()` 生命周期钩子与统一 JSON 响应快捷方法，
-适用于不需要 CRUD、但希望使用 `$this->request` 和 `$this->success()` / `$this->fail()` 的场景。
+适用于不需要 CRUD、但希望使用 `$this->request` 和 `$this->success()` / `$this->fail()` / `$this->paginate()` 的场景。
 
 ```php
 namespace App\controller;
@@ -372,8 +390,91 @@ class UploadController extends Controller
 | `initialize()` | 初始化钩子，在中间件之后、方法调用前执行 |
 | `$this->success($data, $msg, $code)` | 成功 JSON 响应 |
 | `$this->fail($msg, $code)` | 失败 JSON 响应 |
+| `$this->paginate($items, $page, $pageSize, $message, $httpStatus)` | 分页 JSON 响应 |
 
 > `Lychee\routing\ResourceController` 继承自此基类，因此资源控制器同样拥有以上能力。
+
+### 分页响应 `paginate()`
+
+`paginate()` 在传入查询构建器时自动完成总数统计与分页查询，也可以直接传入一个数组作为当页数据。
+
+方法签名：
+
+```php
+protected function paginate(
+    mixed  $items = [],       // Query、Model 或当页数据数组
+    int    $page = 1,         // 当前页码
+    int    $pageSize = 10,    // 每页条数，自动限制在 1~200
+    string $message = 'success',
+    int    $httpStatus = 200,
+): JsonResponse
+```
+
+传入 `Query` / `Model` 时，框架会先执行 `count()` 统计总数，再查询当前页数据；
+传入数组时数组原样作为当页数据，`total` 为 0。非数组（如 `null`、字符串）会被归一为空数组。
+
+```php
+use App\model\Order;
+use think\facade\Db;
+
+class OrderController extends Controller
+{
+    // 传入 Query：自动 count + 分页
+    public function list(): JsonResponse
+    {
+        $page     = (int) $this->request->param('page', 1);
+        $pageSize = (int) $this->request->param('pageSize', 10);
+
+        $query = Db::table('orders')->where('status', 1);
+
+        return $this->paginate($query, $page, $pageSize);
+    }
+
+    // 传入 Query（由模型产生）：Model::where() 静态调用返回的是 Query
+    public function vipList(): JsonResponse
+    {
+        return $this->paginate(
+            Order::where('is_vip', 1),
+            page: 1,
+            pageSize: 20,
+            message: 'ok',
+            httpStatus: 200,
+        );
+    }
+
+    // 传入 Model 实例：框架自动调用其 db() 获取查询构建器（不带额外条件）
+    public function allList(): JsonResponse
+    {
+        return $this->paginate(new Order(), 1, 20);
+    }
+
+    // 传入数组：数据来自外部接口或自行组装时，直接作为当页数据
+    public function remoteList(): JsonResponse
+    {
+        $items = $this->fetchFromRemote();
+
+        return $this->paginate($items);
+    }
+}
+```
+
+响应结构（分页数据在 `data.list`，总数在 `data.total`）：
+
+```json
+{
+  "errno": 0,
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "list": [{ "id": 3 }, { "id": 4 }],
+    "total": 5
+  }
+}
+```
+
+> 与 `ResourceController::paginate()` 的区别：基础控制器版本接受任意 `Query` / `Model` / 数组，
+> 自行通过 `count()` + `page()` 完成分页；资源控制器的重写版本只接受 `Query` / `Model`，
+> 内部使用 think-orm 分页器。两者响应结构一致。
 
 ## 不继承基类的控制器
 
