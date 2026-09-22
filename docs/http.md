@@ -11,7 +11,7 @@ $request = request();
 $method = $request->getMethod();
 $uri    = $request->getUri();
 
-// 获取参数（合并 GET / POST / 路由参数）
+// 获取参数（合并 GET / POST / 上传文件 / 路由参数）
 $id    = $request->param('id');
 $name  = $request->param('name', '默认值');
 $all   = $request->param();
@@ -45,6 +45,8 @@ $domain = $request->domain();   // https://example.com:8080
 
 `Request` 仅负责读取上传文件的信息，文件的存储由 `filesystem` 模块处理（见 [文件系统](filesystem.md#上传文件)）。
 
+`UploadedFile` 继承自 `think\File`（基于 `SplFileInfo`），因此可直接作为 `think-validate` 的 `file` / `image` / `fileExt` / `fileMime` / `fileSize` 规则的校验对象（见 [数据验证](validation.md)）。
+
 ```php
 use Lychee\http\UploadedFile;
 
@@ -55,13 +57,15 @@ if ($request->hasFile('avatar')) {
     $file = $request->file('avatar');
 
     // 文件元信息
-    $file->getOriginalName(); // 原始文件名，如 photo.jpg
-    $file->extension();       // 扩展名，如 jpg
-    $file->getSize();         // 文件大小（字节）
-    $file->getMimeType();     // MIME 类型
-    $file->getTempName();     // 服务器临时路径
-    $file->isValid();         // 上传是否成功
-    $file->getContent();      // 文件内容字符串
+    $file->getOriginalName();  // 原始文件名，如 photo.jpg
+    $file->extension();        // 扩展名（取自原始文件名），如 jpg
+    $file->getSize();          // 文件大小（字节）
+    $file->getOriginalMime();  // 客户端声明的 MIME（不可信），getMimeType() 为其别名
+    $file->getMime();          // 基于文件内容检测的真实 MIME
+    $file->getTempName();      // 服务器临时路径
+    $file->isValid();          // 上传是否成功
+    $file->getContent();       // 文件内容字符串
+    $file->getStream();        // 文件流资源
 
     // 交给 filesystem 模块存储
     $path = storage()->putFile('uploads/avatar', $file);
@@ -78,6 +82,33 @@ $all = $request->file();
 ```
 
 前端表单需设置 `enctype="multipart/form-data"`。
+
+### 上传文件校验
+
+`param()` 会合并上传文件，可直接把 `$request->param()` 交给校验器：
+
+```php
+use think\Validate;
+
+$validate = new Validate();
+$validate->rule([
+    'avatar' => 'require|image|fileExt:jpg,png|fileMime:image/jpeg,image/png|fileSize:2097152',
+]);
+
+if (!$validate->check($request->param())) {
+    // 校验失败：未上传 / 不是图片 / 后缀不允许 / 类型不符 / 超过 2MB
+}
+```
+
+| 规则 | 说明 |
+| --- | --- |
+| `file` | 必须是有效的上传文件（`UploadedFile` 实例） |
+| `image` | 必须是图片（GIF/JPG/PNG/BMP 等，按文件内容识别） |
+| `fileExt:jpg,png` | 原始文件名后缀必须在允许列表中 |
+| `fileMime:image/jpeg,image/png` | 文件内容检测出的 MIME 必须在允许列表中 |
+| `fileSize:2097152` | 文件大小不得超过指定字节数 |
+
+> 注意：`fileMime` 基于文件内容检测，比客户端上传的 `getOriginalMime()`（可伪造）更可靠。
 
 ## 响应 Response
 
