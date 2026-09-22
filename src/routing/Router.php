@@ -39,9 +39,38 @@ class Router
     /** @var array<string, string> */
     private array $namedRoutes = [];
 
+    /**
+     * 路由表是否来自缓存文件。
+     *
+     * 为 true 时 registerController / registerDirectory 不再执行，
+     * 缓存表即为路由的唯一来源（其中已包含插件注册的路由）。
+     */
+    private bool $loadedFromCache = false;
+
     public function __construct(string $routePrefix = '')
     {
         $this->routePrefix = trim($routePrefix, '/');
+    }
+
+    /**
+     * 从缓存数据加载路由表，跳过目录扫描与注解反射。
+     *
+     * 缓存中的 pattern 为已编译的正则表达式，动态参数（如 {id}）
+     * 以命名捕获组形式保留，dispatch 的匹配与参数提取行为与实时扫描完全一致。
+     *
+     * @param array<int, array{method:string, path:string, pattern:string, controller:class-string, action:string, middlewares:array<class-string>, cache:?int}> $routes
+     * @param array<string, string> $namedRoutes
+     */
+    public function loadFromCache(array $routes, array $namedRoutes = []): void
+    {
+        $this->routes          = $routes;
+        $this->namedRoutes     = $namedRoutes;
+        $this->loadedFromCache = true;
+    }
+
+    public function isLoadedFromCache(): bool
+    {
+        return $this->loadedFromCache;
     }
 
     /**
@@ -49,6 +78,11 @@ class Router
      */
     public function registerController(string $controllerClass): void
     {
+        // 缓存表为唯一来源时，插件 boot 中的动态注册无需重复执行
+        if ($this->loadedFromCache) {
+            return;
+        }
+
         $ref = new ReflectionClass($controllerClass);
 
         $prefix      = $this->resolvePrefix($ref);
@@ -143,6 +177,10 @@ class Router
 
     public function registerDirectory(string $directory, string $namespace): void
     {
+        if ($this->loadedFromCache) {
+            return;
+        }
+
         $iterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS)
         );
@@ -201,6 +239,16 @@ class Router
     public function getRoutes(): array
     {
         return $this->routes;
+    }
+
+    /**
+     * 获取命名路由映射表。
+     *
+     * @return array<string, string>
+     */
+    public function getNamedRoutes(): array
+    {
+        return $this->namedRoutes;
     }
 
     /**

@@ -35,7 +35,6 @@ use Lychee\session\driver\File as SessionFileDriver;
 use Lychee\session\Session;
 use Lychee\view\ExceptionRenderer;
 use Lychee\view\View;
-use Lychee\view\ViewInterface;
 use Lychee\websocket\command\ServerCommand;
 use Lychee\websocket\WebSocketServer;
 use Psr\Log\LoggerInterface;
@@ -176,6 +175,21 @@ class Application
         $this->container->singleton(Router::class, function (): Router {
             $routePrefix = (string) config('app.route_prefix', '');
             $router      = new Router($routePrefix);
+
+            // 生产环境存在路由缓存文件时直接加载，跳过目录扫描与注解反射
+            $cacheFile = \Lychee\console\command\RouteCacheCommand::cacheFilePath($this->container->runtimePath);
+            if (is_file($cacheFile)) {
+                $data = require $cacheFile;
+                if (is_array($data) && isset($data['routes']) && is_array($data['routes'])) {
+                    $namedRoutes = isset($data['named_routes']) && is_array($data['named_routes'])
+                        ? $data['named_routes']
+                        : [];
+                    $router->loadFromCache($data['routes'], $namedRoutes);
+
+                    return $router;
+                }
+            }
+
             $router->registerDirectory(
                 $this->basePath . '/app/controller',
                 $this->controllerNamespace
@@ -192,6 +206,7 @@ class Application
             $console = new ConsoleApplication($this->container);
             $console->addCommand(\Lychee\console\command\RunCommand::class);
             $console->addCommand(\Lychee\console\command\RouteListCommand::class);
+            $console->addCommand(\Lychee\console\command\RouteCacheCommand::class);
             $console->addCommand(\Lychee\console\command\MakeRestCommand::class);
             $console->addCommand(\Lychee\console\command\MakeBaseCommand::class);
             $console->addCommand(\Lychee\console\command\ConfigPublishCommand::class);
@@ -556,43 +571,28 @@ class Application
 
     private function bootView(): void
     {
-        // 若应用侧已通过容器绑定自定义模板驱动，则优先使用
-        if ($this->container->has(ViewInterface::class)) {
-            $view = $this->container->get(ViewInterface::class);
-        } else {
-            /** @var Config $config */
-            $config     = $this->container->get('config');
-            $viewConfig = $config->get('view', []);
+        /** @var Config $config */
+        $config     = $this->container->get('config');
+        $viewConfig = $config->get('view', []);
 
-            $driver    = (string) ($viewConfig['driver'] ?? 'twig');
-            $viewPath  = (string) ($viewConfig['view_path'] ?? ($this->basePath . '/app/view'));
-            $cachePath = (string) ($viewConfig['cache_path'] ?? ($this->container->runtimePath . 'twig'));
-            $debug     = (bool) ($viewConfig['debug'] ?? false);
-            $baseUrl   = (string) ($viewConfig['base_url'] ?? '');
+        $viewPath   = (string) ($viewConfig['view_path'] ?? ($this->basePath . '/app/view'));
+        $cachePath  = (string) ($viewConfig['cache_path'] ?? ($this->container->runtimePath . 'twig'));
+        $debug      = (bool) ($viewConfig['debug'] ?? false);
+        $baseUrl    = (string) ($viewConfig['base_url'] ?? '');
+        $extensions = (array) ($viewConfig['extensions'] ?? ['.twig', '.html']);
 
-            if (!is_dir($viewPath)) {
-                @mkdir($viewPath, 0777, true);
-            }
-
-            $view = match ($driver) {
-                'liquid' => new \Lychee\view\driver\Liquid(
-                    viewPath: $viewPath,
-                    cachePath: $cachePath,
-                    debug: $debug,
-                    baseUrl: $baseUrl,
-                    extensions: (array) ($viewConfig['extensions'] ?? ['.liquid']),
-                ),
-                default  => new View(
-                    viewPath: $viewPath,
-                    cachePath: $cachePath,
-                    debug: $debug,
-                    baseUrl: $baseUrl,
-                    extensions: (array) ($viewConfig['extensions'] ?? ['.twig', '.html']),
-                ),
-            };
+        if (!is_dir($viewPath)) {
+            @mkdir($viewPath, 0777, true);
         }
 
-        $this->container->instance(ViewInterface::class, $view);
+        $view = new View(
+            viewPath: $viewPath,
+            cachePath: $cachePath,
+            debug: $debug,
+            baseUrl: $baseUrl,
+            extensions: $extensions,
+        );
+
         $this->container->instance(View::class, $view);
         $this->container->instance('view', $view);
     }

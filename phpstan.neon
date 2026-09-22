@@ -6,11 +6,3 @@ parameters:
     checkExplicitMixed: false
     bootstrapFiles:
         - tests/stub/bootstrap.php
-    ignoreErrors:
-        # Liquid 驱动依赖可选的 liquid/liquid 包，未安装时静态分析无法解析其符号
-        -
-            identifier: class.notFound
-            path: src/view/driver/Liquid.php
-        -
-            identifier: constructor.unusedParameter
-            path: src/view/driver/Liquid.php
