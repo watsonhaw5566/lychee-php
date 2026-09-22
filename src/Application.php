@@ -35,6 +35,7 @@ use Lychee\session\driver\File as SessionFileDriver;
 use Lychee\session\Session;
 use Lychee\view\ExceptionRenderer;
 use Lychee\view\View;
+use Lychee\view\ViewInterface;
 use Lychee\websocket\command\ServerCommand;
 use Lychee\websocket\WebSocketServer;
 use Psr\Log\LoggerInterface;
@@ -555,28 +556,43 @@ class Application
 
     private function bootView(): void
     {
-        /** @var Config $config */
-        $config     = $this->container->get('config');
-        $viewConfig = $config->get('view', []);
+        // 若应用侧已通过容器绑定自定义模板驱动，则优先使用
+        if ($this->container->has(ViewInterface::class)) {
+            $view = $this->container->get(ViewInterface::class);
+        } else {
+            /** @var Config $config */
+            $config     = $this->container->get('config');
+            $viewConfig = $config->get('view', []);
 
-        $viewPath   = (string) ($viewConfig['view_path'] ?? ($this->basePath . '/app/view'));
-        $cachePath  = (string) ($viewConfig['cache_path'] ?? ($this->container->runtimePath . 'twig'));
-        $debug      = (bool) ($viewConfig['debug'] ?? false);
-        $baseUrl    = (string) ($viewConfig['base_url'] ?? '');
-        $extensions = (array) ($viewConfig['extensions'] ?? ['.twig', '.html']);
+            $driver    = (string) ($viewConfig['driver'] ?? 'twig');
+            $viewPath  = (string) ($viewConfig['view_path'] ?? ($this->basePath . '/app/view'));
+            $cachePath = (string) ($viewConfig['cache_path'] ?? ($this->container->runtimePath . 'twig'));
+            $debug     = (bool) ($viewConfig['debug'] ?? false);
+            $baseUrl   = (string) ($viewConfig['base_url'] ?? '');
 
-        if (!is_dir($viewPath)) {
-            @mkdir($viewPath, 0777, true);
+            if (!is_dir($viewPath)) {
+                @mkdir($viewPath, 0777, true);
+            }
+
+            $view = match ($driver) {
+                'liquid' => new \Lychee\view\driver\Liquid(
+                    viewPath: $viewPath,
+                    cachePath: $cachePath,
+                    debug: $debug,
+                    baseUrl: $baseUrl,
+                    extensions: (array) ($viewConfig['extensions'] ?? ['.liquid']),
+                ),
+                default  => new View(
+                    viewPath: $viewPath,
+                    cachePath: $cachePath,
+                    debug: $debug,
+                    baseUrl: $baseUrl,
+                    extensions: (array) ($viewConfig['extensions'] ?? ['.twig', '.html']),
+                ),
+            };
         }
 
-        $view = new View(
-            viewPath: $viewPath,
-            cachePath: $cachePath,
-            debug: $debug,
-            baseUrl: $baseUrl,
-            extensions: $extensions,
-        );
-
+        $this->container->instance(ViewInterface::class, $view);
         $this->container->instance(View::class, $view);
         $this->container->instance('view', $view);
     }

@@ -8,6 +8,9 @@
 
 ```php
 return [
+    // 模板驱动：twig（默认）或 liquid（需 composer require liquid/liquid）
+    'driver'     => 'twig',
+
     // 模板根目录
     'view_path'  => app_path('view'),
 
@@ -29,11 +32,12 @@ return [
 
 | 配置项       | 类型     | 默认值                  | 说明                                   |
 | ------------ | -------- | ----------------------- | -------------------------------------- |
+| `driver`     | string   | `'twig'`                | 模板引擎驱动，可选 `twig` 或 `liquid`  |
 | `view_path`  | string   | `app_path('view')`      | 模板文件所在目录                       |
-| `cache_path` | string   | `runtime_path('twig')`  | Twig 编译缓存目录                      |
-| `debug`      | bool     | `false`                 | 是否开启 Twig 调试模式                 |
+| `cache_path` | string   | `runtime_path('twig')`  | 模板编译缓存目录                       |
+| `debug`      | bool     | `false`                 | 是否开启调试模式                       |
 | `base_url`   | string   | `''`                    | 静态资源 URL 前缀，用于 `asset()`/`url()` |
-| `extensions` | string[] | `['.twig', '.html']`    | 允许的模板后缀，按查找优先级排序       |
+| `extensions` | string[] | `['.twig', '.html']`    | 允许的模板后缀，按查找优先级排序（liquid 驱动默认为 `['.liquid']`） |
 
 ## 模板后缀
 
@@ -181,3 +185,105 @@ $twig->addFilter(new \Twig\TwigFilter('money', fn ($value) => number_format((flo
 ```bash
 php lee run --host=127.0.0.1 --port=8000
 ```
+
+## 切换到 Liquid 驱动
+
+框架内置了基于 [liquid/liquid](https://github.com/kalimatas/php-liquid) 的 Liquid 驱动，可通过配置一键切换，无需编写适配代码。
+
+### 1. 安装依赖
+
+```bash
+composer require liquid/liquid
+```
+
+### 2. 修改配置
+
+在 `config/view.php` 中将 `driver` 设为 `liquid`：
+
+```php
+return [
+    'driver'     => 'liquid',
+    'view_path'  => app_path('view'),
+    'cache_path' => runtime_path('liquid'),
+    'extensions' => ['.liquid'],
+    // ...
+];
+```
+
+切换后，`view()`、`asset()` 辅助函数及 `app('view')` 自动使用 Liquid 驱动，控制器代码无需改动：
+
+```php
+public function index()
+{
+    return view('user/profile', ['name' => 'Lychee']);
+}
+```
+
+### Liquid 模板示例
+
+```liquid
+{# app/view/user/profile.liquid #}
+<h1>Hello, {{ name }}!</h1>
+
+{% if user %}
+    <p>Email: {{ user.email }}</p>
+{% endif %}
+
+{% for item in items %}
+    <li>{{ item }}</li>
+{% endfor %}
+```
+
+> **注意**：框架内置的异常页面（调试模式的堆栈页、生产环境的通用错误页）始终使用 Twig 渲染，不受驱动切换影响，确保异常情况下也能正常展示错误信息。
+
+## 自定义模板驱动
+
+如需使用 Twig、Liquid 之外的其他模板引擎（如 Blade、Smarty），可实现 `Lychee\view\ViewInterface` 接口并通过容器绑定覆盖。
+
+### 1. 实现 ViewInterface
+
+```php
+<?php
+// app/view/CustomDriver.php
+
+namespace App\view;
+
+use Lychee\view\ViewInterface;
+
+class CustomDriver implements ViewInterface
+{
+    public function __construct(
+        protected string $viewPath,
+        protected string $baseUrl = '',
+    ) {}
+
+    public function render(string $template, array $data = []): string
+    {
+        // 你的渲染逻辑
+    }
+
+    public function exists(string $template): bool
+    {
+        return is_file($this->viewPath . '/' . $template);
+    }
+
+    public function asset(string $path): string
+    {
+        return $this->baseUrl . '/' . ltrim($path, '/');
+    }
+}
+```
+
+### 2. 注册到容器
+
+在 `app/common.php` 中绑定（加载时机早于视图模块初始化）：
+
+```php
+app()->instance(\Lychee\view\ViewInterface::class, new \App\view\CustomDriver(
+    viewPath: app_path('view'),
+    baseUrl:  config('view.base_url', ''),
+));
+```
+
+移除绑定即可恢复框架默认的 Twig 驱动。
+

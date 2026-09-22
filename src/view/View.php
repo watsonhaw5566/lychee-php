@@ -13,8 +13,11 @@ use Twig\TwigFunction;
  * 基于 Twig 的模板引擎。
  *
  * 模板文件默认从 app/view 目录读取，编译缓存写入 runtime/twig。
+ *
+ * 这是 {@see ViewInterface} 的默认实现；如需切换到 Liquid 等其他模板引擎，
+ * 实现 ViewInterface 后通过容器覆盖绑定即可。
  */
-class View
+class View implements ViewInterface
 {
     protected Environment $twig;
 
