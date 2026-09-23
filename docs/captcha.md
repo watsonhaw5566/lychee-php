@@ -267,8 +267,8 @@ public function register(Request $request, Captcha $captcha): JsonResponse
 // app/middleware/SmsThrottle.php
 namespace App\middleware;
 
+use Lychee\cache\CacheManager;
 use Lychee\throttle\ThrottleMiddleware;
-use think\CacheManager;
 
 class SmsThrottle extends ThrottleMiddleware
 {

@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Tests\unit;
 
 use Lychee\Application;
+use Lychee\cache\CacheManager;
 use Lychee\http\Request;
 use Lychee\http\Response;
 use Lychee\throttle\ThrottleMiddleware;
 use PHPUnit\Framework\TestCase;
-use think\CacheManager;
 
 class ThrottleMiddlewareTest extends TestCase
 {

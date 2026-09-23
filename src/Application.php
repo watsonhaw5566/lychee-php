@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Lychee;
 
 use Lychee\auth\SaToken;
+use Lychee\cache\CacheManager;
 use Lychee\captcha\Captcha;
 use Lychee\config\Config;
 use Lychee\config\Env;
@@ -38,7 +39,6 @@ use Lychee\view\View;
 use Lychee\websocket\command\ServerCommand;
 use Lychee\websocket\WebSocketServer;
 use Psr\Log\LoggerInterface;
-use think\CacheManager;
 use think\DbManager;
 use think\Model as ThinkModel;
 use think\Validate;
@@ -338,16 +338,10 @@ class Application
 
     private function bootCache(): void
     {
-        /** @var Config $config */
-        $config      = $this->container->get('config');
-        $cacheConfig = $config->get('cache', []);
-
-        $cacheManager = new CacheManager();
-        $cacheManager->config($cacheConfig);
+        $cacheManager = new CacheManager($this->container);
 
         $this->container->instance(CacheManager::class, $cacheManager);
         $this->container->instance('cache', $cacheManager);
-        $this->container->instance('think\CacheManager', $cacheManager);
     }
 
     private function bootLog(): void

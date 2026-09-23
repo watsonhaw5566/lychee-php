@@ -90,7 +90,7 @@ return [
 namespace App\middleware;
 
 use Lychee\throttle\ThrottleMiddleware;
-use think\CacheManager;
+use Lychee\cache\CacheManager;
 
 class LoginThrottle extends ThrottleMiddleware
 {
@@ -110,7 +110,7 @@ class LoginThrottle extends ThrottleMiddleware
 namespace App\middleware;
 
 use Lychee\throttle\ThrottleMiddleware;
-use think\CacheManager;
+use Lychee\cache\CacheManager;
 
 class SmsThrottle extends ThrottleMiddleware
 {
@@ -163,7 +163,7 @@ public function sendSms() {}
 
 ## 缓存依赖
 
-限流计数器存储在缓存中，依赖框架的 `think\CacheManager`（`config/cache.php` 配置的缓存驱动）。
+限流计数器存储在缓存中，依赖框架的 `Lychee\cache\CacheManager`（`config/cache.php` 配置的缓存驱动）。
 
 - **开发环境**：使用 File 驱动即可
 - **生产环境**：推荐使用 Redis 驱动。File 驱动的 `inc` 操作是非原子的（读-改-写），高并发下可能计数不准；Redis 驱动的 `incrby` 是原子操作，计数精确

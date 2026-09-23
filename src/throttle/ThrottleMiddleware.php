@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Lychee\throttle;
 
 use Closure;
+use Lychee\cache\CacheManager;
 use Lychee\http\JsonResponse;
 use Lychee\http\MiddlewareInterface;
 use Lychee\http\Request;
 use Lychee\http\Response;
-use think\CacheManager;
 
 /**
  * 限速中间件（Throttle）。
