@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\unit;
 
 use Lychee\Application;
+use Lychee\cache\CacheManager;
 use Lychee\captcha\Captcha;
 use PHPUnit\Framework\TestCase;
-use think\CacheManager;
 
 class CaptchaTest extends TestCase
 {

@@ -132,6 +132,24 @@ if (!function_exists('storage_path')) {
     }
 }
 
+if (!function_exists('cache')) {
+    /**
+     * 获取缓存驱动实例，支持通道切换。
+     *
+     *   cache()->get('key');              // 默认通道读取
+     *   cache('redis')->set('key', $v, 3600); // 切换 redis 通道写入
+     *
+     * @param  string|null $store 通道名（file / redis），为 null 时使用默认通道
+     */
+    function cache(?string $store = null): \Lychee\cache\Driver
+    {
+        /** @var \Lychee\cache\CacheManager $manager */
+        $manager = app('cache');
+
+        return $manager->store($store);
+    }
+}
+
 if (!function_exists('logger')) {
     /**
      * 获取指定频道的日志记录器。

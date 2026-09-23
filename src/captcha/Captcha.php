@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Lychee\captcha;
 
+use Lychee\cache\CacheManager;
 use Lychee\captcha\driver\EmailDriver;
 use Lychee\captcha\driver\ImageDriver;
 use Lychee\captcha\driver\SmsDriver;
 use Lychee\captcha\exception\CaptchaException;
 use Lychee\config\Config;
 use Lychee\container\Container;
-use think\CacheManager;
 
 /**
  * 验证码核心类。
