@@ -154,6 +154,22 @@ class Request
     }
 
     /**
+     * 获取当前请求的完整 URL（协议 + 主机 + 路径 + 查询字符串）。
+     *
+     * 缺少 Host 头时退化为相对路径（如 /users?id=1）。
+     */
+    public function url(): string
+    {
+        $url = $this->domain() . $this->path;
+
+        if ($this->query !== []) {
+            $url .= '?' . http_build_query($this->query);
+        }
+
+        return $url;
+    }
+
+    /**
      * 判断是否为 GET 请求。
      */
     public function isGet(): bool
