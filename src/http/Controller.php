@@ -9,9 +9,10 @@ use think\db\Query;
 use think\Model;
 
 /**
- * 基础控制器：提供请求注入、initialize 生命周期与分页响应。
+ * 基础控制器：提供请求注入、initialize 生命周期与统一 JSON 响应。
  *
- * 普通 JSON 响应使用全局助手 json() 自行组装数据结构；
+ * JSON 响应可直接使用 success()/fail()/paginate()；
+ * 需要自定义信封结构时使用全局助手 json() 自行组装。
  * 需要资源路由与零代码 CRUD 的控制器请继承 {@see \Lychee\routing\ResourceController}。
  */
 abstract class Controller
@@ -33,6 +34,47 @@ abstract class Controller
      */
     protected function initialize(): void
     {
+    }
+
+    // ── 统一 JSON 响应 ─────────────────────────────────────────────
+
+    /**
+     * 成功响应。
+     *
+     * 信封格式：{errno, code, msg, data}。
+     *
+     * @param mixed  $data 响应数据
+     * @param string $msg  提示信息
+     * @param int    $code 业务码（同时作为 HTTP 状态码）
+     */
+    protected function success(mixed $data = null, string $msg = 'success', int $code = 200): JsonResponse
+    {
+        return new JsonResponse([
+            'errno' => 0,
+            'code'  => $code,
+            'msg'   => $msg,
+            'data'  => $data,
+        ], $code);
+    }
+
+    /**
+     * 失败响应。
+     *
+     * 信封格式：{errno, code, msg, data}。
+     * HTTP 状态码固定为 200，业务错误码通过 body.code 返回。
+     *
+     * @param string $msg  错误信息
+     * @param int    $code 业务错误码
+     * @param mixed  $data 附加数据
+     */
+    protected function fail(string $msg = 'fail', int $code = 400, mixed $data = null): JsonResponse
+    {
+        return new JsonResponse([
+            'errno' => 0,
+            'code'  => $code,
+            'msg'   => $msg,
+            'data'  => $data,
+        ]);
     }
 
     // ── 分页 JSON 响应 ──────────────────────────────────────────────
