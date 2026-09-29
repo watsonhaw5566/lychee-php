@@ -38,11 +38,11 @@ class SqlSeederRunner
     private const STATE_LINE_COMMENT  = 4;
     private const STATE_BLOCK_COMMENT = 5;
 
-    private int $state = self::STATE_NORMAL;
-    private string $buffer = '';
-    private int $line = 1;
+    private int $state              = self::STATE_NORMAL;
+    private string $buffer          = '';
+    private int $line               = 1;
     private int $statementStartLine = 1;
-    private bool $hasToken = false;
+    private bool $hasToken          = false;
 
     /** @var array<int, array{0: string, 1: int}> 已切分出的语句（SQL, 起始行号） */
     private array $emitted = [];
@@ -289,7 +289,7 @@ class SqlSeederRunner
                     $c = $data[$i];
 
                     // MySQL 行注释要求 -- 后紧跟空白；$i 不动，由注释状态连同 "--" 一起消费
-                    if ($c === '-'
+                    if ($c                                === '-'
                         && $i + 1 < $len && $data[$i + 1] === '-'
                         && ($i + 2 >= $len || ctype_space($data[$i + 2]))
                     ) {
@@ -447,7 +447,7 @@ class SqlSeederRunner
         }
 
         $this->buffer .= $s;
-        $this->line   += substr_count($s, "\n");
+        $this->line += substr_count($s, "\n");
     }
 
     /**
