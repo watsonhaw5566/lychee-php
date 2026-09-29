@@ -39,6 +39,10 @@ $request->isMobile();
 $scheme = $request->scheme();   // http | https
 $host   = $request->host();     // example.com:8080
 $domain = $request->domain();   // https://example.com:8080
+
+// 完整 URL（协议 + 主机 + 路径 + 查询字符串，无查询参数时不带 ? 后缀）
+$url = $request->url();         // https://example.com:8080/users?id=1
+// CLI / 无 Host 头场景退化为相对路径，如 /users?id=1
 ```
 
 ## 文件上传 Upload
