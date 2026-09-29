@@ -28,7 +28,9 @@ use Lychee\migration\command\MigrateRollbackCommand;
 use Lychee\migration\command\MigrateRunCommand;
 use Lychee\migration\command\SeedCreateCommand;
 use Lychee\migration\command\SeedRunCommand;
+use Lychee\migration\command\SeedSqlCommand;
 use Lychee\migration\MigrationManager;
+use Lychee\migration\SqlSeederRunner;
 use Lychee\queue\command\WorkCommand;
 use Lychee\queue\QueueManager;
 use Lychee\routing\Router;
@@ -494,6 +496,7 @@ class Application
     {
         $migrationPath = $this->basePath . '/database/migrations';
         $seederPath    = $this->basePath . '/database/seeders';
+        $sqlPath       = $this->basePath . '/database/sql';
 
         $pdo = $this->resolveMigrationPdo();
 
@@ -507,6 +510,9 @@ class Application
 
             $this->container->instance(MigrationManager::class, $manager);
             $this->container->instance('migration', $manager);
+
+            $sqlSeeder = new SqlSeederRunner($pdo, $sqlPath);
+            $this->container->instance(SqlSeederRunner::class, $sqlSeeder);
         }
 
         /** @var ConsoleApplication $console */
@@ -514,8 +520,9 @@ class Application
         $console->addCommand(MigrateRunCommand::class);
         $console->addCommand(MigrateRollbackCommand::class);
         $console->addCommand(MigrateCreateCommand::class);
-        $console->addCommand(SeedRunCommand::class);
         $console->addCommand(SeedCreateCommand::class);
+        $console->addCommand(SeedRunCommand::class);
+        $console->addCommand(SeedSqlCommand::class);
     }
 
     /**
