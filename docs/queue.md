@@ -110,6 +110,39 @@ Sync 连接器在 `delay()` 大于 0 时会调用 `sleep()` 阻塞等待，然�
 
 ## 消费队列
 
+### 常驻消费：queue:work
+
 ```bash
 php lee queue:work --connection=redis --queue=default --tries=3
 ```
+
+`queue:work` 是常驻进程，吞吐性能高，但 PHP 类一旦加载就驻留内存——**修改任务代码后必须重启进程**才会生效。
+
+### 实时监听：queue:listen
+
+```bash
+php lee queue:listen --connection=redis --queue=default --sleep=3 --tries=3 --memory=128 --timeout=60
+```
+
+`queue:listen` 的父进程常驻，但**每个任务都在全新的 `queue:work --once` 子进程中执行**。子进程每次重新引导框架、重新加载代码，因此修改任务代码后无需重启监听进程，当前任务执行完，下一个任务自动使用新代码。
+
+适用场景与取舍：
+
+- 适合生产环境配合 Supervisor（如宝塔面板的 Supervisor 管理器）守护，实现部署后免重启
+- 代价是每个任务需支付一次框架引导开销（读配置、建连接等），吞吐量低于常驻 `queue:work`，高并发队列仍应使用 `queue:work`
+- 需要 PHP 未禁用 `proc_open`；可选安装 pcntl 扩展以支持 SIGTERM 优雅退出（无 pcntl 时任务依靠 Redis reserved 超时重试兜底）
+
+选项说明：
+
+| 选项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `--connection` / `-c` | 配置默认连接 | 队列连接 |
+| `--queue` | 连接默认队列 | 监听的队列名 |
+| `--sleep` | 3 | 队列为空时再次轮询的等待秒数 |
+| `--tries` | 1 | 任务失败后的最大尝试次数 |
+| `--memory` | 128 | 监听进程内存上限（MB），超限后自动退出交由 Supervisor 重启 |
+| `--timeout` | 60 | 单个 worker 子进程的最长执行秒数，超时强杀（0 表示不限制） |
+
+注意：`--timeout` 应小于 Redis 连接的 `retry_after`（默认 60 秒），否则旧任务尚未被杀掉、预留已过期，任务可能被其他 worker 重复消费。被强杀的任务留在 `:reserved` 集合中，超过 `retry_after` 后自动重新入队重试。
+
+需要并发消费时，启动多个监听进程即可（可分别指定不同的 `--queue`）。
