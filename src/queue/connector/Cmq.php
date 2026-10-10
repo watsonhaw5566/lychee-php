@@ -63,8 +63,7 @@ class Cmq extends Connector
         $this->default            = (string) ($config['queue'] ?? 'default');
         $this->pollingWaitSeconds = max(0, (int) ($config['polling_wait_seconds'] ?? 0));
 
-        if ($this->secretId                                                  === '' || $this->secretKey === ''
-                                                                                    || $this->region === '' || $this->endpoint === '') {
+        if (in_array('', [$this->secretId, $this->secretKey, $this->region, $this->endpoint], true)) {
             throw new InvalidArgumentException(
                 'CMQ 连接配置不完整：必须提供 secret_id、secret_key、region 与 endpoint。'
             );
