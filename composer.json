@@ -18,11 +18,13 @@
     "yzh52521/flysystem-oss": "^3.0"
   },
   "require-dev": {
+    "aliyun/aliyun-mns-php-sdk": "^1.4",
     "friendsofphp/php-cs-fixer": "^3.95",
     "phpstan/phpstan": "^2.0",
     "phpunit/phpunit": "^12.0"
   },
   "suggest": {
+    "aliyun/aliyun-mns-php-sdk": "Required to use the Aliyun MNS queue connection (>=1.0.0).",
     "liquid/liquid": "Required for the Liquid template driver (set view.driver to 'liquid').",
     "workerman/workerman": "Required for the WebSocket module (^5.0). Install when config/websocket.php is present."
   },

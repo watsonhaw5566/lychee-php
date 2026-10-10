@@ -23,5 +23,26 @@ return [
             'queue'       => 'default',
             'retry_after' => 60,
         ],
+
+        // 阿里云轻量消息队列 MNS（需先 composer require aliyun/aliyun-mns-php-sdk）
+        'mns'   => [
+            'type'         => 'mns',
+            'access_id'    => '',
+            'access_key'   => '',
+            'endpoint'     => 'https://{AccountId}.mns.{RegionId}.aliyuncs.com',
+            'queue'        => 'default',
+            'wait_seconds' => 0,
+        ],
+
+        // 腾讯云 CMQ（纯 curl 实现，无需额外 SDK）
+        'cmq'   => [
+            'type'                 => 'cmq',
+            'secret_id'            => '',
+            'secret_key'           => '',
+            'region'               => 'ap-guangzhou',
+            'endpoint'             => '',
+            'queue'                => 'default',
+            'polling_wait_seconds' => 0,
+        ],
     ],
 ];

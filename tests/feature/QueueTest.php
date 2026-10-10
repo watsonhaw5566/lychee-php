@@ -139,5 +139,30 @@ class QueueTest extends TestCase
         $console = $this->app->container->get(\Lychee\console\Application::class);
 
         $this->assertTrue($console->has('queue:work'));
+        $this->assertTrue($console->has('queue:listen'));
+    }
+
+    public function test_cmq_connection_is_resolved_by_manager(): void
+    {
+        if (!extension_loaded('curl')) {
+            $this->markTestSkipped('curl 扩展未安装');
+        }
+
+        $connector = $this->app->container->get(QueueManager::class)->connection('cmq');
+
+        $this->assertInstanceOf(\Lychee\queue\connector\Cmq::class, $connector);
+        $this->assertSame('cmq', $connector->getConnection());
+    }
+
+    public function test_mns_connection_is_resolved_by_manager(): void
+    {
+        if (!class_exists(\AliyunMNS\Client::class)) {
+            $this->markTestSkipped('aliyun/aliyun-mns-php-sdk 未安装');
+        }
+
+        $connector = $this->app->container->get(QueueManager::class)->connection('mns');
+
+        $this->assertInstanceOf(\Lychee\queue\connector\Mns::class, $connector);
+        $this->assertSame('mns', $connector->getConnection());
     }
 }
