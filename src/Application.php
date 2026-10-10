@@ -31,6 +31,7 @@ use Lychee\migration\command\SeedRunCommand;
 use Lychee\migration\command\SeedSqlCommand;
 use Lychee\migration\MigrationManager;
 use Lychee\migration\SqlSeederRunner;
+use Lychee\queue\command\ListenCommand;
 use Lychee\queue\command\WorkCommand;
 use Lychee\queue\QueueManager;
 use Lychee\routing\Router;
@@ -415,6 +416,7 @@ class Application
         /** @var ConsoleApplication $console */
         $console = $this->container->get(ConsoleApplication::class);
         $console->addCommand(WorkCommand::class);
+        $console->addCommand(ListenCommand::class);
     }
 
     private function bootSession(): void

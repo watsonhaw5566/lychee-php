@@ -22,6 +22,12 @@ use Throwable;
  */
 class WorkCommand extends Command
 {
+    /** 退出码：正常（至少处理了一个任务，或无此约定的场景） */
+    public const EXIT_SUCCESS = 0;
+
+    /** 退出码：队列为空，未处理任何任务（供 queue:listen 父进程判断是否休眠） */
+    public const EXIT_EMPTY = 2;
+
     protected string $name = 'queue:work';
 
     protected string $description = 'Process jobs on the queue';
@@ -54,6 +60,8 @@ class WorkCommand extends Command
 
         $output->writeln("<info>Processing jobs from connection [{$connection}]</info>");
 
+        $processed = 0;
+
         while (true) {
             $job = $connector->pop($queue);
 
@@ -61,7 +69,9 @@ class WorkCommand extends Command
                 if ($stopEmpty || $once) {
                     $output->writeln('<info>No more jobs. Exiting.</info>');
 
-                    return 0;
+                    // --stop-when-empty 可能已处理过任务，此时仍视为成功；
+                    // 完全空转则返回 EXIT_EMPTY，供 listen 父进程决定休眠
+                    return $processed > 0 ? self::EXIT_SUCCESS : self::EXIT_EMPTY;
                 }
 
                 sleep($sleep);
@@ -70,9 +80,10 @@ class WorkCommand extends Command
             }
 
             $this->processJob($job, $output, $tries);
+            $processed++;
 
             if ($once) {
-                return 0;
+                return self::EXIT_SUCCESS;
             }
         }
     }
