@@ -23,5 +23,23 @@ return [
             'queue'       => 'default',
             'retry_after' => 60,
         ],
+
+        // 仅用于验证驱动可被 QueueManager 解析，不会发起真实网络请求
+        'mns'   => [
+            'type'       => 'mns',
+            'access_id'  => 'test-ak',
+            'access_key' => 'test-sk',
+            'endpoint'   => 'https://1234567890.mns.cn-hangzhou.aliyuncs.com',
+            'queue'      => 'default',
+        ],
+
+        'cmq'   => [
+            'type'       => 'cmq',
+            'secret_id'  => 'test-ak',
+            'secret_key' => 'test-sk',
+            'region'     => 'ap-guangzhou',
+            'endpoint'   => 'https://cmq-gz.example.com',
+            'queue'      => 'default',
+        ],
     ],
 ];

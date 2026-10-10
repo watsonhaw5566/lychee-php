@@ -1,6 +1,6 @@
 # 队列 Queue
 
-支持同步（Sync）和 Redis 驱动。
+支持同步（Sync）、Redis、阿里云 MNS 与腾讯云 CMQ 四种驱动。
 
 ## 配置
 
@@ -21,9 +21,70 @@ return [
             'select'   => 0,
             'queue'    => 'default',
         ],
+
+        // 阿里云轻量消息队列 MNS（需先 composer require aliyun/aliyun-mns-php-sdk）
+        'mns' => [
+            'type'         => 'mns',
+            'access_id'    => '',
+            'access_key'   => '',
+            'endpoint'     => 'https://{AccountId}.mns.{RegionId}.aliyuncs.com',
+            'queue'        => 'default',
+            'wait_seconds' => 0,
+        ],
+
+        // 腾讯云 CMQ（纯 curl 实现，无需额外 SDK，需开启 curl 扩展）
+        'cmq' => [
+            'type'                 => 'cmq',
+            'secret_id'            => '',
+            'secret_key'           => '',
+            'region'               => 'ap-guangzhou',
+            'endpoint'             => '',
+            'queue'                => 'default',
+            'polling_wait_seconds' => 0,
+        ],
     ],
 ];
 ```
+
+### 长轮询
+
+Redis 驱动的空队列轮询间隔由消费端的 `--sleep` 控制；MNS 的 `wait_seconds` 与 CMQ 的
+`polling_wait_seconds` 是服务端长轮询：取消息的 HTTP 请求在服务端挂起等待，期间有消息立即
+返回，建议生产环境设置为 10~30 秒，可同时降低空请求次数与任务延迟。
+
+## 云队列重试机制与 Redis 的差异
+
+云队列**没有** Redis 的 `:reserved` + `retry_after` 超时重投机制。任务失败重试时，驱动执行
+"先删除原消息、再带累计 attempts 重新投递一条新消息"（新消息支持延迟秒数）；如果 worker 进程
+崩溃导致 release 没执行，消息的重新可见依赖云队列自身的**不可见时间（VisibilityTimeout）**，
+需要在云控制台为队列设置合理的值（如 `--tries=3`、单任务最长 60 秒，则设为 120 秒左右），
+可见性超时后平台会把消息重新投递给其他消费者。
+
+## 阿里云 MNS 驱动
+
+- 需要先安装官方 SDK：`composer require aliyun/aliyun-mns-php-sdk`
+- 队列需提前在 MNS 控制台创建；`endpoint` 从控制台队列详情页复制
+- 消息以 JSON 原文收发（驱动以 `base64=false` 打开队列），可在控制台直接查看 payload
+- 延迟投递、长轮询均使用 MNS 原生能力
+
+## 腾讯云 CMQ 驱动
+
+- 纯 curl + HMAC-SHA1 / TC3-HMAC-SHA256 签名实现，**无需安装额外 SDK**，但 PHP 需开启 curl 扩展
+- `endpoint` 是 CMQ 队列服务接入地址（控制台分配），`region` 用于消息数查询等云 API v3 调用
+- 队列需提前在 TDMQ for CMQ 控制台创建
+
+## 失败任务与死信队列
+
+框架不提供独立的失败任务存储：任务重试次数耗尽后会被删除并写入错误日志（任务名、异常、
+尝试次数）。推荐两种处理方式：
+
+1. **任务类 `failed()` 回调**：需要差异化失败处理（告警、状态回滚、标记人工介入）时实现，
+   这是所有项目的最低配方案。
+2. **云队列原生死信**：MNS 与 CMQ 都支持在控制台为队列配置死信策略（最大接收次数 + 死信
+   队列），超限消息由消息平台自动转投，不依赖 worker 在线，比应用层自建表更可靠。
+
+注意：业务上注定无法通过重试成功的错误（参数非法、数据不存在）应在 `fire()` 中直接
+`$job->delete()` 主动丢弃，避免无谓重试。
 
 ## 定义任务
 
@@ -143,6 +204,6 @@ php lee queue:listen --connection=redis --queue=default --sleep=3 --tries=3 --me
 | `--memory` | 128 | 监听进程内存上限（MB），超限后自动退出交由 Supervisor 重启 |
 | `--timeout` | 60 | 单个 worker 子进程的最长执行秒数，超时强杀（0 表示不限制） |
 
-注意：`--timeout` 应小于 Redis 连接的 `retry_after`（默认 60 秒），否则旧任务尚未被杀掉、预留已过期，任务可能被其他 worker 重复消费。被强杀的任务留在 `:reserved` 集合中，超过 `retry_after` 后自动重新入队重试。
+注意：`--timeout` 应小于 Redis 连接的 `retry_after`（默认 60 秒），否则旧任务尚未被杀掉、预留已过期，任务可能被其他 worker 重复消费。被强杀的任务留在 `:reserved` 集合中，超过 `retry_after` 后自动重新入队重试。MNS/CMQ 驱动同理，`--timeout` 应小于队列在控制台配置的不可见时间（VisibilityTimeout）。
 
 需要并发消费时，启动多个监听进程即可（可分别指定不同的 `--queue`）。
