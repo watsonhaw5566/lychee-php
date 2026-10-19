@@ -68,6 +68,7 @@ $table->addColumn('price', 'decimal', ['precision' => 10, 'scale' => 2]); // 默
 $table->addColumn('status', 'boolean', ['default' => 0]); // 默认值为0
 $table->addColumn('content', 'text');
 $table->addColumn('data', 'json');
+$table->addColumn('nickname', 'string', ['after' => 'name']); // 指定字段位于 name 之后（仅 MySQL，SQLite 不支持列定位、自动忽略）
 
 // 便捷方法
 $table->addTimestamps();        // create_time, update_time（TIMESTAMP 类型）
@@ -84,6 +85,27 @@ $table->update();               // 应用改表变更
 $table->removeColumn('field');
 $table->changeColumn('field', 'varchar', ['length' => 200]);
 ```
+
+### 修改已有表结构
+
+对已存在的表，通过 `addColumn` / `removeColumn` / `changeColumn` / `renameColumn` 描述变更，最后调用 `update()` 应用：
+
+```php
+public function up(): void
+{
+    $this->table('users')
+        ->addColumn('nickname', 'string', ['length' => 50, 'after' => 'name']) // 新增字段并置于 name 之后
+        ->removeColumn('status')                                               // 删除字段
+        ->changeColumn('email', 'string', ['length' => 200])                   // 修改字段类型
+        ->renameColumn('name', 'username')                                    // 重命名字段
+        ->update();                                                            // 应用变更
+}
+```
+
+说明：
+
+- `after` 仅对 MySQL 生效（`AFTER` 子句），`changeColumn` 中同样支持；SQLite 不支持列定位，该选项会被忽略；
+- MySQL 下多个变更会合并为一条 `ALTER TABLE` 语句执行；SQLite 下 `changeColumn` 通过"建临时表-拷贝数据-替换"实现。
 
 ## 数据填充
 

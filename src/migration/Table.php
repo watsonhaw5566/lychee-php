@@ -518,6 +518,10 @@ class Table
             $def .= ' ON UPDATE CURRENT_TIMESTAMP';
         }
 
+        if (!$this->isSqlite() && !empty($options['after'])) {
+            $def .= ' AFTER `' . $options['after'] . '`';
+        }
+
         return $def;
     }
 
