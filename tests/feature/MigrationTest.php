@@ -242,4 +242,34 @@ PHP;
         $this->assertArrayHasKey('deleted_at', $columns);
         $this->assertArrayNotHasKey('delete_time', $columns);
     }
+
+    public function test_add_column_after_generates_mysql_after_clause(): void
+    {
+        $executed = [];
+
+        $pdo = $this->createStub(PDO::class);
+        $pdo->method('getAttribute')->willReturn('mysql');
+        $pdo->method('exec')->willReturnCallback(function (string $sql) use (&$executed): int {
+            $executed[] = $sql;
+
+            return 0;
+        });
+
+        $table = new Table('test_after', $pdo);
+        $table->addColumn('nickname', 'string', ['after' => 'id']);
+        $table->create();
+
+        $this->assertStringContainsString('AFTER `id`', $executed[0]);
+    }
+
+    public function test_add_column_after_ignored_on_sqlite(): void
+    {
+        $table = new Table('test_after_sqlite', $this->pdo);
+        $table->addColumn('nickname', 'string', ['after' => 'id']);
+        $table->create();
+
+        $columns = $this->getColumns('test_after_sqlite');
+
+        $this->assertArrayHasKey('nickname', $columns);
+    }
 }
