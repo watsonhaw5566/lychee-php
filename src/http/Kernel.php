@@ -46,6 +46,12 @@ class Kernel
 
         $request = $request->withRouteParams($route->params);
 
+        // 将携带路由参数的请求实例注册到容器，使全局 request() 辅助函数
+        // 与中间件管道、控制器拿到的是同一个实例；否则中间件在克隆体上
+        // setLoginId() 后，控制器通过 request()->loginId() 仍取到 null。
+        $this->container->instance('request', $request);
+        $this->container->instance(Request::class, $request);
+
         // 路由缓存：仅对 GET 请求且配置了 cache TTL 时生效
         if ($route->cache !== null && $request->method === 'GET') {
             $cached = $this->getCachedResponse($request, $route);
