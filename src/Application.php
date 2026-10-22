@@ -604,7 +604,14 @@ class Application
     {
         $this->registerErrorHandling();
 
-        $request  = Request::capture();
+        $request = Request::capture();
+
+        // 立即将当前请求注册到容器：容器中的 request 为懒加载单例，
+        // 若不在此处绑定，后续 request() 助手函数会 capture 出另一个
+        // 全新实例，导致中间件写入的状态（如 loginId）无法读取
+        $this->container->instance('request', $request);
+        $this->container->instance(Request::class, $request);
+
         $kernel   = $this->container->get(Kernel::class);
         $response = $kernel->handle($request);
         $response->send();
