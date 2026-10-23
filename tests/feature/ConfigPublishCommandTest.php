@@ -60,7 +60,7 @@ class ConfigPublishCommandTest extends TestCase
 
         // 所有模块的配置文件都应已生成
         $modules = [
-            'app', 'cache', 'captcha', 'cron', 'database', 'filesystem',
+            'app', 'cache', 'command', 'captcha', 'cron', 'database', 'filesystem',
             'i18n', 'log', 'plugin', 'queue', 'satoken', 'session', 'view', 'websocket',
         ];
 
@@ -154,6 +154,23 @@ class ConfigPublishCommandTest extends TestCase
 
         $content = file_get_contents($this->tempDir . '/config/satoken.php');
         $this->assertStringContainsString("'timeout'         => 86400 * 7", $content);
+    }
+
+    public function test_register_commands_from_config(): void
+    {
+        // 写入 config/command.php，声明自定义命令
+        file_put_contents(
+            $this->tempDir . '/config/command.php',
+            '<?php return [\'commands\' => [\\Tests\\stub\\app\\command\\HelloCommand::class]];'
+        );
+
+        $app     = $this->createApp();
+        $console = $app->container->get(\Lychee\console\Application::class);
+
+        $this->assertTrue($console->has('stub:hello'));
+
+        $code = $console->run(new Input(['stub:hello']), new Output());
+        $this->assertSame(0, $code);
     }
 
     private function createApp(): Application

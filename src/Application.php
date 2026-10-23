@@ -79,6 +79,42 @@ class Application
         $this->loadCommonFile();
         $this->bootTimezone();
         $this->bootOptionalModules();
+        $this->registerAppCommands();
+    }
+
+    /**
+     * 从 config/command.php 注册应用自定义命令。
+     *
+     * 在所有框架内置命令与插件命令注册完成后执行，
+     * 因此应用级命令可覆盖同名的框架或插件命令。
+     *
+     * 配置文件示例（config/command.php）：
+     *
+     *   return [
+     *       'commands' => [
+     *           \App\command\HelloCommand::class,
+     *       ],
+     *   ];
+     */
+    private function registerAppCommands(): void
+    {
+        /** @var Config $config */
+        $config = $this->container->get('config');
+
+        $commands = (array) $config->get('command.commands', []);
+
+        if ($commands === []) {
+            return;
+        }
+
+        /** @var ConsoleApplication $console */
+        $console = $this->container->get(ConsoleApplication::class);
+
+        foreach ($commands as $command) {
+            if (is_string($command) && $command !== '') {
+                $console->addCommand($command);
+            }
+        }
     }
 
     /**

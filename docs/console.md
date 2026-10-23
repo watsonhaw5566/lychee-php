@@ -158,6 +158,7 @@ php lee config:publish cache --force
 |------|------|
 | `app` | 应用基础配置（时区、路由前缀、异常渲染等） |
 | `cache` | 缓存驱动配置（file / redis） |
+| `command` | 自定义命令注册配置 |
 | `captcha` | 验证码配置（图形、短信、邮箱） |
 | `cron` | 定时任务配置 |
 | `database` | 数据库连接配置（mysql / sqlite） |
@@ -206,6 +207,32 @@ class HelloCommand extends Command
     }
 }
 ```
+
+### 注册自定义命令
+
+推荐通过 `config/command.php` 配置文件注册，无需修改入口脚本：
+
+```bash
+# 发布命令配置文件（若尚未创建）
+php lee config:publish command
+```
+
+```php
+// config/command.php
+return [
+    'commands' => [
+        \App\command\HelloCommand::class,
+    ],
+];
+```
+
+应用级命令在所有框架内置命令与插件命令之后注册，因此可覆盖同名的框架或插件命令。
+
+> 也可以在入口脚本 `lee` 中手动注册：
+>
+> ```php
+> $console->addCommand(\App\command\HelloCommand::class);
+> ```
 
 ## 输出样式
 
