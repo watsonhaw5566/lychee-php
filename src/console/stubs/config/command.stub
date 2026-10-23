@@ -1,0 +1,15 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * 自定义命令配置。
+ *
+ * commands 数组声明应用自定义命令类（需继承 Lychee\console\Command）。
+ * 命令在所有框架内置命令与插件命令之后注册，可覆盖同名命令。
+ */
+return [
+    'commands' => [
+        // \App\command\HelloCommand::class,
+    ],
+];

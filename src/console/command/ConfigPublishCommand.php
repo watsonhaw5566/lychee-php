@@ -35,6 +35,7 @@ class ConfigPublishCommand extends Command
     protected array $modules = [
         'app'        => '应用基础配置（时区、路由前缀、异常渲染等）',
         'cache'      => '缓存驱动配置（file / redis）',
+        'command'    => '自定义命令注册配置',
         'captcha'    => '验证码配置（图形、短信、邮箱）',
         'cron'       => '定时任务配置',
         'database'   => '数据库连接配置（mysql / sqlite）',
