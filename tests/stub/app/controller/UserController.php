@@ -7,9 +7,9 @@ namespace Tests\stub\app\controller;
 use Lychee\http\JsonResponse;
 use Lychee\http\Request;
 use Lychee\routing\Resource;
+use Lychee\validate\Validate;
+use Lychee\validate\ValidateException;
 use Tests\stub\app\model\User;
-use think\exception\ValidateException;
-use think\Validate;
 
 /**
  * 用户控制器。

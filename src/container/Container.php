@@ -9,7 +9,7 @@ use think\Container as ThinkContainer;
 /**
  * 依赖注入容器。
  *
- * 继承 think\Container 以兼容 Facade（Db::、Validate:: 等），
+ * 继承 think\Container 以兼容 Facade（Db:: 等），
  * 同时提供应用路径、命名空间等框架级属性。
  *
  * @template T

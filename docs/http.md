@@ -49,7 +49,7 @@ $url = $request->url();         // https://example.com:8080/users?id=1
 
 `Request` 仅负责读取上传文件的信息，文件的存储由 `filesystem` 模块处理（见 [文件系统](filesystem.md#上传文件)）。
 
-`UploadedFile` 继承自 `think\File`（基于 `SplFileInfo`），因此可直接作为 `think-validate` 的 `file` / `image` / `fileExt` / `fileMime` / `fileSize` 规则的校验对象（见 [数据验证](validation.md)）。
+`UploadedFile` 继承自 `Lychee\http\File`（基于 `SplFileInfo`），因此可直接作为 `Lychee\validate\Validate` 的 `file` / `image` / `fileExt` / `fileMime` / `fileSize` 规则的校验对象（见 [数据验证](validation.md)）。
 
 ```php
 use Lychee\http\UploadedFile;
@@ -92,7 +92,7 @@ $all = $request->file();
 `param()` 会合并上传文件，可直接把 `$request->param()` 交给校验器：
 
 ```php
-use think\Validate;
+use Lychee\validate\Validate;
 
 $validate = new Validate();
 $validate->rule([

@@ -127,7 +127,7 @@ $message = $debug || $showErrorMsg
 
 | 异常类 | HTTP 状态码 | 说明 |
 | --- | --- | --- |
-| `think\exception\ValidateException` | 400 | 数据验证失败 |
+| `Lychee\validate\ValidateException` | 400 | 数据验证失败 |
 | `Lychee\routing\RouteNotFoundException` | 404 | 路由未找到 |
 | `Lychee\http\HttpException` | 自定义 | HTTP 异常 |
 | 其他异常 | 500 | 服务器内部错误 |
@@ -153,7 +153,7 @@ class Handler extends ExceptionHandler
     protected array $ignoreReport = [
         \Lychee\http\HttpException::class,
         \Lychee\routing\RouteNotFoundException::class,
-        \think\exception\ValidateException::class,
+        \Lychee\validate\ValidateException::class,
     ];
 
     /**
@@ -184,12 +184,12 @@ class Handler extends ExceptionHandler
 
 ### validate_lang
 
-校验失败提示的默认语言，作用于所有通过 `think\Validate` 进行的校验（包括全局 `validate()` 函数、`ResourceController` 的 `validate()` 方法、验证器类等）。
+校验失败提示的默认语言，作用于所有通过 `Lychee\validate\Validate` 进行的校验（包括全局 `validate()` 函数、`ResourceController` 的 `validate()` 方法、验证器类等）。
 
 | 值 | 说明 |
 | --- | --- |
-| `'zh'`（默认，不配置即为中文） | 使用 think-validate 内置中文提示 |
-| `'en'` | 使用 think-validate 内置英文提示 |
+| `'zh'`（默认，不配置即为中文） | 使用内置中文提示 |
+| `'en'` | 使用内置英文提示 |
 
 不配置该项时默认为中文，开箱即用。如需切换为英文，在 `config/app.php` 中添加：
 

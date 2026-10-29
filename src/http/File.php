@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace think;
+namespace Lychee\http;
 
 use RuntimeException;
 use SplFileInfo;
@@ -10,8 +10,8 @@ use SplFileInfo;
 /**
  * 文件对象。
  *
- * think-validate 的 file/image/fileExt/fileMime/fileSize 等规则
- * 要求被校验值为 think\File 实例。本类基于 SplFileInfo 实现，
+ * Lychee\validate 的 file / image / fileExt / fileMime / fileSize
+ * 等规则要求被校验值为 File 实例。本类基于 SplFileInfo 实现，
  * 提供校验器依赖的 getMime()、extension() 等方法。
  */
 class File extends SplFileInfo
