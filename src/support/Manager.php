@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Lychee\support;
 
 use InvalidArgumentException;
-use think\Container;
-use think\helper\Str;
+use Lychee\container\Container;
 
 /**
  * 驱动管理器抽象基类。
@@ -70,7 +69,7 @@ abstract class Manager
     protected function resolveClass(string $type): string
     {
         if ($this->namespace || str_contains($type, '\\')) {
-            $class = str_contains($type, '\\') ? $type : $this->namespace . Str::studly($type);
+            $class = str_contains($type, '\\') ? $type : $this->namespace . self::studly($type);
 
             if (class_exists($class)) {
                 return $class;
@@ -96,7 +95,7 @@ abstract class Manager
     protected function createDriver(string $name): mixed
     {
         $type   = $this->resolveType($name);
-        $method = 'create' . Str::studly($type) . 'Driver';
+        $method = 'create' . self::studly($type) . 'Driver';
         $params = $this->resolveParams($name);
 
         if (method_exists($this, $method)) {
@@ -135,5 +134,13 @@ abstract class Manager
     public function __call(string $method, array $parameters): mixed
     {
         return $this->driver()->{$method}(...$parameters);
+    }
+
+    /**
+     * 下划线/中划线转大驼峰（StudlyCase）。
+     */
+    private static function studly(string $value): string
+    {
+        return str_replace(' ', '', ucwords(str_replace(['-', '_'], ' ', $value)));
     }
 }

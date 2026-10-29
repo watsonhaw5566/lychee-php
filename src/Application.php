@@ -202,7 +202,7 @@ class Application
 
     private function registerBindings(): void
     {
-        \think\Container::setInstance($this->container);
+        Container::setInstance($this->container);
 
         $this->container->instance(Container::class, $this->container);
         $this->container->instance('app', $this->container);

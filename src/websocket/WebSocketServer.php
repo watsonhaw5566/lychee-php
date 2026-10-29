@@ -6,7 +6,7 @@ namespace Lychee\websocket;
 
 use Closure;
 use RuntimeException;
-use think\Container;
+use Lychee\container\Container;
 
 /**
  * WebSocket 服务管理器。

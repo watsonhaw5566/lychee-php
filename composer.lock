@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a42269cbf369343738c2e1cae2cbb876",
+    "content-hash": "f968c648ee2bec91d40f1583c9d26203",
     "packages": [
         {
             "name": "aliyuncs/oss-sdk-php",
@@ -1437,86 +1437,6 @@
                 "source": "https://github.com/TheNorthMemory/xml/tree/1.1.1"
             },
             "time": "2023-01-15T06:01:13+00:00"
-        },
-        {
-            "name": "topthink/think-container",
-            "version": "v3.0.2",
-            "dist": {
-                "type": "zip",
-                "url": "https://mirrors.cloud.tencent.com/repository/composer/topthink/think-container/v3.0.2/topthink-think-container-v3.0.2.zip",
-                "reference": "b2df244be1e7399ad4c8be1ccc40ed57868f730a",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=8.0",
-                "psr/container": "^2.0",
-                "topthink/think-helper": "^3.1"
-            },
-            "require-dev": {
-                "phpunit/phpunit": "^9.5"
-            },
-            "type": "library",
-            "autoload": {
-                "files": [],
-                "psr-4": {
-                    "think\\": "src"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "authors": [
-                {
-                    "name": "liu21st",
-                    "email": "liu21st@gmail.com"
-                }
-            ],
-            "description": "PHP Container & Facade Manager",
-            "support": {
-                "issues": "https://github.com/top-think/think-container/issues",
-                "source": "https://github.com/top-think/think-container/tree/v3.0.2"
-            },
-            "time": "2025-04-07T03:21:51+00:00"
-        },
-        {
-            "name": "topthink/think-helper",
-            "version": "v3.1.12",
-            "dist": {
-                "type": "zip",
-                "url": "https://mirrors.cloud.tencent.com/repository/composer/topthink/think-helper/v3.1.12/topthink-think-helper-v3.1.12.zip",
-                "reference": "fe277121112a8f1c872e169a733ca80bb11c4acb",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=7.1.0"
-            },
-            "require-dev": {
-                "phpunit/phpunit": "^9.5"
-            },
-            "type": "library",
-            "autoload": {
-                "files": [
-                    "src/helper.php"
-                ],
-                "psr-4": {
-                    "think\\": "src"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "authors": [
-                {
-                    "name": "yunwuxin",
-                    "email": "448901948@qq.com"
-                }
-            ],
-            "description": "The ThinkPHP6 Helper Package",
-            "support": {
-                "issues": "https://github.com/top-think/think-helper/issues",
-                "source": "https://github.com/top-think/think-helper/tree/v3.1.12"
-            },
-            "time": "2025-12-26T09:58:29+00:00"
         },
         {
             "name": "twig/twig",
