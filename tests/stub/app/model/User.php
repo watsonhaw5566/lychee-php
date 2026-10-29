@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\stub\app\model;
 
-use think\Model;
+use Lychee\orm\Model;
 
 /**
  * 用户模型。
@@ -18,5 +18,5 @@ use think\Model;
  */
 class User extends Model
 {
-    protected $name = 'users';
+    protected string $name = 'users';
 }

@@ -23,6 +23,9 @@ use Lychee\http\Request;
 use Lychee\i18n\I18n;
 use Lychee\log\LogManager;
 use Lychee\migration\command\MigrateCreateCommand;
+use Lychee\orm\ConnectionManager;
+use Lychee\orm\facade\Db;
+use Lychee\orm\Model as OrmModel;
 use Lychee\plugin\PluginManager;
 use Lychee\migration\command\MigrateRollbackCommand;
 use Lychee\migration\command\MigrateRunCommand;
@@ -42,8 +45,6 @@ use Lychee\view\View;
 use Lychee\websocket\command\ServerCommand;
 use Lychee\websocket\WebSocketServer;
 use Psr\Log\LoggerInterface;
-use think\DbManager;
-use think\Model as ThinkModel;
 use think\Validate;
 use ErrorException;
 use PDO;
@@ -249,6 +250,7 @@ class Application
             $console->addCommand(\Lychee\console\command\MakeRestCommand::class);
             $console->addCommand(\Lychee\console\command\MakeBaseCommand::class);
             $console->addCommand(\Lychee\console\command\ConfigPublishCommand::class);
+            $console->addCommand(\Lychee\orm\command\MigrateCommand::class);
 
             return $console;
         });
@@ -337,42 +339,40 @@ class Application
         $config   = $this->container->get('config');
         $dbConfig = $config->get('database', []);
 
-        $dbManager = new DbManager();
-        $dbManager->setConfig($dbConfig);
-        ThinkModel::setDb($dbManager);
+        $manager = new ConnectionManager();
+        $manager->setConfig($dbConfig);
 
-        // 接入 SQL 日志：当日志模块已启动时，将 ORM 的 SQL 监听输出到日志通道。
+        OrmModel::setConnectionResolver($manager);
+        Db::setManager($manager);
+
+        // 接入 SQL 日志：当日志模块已启动时，将 ORM 的 SQL 日志回调输出到日志通道。
         // 优先使用 'sql' 频道（用户可在 config/log.php 中单独配置），否则回退到默认频道。
-        // DbManager::log() 传入的类型为 'sql'，非 PSR-3 标准级别，
-        // 故用 Closure 适配为 debug 级别，避免被级别过滤。
         if ($this->container->bound(LogManager::class)) {
             $logManager = $this->container->get(LogManager::class);
             $channels   = $logManager->getConfig('channels', []);
             $channel    = array_key_exists('sql', $channels) ? 'sql' : null;
             $logger     = $logManager->channel($channel);
 
-            $dbManager->setLog(static function (string $type, string $message) use ($logger): void {
+            $manager->setLog(static function (string $type, string $message) use ($logger): void {
                 $logger->debug($message);
             });
         }
 
-        // 全局时间字段配置：think-orm 原生支持 auto_timestamp 与 datetime_format，
-        // 但不支持 datetime_field 全局配置。这里通过 Model::maker() 闭包，
+        // 全局时间字段配置：通过 Model::maker() 闭包，
         // 将 'create_time,update_time' 格式的配置应用到所有模型实例。
         $datetimeField = (string) ($dbConfig['datetime_field'] ?? '');
         if ($datetimeField !== '') {
             $parts = array_map('trim', explode(',', $datetimeField));
             if (count($parts) >= 2) {
                 [$createTime, $updateTime] = $parts;
-                ThinkModel::maker(static function ($model) use ($createTime, $updateTime): void {
+                OrmModel::maker(static function ($model) use ($createTime, $updateTime): void {
                     $model->setTimeField($createTime, $updateTime);
                 });
             }
         }
 
-        $this->container->instance('db', $dbManager);
-        $this->container->instance(DbManager::class, $dbManager);
-        $this->container->instance('think\DbManager', $dbManager);
+        $this->container->instance('db', $manager);
+        $this->container->instance(ConnectionManager::class, $manager);
     }
 
     private function bootCache(): void
@@ -593,14 +593,12 @@ class Application
             return null;
         }
 
-        /** @var DbManager $dbManager */
-        $dbManager = $this->container->get('db');
+        /** @var ConnectionManager $manager */
+        $manager = $this->container->get('db');
 
         try {
-            /** @var \think\db\PDOConnection $connection */
-            $connection = $dbManager->connect();
-            // connect() 会主动建立连接并返回 PDO；连接失败时抛出异常
-            $pdo = $connection->connect();
+            $connection = $manager->connect();
+            $pdo        = $connection->getPdo();
 
             return $pdo instanceof PDO ? $pdo : null;
         } catch (Throwable) {

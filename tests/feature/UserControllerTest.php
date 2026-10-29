@@ -7,13 +7,14 @@ namespace Tests\feature;
 use Lychee\Application;
 use Lychee\http\Kernel;
 use Lychee\http\Request;
+use Lychee\orm\ConnectionManager;
+use Lychee\orm\facade\Db;
 use PHPUnit\Framework\TestCase;
-use think\DbManager;
 
 class UserControllerTest extends TestCase
 {
     private Kernel $kernel;
-    private DbManager $db;
+    private ConnectionManager $db;
 
     protected function setUp(): void
     {
@@ -26,7 +27,7 @@ class UserControllerTest extends TestCase
         $this->db     = $app->container->get('db');
 
         // 在 sqlite 内存库中建表
-        $this->db->execute('CREATE TABLE users (
+        $this->db->connect()->execute('CREATE TABLE users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name VARCHAR(255) NOT NULL,
             email VARCHAR(255) NOT NULL,
@@ -38,7 +39,7 @@ class UserControllerTest extends TestCase
 
     public function test_index_returns_user_list(): void
     {
-        $this->db->table('users')->insert(['name' => 'Alice', 'email' => 'alice@example.com', 'age' => 30]);
+        Db::table('users')->insert(['name' => 'Alice', 'email' => 'alice@example.com', 'age' => 30]);
 
         $response = $this->kernel->handle(new Request('GET', '/users', [], [], []));
 
@@ -50,7 +51,7 @@ class UserControllerTest extends TestCase
 
     public function test_show_returns_user_when_found(): void
     {
-        $id = $this->db->table('users')->insertGetId(['name' => 'Bob', 'email' => 'bob@example.com', 'age' => 25]);
+        $id = Db::table('users')->insertGetId(['name' => 'Bob', 'email' => 'bob@example.com', 'age' => 25]);
 
         $response = $this->kernel->handle(new Request('GET', "/users/{$id}", [], [], []));
 

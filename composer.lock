@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7dce369718f6a8d3f2c3f5115e0b59c9",
+    "content-hash": "f97ef308e8fac1a98d04eda638caf0e1",
     "packages": [
         {
             "name": "aliyuncs/oss-sdk-php",
@@ -942,11 +942,11 @@
         },
         {
             "name": "psr/simple-cache",
-            "version": "2.0.0",
+            "version": "3.0.0",
             "dist": {
                 "type": "zip",
-                "url": "https://mirrors.cloud.tencent.com/repository/composer/psr/simple-cache/2.0.0/psr-simple-cache-2.0.0.zip",
-                "reference": "8707bf3cea6f710bf6ef05491234e3ab06f6432a",
+                "url": "https://mirrors.cloud.tencent.com/repository/composer/psr/simple-cache/3.0.0/psr-simple-cache-3.0.0.zip",
+                "reference": "764e0b3939f5ca87cb904f570ef9be2d78a07865",
                 "shasum": ""
             },
             "require": {
@@ -955,7 +955,7 @@
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-master": "2.0.x-dev"
+                    "dev-master": "3.0.x-dev"
                 }
             },
             "autoload": {
@@ -981,9 +981,9 @@
                 "simple-cache"
             ],
             "support": {
-                "source": "https://github.com/php-fig/simple-cache/tree/2.0.0"
+                "source": "https://github.com/php-fig/simple-cache/tree/3.0.0"
             },
-            "time": "2021-10-29T13:22:09+00:00"
+            "time": "2021-10-29T13:26:27+00:00"
         },
         {
             "name": "ralouphie/getallheaders",
@@ -1618,68 +1618,6 @@
                 "source": "https://github.com/twigphp/Twig/tree/v3.28.0"
             },
             "time": "2026-07-03T20:44:34+00:00"
-        },
-        {
-            "name": "watsonhaw/think-orm",
-            "version": "v0.2.1",
-            "dist": {
-                "type": "zip",
-                "url": "https://mirrors.cloud.tencent.com/repository/composer/watsonhaw/think-orm/v0.2.1/watsonhaw-think-orm-v0.2.1.zip",
-                "reference": "38ad0d79da10c6517335cc64bbc90a85abd95680",
-                "shasum": ""
-            },
-            "require": {
-                "ext-json": "*",
-                "ext-openssl": "*",
-                "ext-pdo": "*",
-                "php": ">=8.1",
-                "psr/log": "^1.0|^2.0|^3.0",
-                "psr/simple-cache": "^1.0|^2.0",
-                "topthink/think-helper": "^3.1"
-            },
-            "replace": {
-                "topthink/think-orm": "^3.0"
-            },
-            "require-dev": {
-                "bamarni/composer-bin-plugin": "^1.8",
-                "friendsofphp/php-cs-fixer": "^3.95",
-                "mockery/mockery": "^1.2",
-                "phpstan/phpstan": "^2.2",
-                "phpunit/phpunit": "^12.0"
-            },
-            "type": "library",
-            "extra": {
-                "bamarni-bin": {
-                    "bin-links": true,
-                    "forward-command": false
-                }
-            },
-            "autoload": {
-                "files": [
-                    "stubs/load_stubs.php"
-                ],
-                "psr-4": {
-                    "think\\": "src"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "authors": [
-                {
-                    "name": "liu21st",
-                    "email": "liu21st@gmail.com"
-                }
-            ],
-            "description": "the PHP Database&ORM Framework",
-            "keywords": [
-                "database",
-                "orm"
-            ],
-            "support": {
-                "source": "https://github.com/watsonhaw5566/think-orm/tree/v0.2.1"
-            },
-            "time": "2026-09-04T03:51:05+00:00"
         },
         {
             "name": "yzh52521/flysystem-oss",

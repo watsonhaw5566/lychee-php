@@ -8,8 +8,8 @@ use Lychee\Application;
 use Lychee\http\Kernel;
 use Lychee\http\Request;
 use Lychee\http\Response;
+use Lychee\orm\ConnectionManager;
 use PHPUnit\Framework\TestCase;
-use think\DbManager;
 use RuntimeException;
 
 /**
@@ -36,9 +36,9 @@ use RuntimeException;
  */
 abstract class LycheeTestCase extends TestCase
 {
-    protected Application $app;
-    protected Kernel      $kernel;
-    protected DbManager   $db;
+    protected Application       $app;
+    protected Kernel            $kernel;
+    protected ConnectionManager $db;
 
     /** 应用根目录（包含 app/、config/ 等），子类必须覆盖 */
     protected string $basePath = '';
@@ -61,19 +61,19 @@ abstract class LycheeTestCase extends TestCase
         );
 
         $this->kernel = $this->app->container->get(Kernel::class);
-        /** @var DbManager $db */
+        /** @var ConnectionManager $db */
         $db       = $this->app->container->get('db');
         $this->db = $db;
 
         if ($this->useTransactions) {
-            $this->db->connect()->startTrans();
+            $this->db->connect()->beginTransaction();
         }
     }
 
     protected function tearDown(): void
     {
         if ($this->useTransactions) {
-            $this->db->connect()->rollback();
+            $this->db->connect()->rollBack();
         }
 
         $this->actingAsUserId = null;

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Lychee\http;
 
 use Lychee\container\Container;
-use think\db\Query;
-use think\Model;
+use Lychee\orm\Model;
+use Lychee\orm\Query;
 
 /**
  * 基础控制器：提供请求注入、initialize 生命周期与统一 JSON 响应。
@@ -109,7 +109,8 @@ abstract class Controller
             $total = $query->count();
 
             // 获取当前页数据
-            $items = $query->page($page, $pageSize)->select()->toArray();
+            $result = $query->page($page, $pageSize)->select();
+            $items  = is_array($result) ? $result : $result->toArray();
         }
 
         // 确保 $items 是数组

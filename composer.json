@@ -10,9 +10,9 @@
     "league/flysystem-read-only": "^3.0",
     "overtrue/flysystem-cos": "^5.0",
     "psr/log": "^3.0",
+    "psr/simple-cache": "^2.0 || ^3.0",
     "ramsey/uuid": "^4.0",
     "topthink/think-container": "^3.0",
-    "watsonhaw/think-orm": "^0.2",
     "topthink/think-validate": "^3.0",
     "twig/twig": "^3.0",
     "yzh52521/flysystem-oss": "^3.0"

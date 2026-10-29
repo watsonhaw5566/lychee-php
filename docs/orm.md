@@ -1,8 +1,8 @@
 # 数据库 ORM
 
-框架集成了 [topthink/think-orm](https://github.com/top-think/think-orm) 作为数据库抽象层，支持查询构造器、模型、关联、事务等能力。底层由 `think\DbManager` 统一管理连接，已在容器中注册为 `db` 服务。
+框架内置轻量级 ORM（命名空间 `Lychee\orm`），参考 ThinkORM 的常用 API 设计，专注于 IDE 友好与可读的实现。底层基于 PDO 直连 + 预编译语句，提供查询构造器、Active Record 模型、关联预加载、软删除、事务、断线重连、SQL 日志等能力。
 
-> 完整 API 与高级用法请参考 [ThinkORM 官方文档](https://doc.thinkphp.cn/v8_0/orm.html)。
+> 仅实现 ThinkORM 的常用功能子集；若需要更复杂的能力（视图模型、关联统计、事件订阅器等），请评估是否可用现有 API 组合实现。
 
 ## 配置
 
@@ -11,20 +11,20 @@
 ```php
 return [
     // 默认连接
-    'default' => 'mysql',
+    'default' => env('DB_DRIVER', 'mysql'),
 
     // 连接列表
     'connections' => [
         'mysql' => [
-            'type'     => 'mysql',
-            'hostname' => '127.0.0.1',
-            'hostport' => 3306,
-            'database' => 'app',
-            'username' => 'root',
-            'password' => '',
-            'charset'  => 'utf8mb4',
-            'prefix'   => '',
-            'debug'    => false,
+            'type'            => env('DB_TYPE', 'mysql'),
+            'hostname'        => env('DB_HOST', '127.0.0.1'),
+            'hostport'        => env('DB_PORT', '3306'),
+            'database'        => env('DB_NAME', ''),
+            'username'        => env('DB_USER', 'root'),
+            'password'        => env('DB_PASS', ''),
+            'charset'         => env('DB_CHARSET', 'utf8mb4'),
+            'prefix'          => env('DB_PREFIX', ''),
+            'debug'           => false,
 
             // 是否开启断线重连（默认 false）
             // 常驻进程（队列/定时任务/WebSocket）中建议开启，
@@ -34,37 +34,29 @@ return [
             // 是否监听 SQL（默认 true）
             // 开启后执行的 SQL 会通过框架日志模块输出
             // 日志频道优先使用 config/log.php 中的 'sql' 频道，未配置则使用默认频道
-            'trigger_sql' => true,
+            'trigger_sql'     => env('APP_DEBUG', true),
 
-            // 是否严格检查字段是否存在（默认 true）
+            // 是否严格检查字段（默认 true）
             // true：写入/更新时若包含数据表不存在的字段会抛出异常
             // false：忽略不存在的字段
-            'fields_strict' => true,
-        ],
-        'sqlite' => [
-            'type'     => 'sqlite',
-            'database' => runtime_path('app.sqlite'),
-            'prefix'   => '',
-            'debug'    => false,
+            'fields_strict'   => true,
         ],
     ],
 
-    // 以下为全局配置（对所有连接的模型生效）
+    // 以下为全局配置（对所有模型生效）
 
     // 是否自动写入时间戳（默认 true）
-    // true：自动检测字段类型；'datetime'：强制写入 Y-m-d H:i:s 格式字符串
-    'auto_timestamp' => true,
+    'auto_timestamp'  => true,
 
-    // 时间字段取出后的默认时间格式
+    // 时间字段读取格式
     'datetime_format' => 'Y-m-d H:i:s',
 
     // 全局时间字段名，格式：create_time,update_time
-    // 留空则使用模型默认值（create_time / update_time）
-    'datetime_field' => '',
+    'datetime_field'  => '',
 ];
 ```
 
-框架启动时会自动读取该配置并初始化 `DbManager`，同时绑定到模型基类（`think\Model`）。
+框架启动时自动读取该配置并初始化 `Lychee\orm\ConnectionManager`，同时注入到 `Lychee\orm\Model` 基类与 `Lychee\orm\facade\Db` 门面。
 
 ### 配置说明
 
@@ -72,36 +64,35 @@ return [
 | --- | --- | --- | --- |
 | `break_reconnect` | connections 内 | `false` | 断线重连开关，常驻进程建议开启 |
 | `trigger_sql` | connections 内 | `true` | SQL 监听开关，开启后 SQL 输出到日志 |
-| `fields_strict` | connections 内 | `true` | 严格检查字段是否存在，开启后写入不存在的字段会抛异常 |
+| `fields_strict` | connections 内 | `true` | 字段严格检查（由 Model 的字段白名单自动约束） |
 | `auto_timestamp` | 顶层 | `true` | 模型自动写入创建/更新时间 |
-| `datetime_format` | 顶层 | `Y-m-d H:i:s` | 时间字段读取时的格式化字符串 |
+| `datetime_format` | 顶层 | `Y-m-d H:i:s` | 时间字段读取格式 |
 | `datetime_field` | 顶层 | `''` | 全局时间字段名，格式 `create_time,update_time` |
-
-> `break_reconnect`、`trigger_sql`、`fields_strict` 是连接级配置，需写在 `connections` 数组的具体连接内；`auto_timestamp`、`datetime_format`、`datetime_field` 是全局配置，写在配置顶层。
 
 ## 获取数据库实例
 
-有两种方式获取数据库管理器：
+两种方式：
 
 ```php
-use think\facade\Db;
+use Lychee\orm\facade\Db;
 
-// 方式一：Facade 门面（推荐，IDE 友好）
+// 方式一：门面（推荐，IDE 友好）
 Db::table('users')->select();
 
-// 方式二：从容器解析
-$db = app('db');
-$db->table('users')->select();
+// 方式二：容器解析
+/** @var \Lychee\orm\ConnectionManager $manager */
+$manager = app('db');
+$manager->connect()->select('SELECT * FROM users');
 ```
 
 ## 查询构造器
 
-通过 `Db::table('表名')` 获取查询构造器，支持链式调用。
+通过 `Db::table()` / `Db::name()` 获取查询构造器，支持链式调用。`table()` 使用完整表名，`name()` 自动拼接连接的 `prefix`。
 
 ### 查询
 
 ```php
-use think\facade\Db;
+use Lychee\orm\facade\Db;
 
 // 查询全部
 $users = Db::table('users')->select();
@@ -118,23 +109,56 @@ $list = Db::table('users')
     ->select();
 
 // 模糊查询
-Db::table('users')->where('name', 'like', '%张%')->select();
+Db::table('users')->whereLike('name', '%张%')->select();
 
-// IN 查询
+// IN / NOT IN
 Db::table('users')->whereIn('id', [1, 2, 3])->select();
+Db::table('users')->whereNotIn('id', [1, 2])->select();
 
 // 区间查询
-Db::table('users')->whereBetween('age', [18, 30])->select();
+Db::table('users')->whereBetween('age', 18, 30)->select();
+Db::table('orders')->whereBetweenTime('create_time', '2024-01-01', '2024-01-31')->select();
+
+// NULL 判断
+Db::table('users')->whereNull('deleted_at')->select();
+Db::table('users')->whereNotNull('email')->select();
+
+// 原生片段
+Db::table('users')->whereRaw('score > ? AND status = ?', [60, 1])->select();
+
+// 嵌套 OR
+Db::table('users')->where(function ($q) {
+    $q->where('role', 'admin')->whereOr('role', 'manager');
+})->select();
 
 // 聚合
 $count = Db::table('users')->where('status', 1)->count();
+$sum   = Db::table('orders')->sum('amount');
+$avg   = Db::table('users')->avg('age');
 $max   = Db::table('users')->max('age');
 
 // 指定字段
 Db::table('users')->field('id,name')->select();
+Db::table('users')->field(['id', 'name'])->select();
 
-// 分页
-Db::table('users')->paginate(15);
+// 分页（offset + limit）
+Db::table('users')->page(2, 20)->select();
+
+// 单字段取值
+$name  = Db::table('users')->where('id', 1)->value('name');
+$names = Db::table('users')->where('status', 1)->column('name');
+$map   = Db::table('users')->where('status', 1)->column('name', 'id'); // [id => name]
+
+// JOIN
+Db::table('users')
+    ->alias('u')
+    ->leftJoin('profiles p', 'p.user_id = u.id')
+    ->field('u.*,p.avatar')
+    ->select();
+
+// 悲观锁
+Db::table('users')->where('id', 1)->lock()->find();           // FOR UPDATE
+Db::table('users')->where('id', 1)->lock('shared')->find();   // LOCK IN SHARE MODE
 ```
 
 ### 插入
@@ -167,18 +191,14 @@ Db::table('users')
     ->update(['name' => 'New Name', 'age' => 25]);
 
 // 字段自增 / 自减
-Db::table('users')->where('id', 1)->inc('score', 5)->update();
-Db::table('users')->where('id', 1)->dec('score', 2)->update();
+Db::table('users')->where('id', 1)->inc('score', 5);
+Db::table('users')->where('id', 1)->dec('score', 2);
 ```
 
 ### 删除
 
 ```php
-// 按条件删除
 Db::table('users')->where('id', 1)->delete();
-
-// 按主键删除
-Db::table('users')->delete(1);
 ```
 
 ### 原生查询
@@ -189,11 +209,17 @@ Db::query('SELECT * FROM users WHERE status = ?', [1]);
 
 // 写
 Db::execute('UPDATE users SET status = 0 WHERE id = ?', [1]);
+
+// 原生片段（可嵌入 where / update / order）
+use Lychee\orm\facade\Db;
+
+Db::table('users')->order(Db::raw('FIELD(id, ?, ?, ?)', [3, 1, 2]))->select();
+Db::table('users')->update(['view_count' => Db::raw('view_count + 1')]);
 ```
 
 ## 模型
 
-模型继承 `think\Model`，把表操作封装为对象。模型会自动关联到 `DbManager`，无需手动注入连接。
+模型继承 `Lychee\orm\Model`，把表操作封装为对象。模型会自动绑定全局 `ConnectionManager`，无需手动注入连接。
 
 ### 定义模型
 
@@ -201,7 +227,7 @@ Db::execute('UPDATE users SET status = 0 WHERE id = ?', [1]);
 // app/model/User.php
 namespace app\model;
 
-use think\Model;
+use Lychee\orm\Model;
 
 /**
  * @property int    $id
@@ -211,14 +237,20 @@ use think\Model;
  */
 class User extends Model
 {
-    // 表名（不含前缀）。不设置时默认使用类名的 snake_case 复数
-    protected $name = 'users';
+    // 不含前缀的表名（将自动拼接连接的 prefix）
+    protected string $name = 'users';
 
-    // 表前缀，留空则使用配置中的 prefix
-    // protected $prefix = '';
+    // 或直接指定完整表名
+    // protected string $table = 'pre_users';
 
-    // 主键，默认 id
-    // protected $pk = 'id';
+    // 主键字段，默认 id
+    // protected string $pk = 'id';
+
+    // 字段白名单；为空时自动从数据库表结构读取
+    // protected array $field = ['id', 'name', 'email', 'age'];
+
+    // 废弃字段（见下方“废弃字段”章节）
+    // protected array $disuse = [];
 }
 ```
 
@@ -228,8 +260,9 @@ class User extends Model
 use app\model\User;
 
 // 查询
-$user = User::find(1);                 // 按主键
-$list = User::where('status', 1)->select();
+$user = User::find(1);                          // 按主键
+$user = User::findOrFail(1);                    // 查不到抛 ModelNotFoundException
+$list = User::where('status', 1)->select();     // Collection<User>
 $all  = User::select();
 
 // 新增（静态 create）
@@ -238,7 +271,7 @@ $user = User::create([
     'email' => 'tom@example.com',
     'age'   => 20,
 ]);
-echo $user->id; // 自增 ID
+echo $user->id; // 自增 ID 已回填
 
 // 新增（实例 save）
 $user        = new User();
@@ -260,9 +293,12 @@ $user->delete();
 
 // 条件删除
 User::where('id', 1)->delete();
+
+// 按主键批量删除
+User::destroy([1, 2, 3]);
 ```
 
-### 模型可在控制器中通过依赖注入获取
+控制器中可通过依赖注入获取模型实例：
 
 ```php
 use app\model\User;
@@ -271,8 +307,7 @@ class UserController
 {
     public function __construct(
         private readonly User $user,
-    ) {
-    }
+    ) {}
 
     public function index()
     {
@@ -281,70 +316,206 @@ class UserController
 }
 ```
 
+### 字段类型转换
+
+```php
+class User extends Model
+{
+    // 类型映射：int/float/bool/string/array/object/json/datetime/timestamp
+    protected array $type = [
+        'id'      => 'int',
+        'balance' => 'float',
+        'is_vip'  => 'bool',
+        'extra'   => 'json',
+    ];
+
+    // 等价于 type 中设 'json'，可简化写法
+    protected array $json = ['extra'];
+
+    // JSON 解码时是否关联数组（默认 false）
+    protected bool $jsonAssoc = false;
+}
+```
+
+### 废弃字段 `$disuse`
+
+当数据表存在历史遗留的废弃字段，可在模型里声明让 ORM 在查询与写入时自动忽略：
+
+```php
+class User extends Model
+{
+    // 这些字段在数据库里仍存在，但不再使用
+    protected array $disuse = ['status', 'type'];
+}
+```
+
+效果：
+
+- `SELECT` 自动采用模型字段白名单（扣除 `$disuse`），不会把废弃字段读出
+- `save()` / `update()` 时会跳过 `$disuse` 中的字段，哪怕实例上被赋值也不会写入
+- `toArray()` / JSON 序列化输出中会过滤掉废弃字段
+
+### 只读字段 `$readonly`
+
+```php
+class User extends Model
+{
+    // 仅在 INSERT 时写入，UPDATE 时自动忽略
+    protected array $readonly = ['email'];
+}
+```
+
+### 隐藏 / 可见 / 追加字段
+
+```php
+class User extends Model
+{
+    // toArray / JSON 序列化时排除
+    protected array $hidden = ['password'];
+
+    // 白名单（优先级高于 hidden）
+    protected array $visible = [];
+
+    // 虚拟字段，调用 getXxxAttr 作为输出
+    protected array $append = ['full_name'];
+
+    public function getFullNameAttr($value, array $data): string
+    {
+        return $data['first_name'] . ' ' . $data['last_name'];
+    }
+}
+
+// 查询时临时调整
+User::where('status', 1)
+    ->hidden(['password'])
+    ->append(['full_name'])
+    ->visible(['id', 'name'])
+    ->select();
+```
+
 ### 获取器 / 修改器
 
 ```php
 class User extends Model
 {
     // 获取器：读取时自动处理
-    public function getNameAttr($value)
+    public function getNameAttr($value): string
     {
-        return ucfirst($value);
+        return ucfirst((string) $value);
     }
 
     // 修改器：写入时自动处理
-    public function setPasswordAttr($value)
+    public function setPasswordAttr($value): string
     {
-        return password_hash($value, PASSWORD_DEFAULT);
+        return password_hash((string) $value, PASSWORD_DEFAULT);
     }
 }
 ```
 
+### 时间字段
+
+```php
+class User extends Model
+{
+    // 'datetime' 写入 Y-m-d H:i:s；'timestamp' 写入时间戳；false 关闭
+    protected bool|string $autoWriteTimestamp = true;
+
+    protected string $createTime = 'create_time';
+    protected string $updateTime = 'update_time';
+    protected string $dateFormat = 'Y-m-d H:i:s';
+}
+```
+
+也可通过 `database.datetime_field` 全局修改所有模型的时间字段名，格式 `create_time,update_time`。
+
 ### 关联
+
+支持 `hasOne` / `hasMany` / `belongsTo` 三种关联。
 
 ```php
 class User extends Model
 {
     // 一对一
-    public function profile()
+    public function profile(): \Lychee\orm\relation\HasOne
     {
         return $this->hasOne(Profile::class, 'user_id');
     }
 
     // 一对多
-    public function posts()
+    public function posts(): \Lychee\orm\relation\HasMany
     {
         return $this->hasMany(Post::class, 'user_id');
     }
+}
 
-    // 多对多
-    public function roles()
+class Post extends Model
+{
+    // 反向属于
+    public function author(): \Lychee\orm\relation\BelongsTo
     {
-        return $this->belongsToMany(Role::class, 'user_role', 'role_id', 'user_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 }
 
 // 预加载（避免 N+1）
 $users = User::with(['profile', 'posts'])->select();
+
+// 懒加载：首次访问时查询
+$user = User::find(1);
+$user->profile; // 自动触发查询
+$user->posts;
+```
+
+### 软删除
+
+模型 `use` `Lychee\orm\concern\SoftDelete` trait 即启用：
+
+```php
+use Lychee\orm\Model;
+use Lychee\orm\concern\SoftDelete;
+
+class Post extends Model
+{
+    use SoftDelete;
+
+    // 删除时写入的字段，默认 delete_time
+    protected string $deleteTime = 'delete_time';
+}
+
+// delete() 变为逻辑删除
+Post::find(1)->delete();
+
+// 全局自动过滤已删除记录
+Post::select();                       // 不含已删除
+Post::withTrashed()->select();        // 包含已删除
+Post::onlyTrashed()->select();        // 仅已删除
+
+// 恢复
+$post = Post::withTrashed()->find(1);
+$post->restore();
+
+// 强制删除
+Post::find(1)->forceDelete();
 ```
 
 ## 事务
 
 ```php
-use think\facade\Db;
+use Lychee\orm\facade\Db;
 
+// 自动事务（闭包抛出异常自动回滚）
 Db::transaction(function () {
-    Db::table('users')->where('id', 1)->dec('balance', 100)->update();
+    Db::table('users')->where('id', 1)->dec('balance', 100);
     Db::table('orders')->insert(['user_id' => 1, 'amount' => 100]);
 });
 ```
 
-手动控制事务：
+手动控制：
 
 ```php
 Db::startTrans();
 try {
-    Db::table('users')->where('id', 1)->dec('balance', 100)->update();
+    Db::table('users')->where('id', 1)->dec('balance', 100);
     Db::table('orders')->insert(['user_id' => 1, 'amount' => 100]);
 
     Db::commit();
@@ -354,19 +525,168 @@ try {
 }
 ```
 
+嵌套事务通过 `SAVEPOINT` 实现，内层回滚不会影响外层。
+
+## 模型事件
+
+模型在新增、更新、删除前后会自动触发对应事件。推荐在模型内用**静态方法**声明回调（与 ThinkPHP 用法一致），也可以通过 `Model::event()` 注册**闭包**。
+
+### 支持的事件
+
+| 事件 | 对应静态方法 | 触发时机 |
+| --- | --- | --- |
+| `before_write` | `onBeforeWrite` | `save()` 前（新增与更新都触发） |
+| `after_write` | `onAfterWrite` | `save()` 成功后 |
+| `before_insert` | `onBeforeInsert` | 新增前 |
+| `after_insert` | `onAfterInsert` | 新增成功后 |
+| `before_update` | `onBeforeUpdate` | 更新前 |
+| `after_update` | `onAfterUpdate` | 更新成功后 |
+| `before_delete` | `onBeforeDelete` | 删除前（含软删除） |
+| `after_delete` | `onAfterDelete` | 删除成功后 |
+
+> **拦截流程**：任意 `before_*` 回调返回 `false` 都会中断本次 `save()` / `delete()`，并让其返回 `false`。`after_*` 回调的返回值被忽略。
+
+### 方式一：静态方法（推荐）
+
+直接在模型类内声明 `on{StudlyEvent}` 静态方法，参数为当前模型实例：
+
+```php
+<?php
+namespace app\model;
+
+use Lychee\orm\Model;
+
+class User extends Model
+{
+    // 新增前补默认值
+    public static function onBeforeInsert(User $user): void
+    {
+        $user->uuid ??= uuid();
+    }
+
+    // 更新前拦截
+    public static function onBeforeUpdate(User $user): bool|null
+    {
+        if ($user->name === 'thinkphp') {
+            return false; // 阻断本次更新
+        }
+        return null;
+    }
+
+    // 删除后级联清理
+    public static function onAfterDelete(User $user): void
+    {
+        Profile::destroy($user->id);
+    }
+}
+```
+
+事件名到方法名的映射规则：下划线转 StudlyCase 并加 `on` 前缀，例如 `before_insert` → `onBeforeInsert`。方法必须声明为 `public static`，且**无需继承任何额外接口或 trait**，框架会自动检测并调用。
+
+### 方式二：闭包注册
+
+适合在服务启动阶段（如 `Bootstrap` / `AppServiceProvider`）集中挂载事件：
+
+```php
+use app\model\User;
+
+User::event('before_insert', function (User $user) {
+    $user->uuid ??= uuid();
+});
+
+User::event('before_update', function (User $user) {
+    if ($user->isReadonlyAccount()) {
+        return false; // 阻断更新
+    }
+});
+```
+
+### 调用顺序
+
+对同一事件，框架先调用模型里的静态方法，再按注册顺序调用通过 `event()` 添加的闭包；任一回调返回 `false` 都会立刻终止后续回调。两种方式可以并存，便于把"模型内固有逻辑"和"运行期动态逻辑"分离维护。
+
 ## 切换连接
 
 ```php
-// 使用非默认连接
-Db::connect('sqlite')->table('users')->select();
+Db::connect('sqlite')->select('SELECT 1');
 ```
 
-## 更多用法
+模型可通过 `protected string $connection` 指定使用的连接名。
 
-ThinkORM 还支持软删除、模型事件、查询范围、JSON 字段、多数据库切换等高级特性，完整文档请参考：
+## SQL 日志
 
-- [ThinkORM 官方文档](https://doc.thinkphp.cn/v8_0/orm.html)
-- [查询构造器](https://doc.thinkphp.cn/v8_0/orm/query.html)
-- [模型](https://doc.thinkphp.cn/v8_0/orm/model.html)
-- [关联](https://doc.thinkphp.cn/v8_0/orm/relation.html)
-- [事务](https://doc.thinkphp.cn/v8_0/orm/transaction.html)
+当日志模块已加载且连接的 `trigger_sql=true` 时，所有执行过的 SQL 会输出到日志。
+日志通道优先使用 `config/log.php` 中的 `sql` 频道，未配置则落到默认频道。
+
+## 异常
+
+| 异常类 | 场景 |
+| --- | --- |
+| `Lychee\orm\exception\DbException` | 通用数据库异常（配置错误、SQL 异常等） |
+| `Lychee\orm\exception\DataNotFoundException` | `select()->failException()` 结果为空 |
+| `Lychee\orm\exception\ModelNotFoundException` | `findOrFail()` 查不到记录 |
+
+---
+
+## 从 think-orm 迁移到 Lychee ORM
+
+框架内置 `orm:migrate` 命令，基于 PHP 词法分析（`token_get_all`）批量改写项目中 `think\*` 的 `use` 语句与 FQN 引用。仅替换符号，不改动业务逻辑、注释与格式。
+
+### 一键迁移
+
+```bash
+# 预览将会改写哪些文件（不写盘）
+php lee orm:migrate app --dry-run
+
+# 确认无误后执行实际替换
+php lee orm:migrate app
+```
+
+参数：
+
+- `path`（可选）：目标目录，相对项目根路径，默认 `app`
+- `--dry-run`：仅列出会被修改的文件清单，不实际写入
+
+命令会递归扫描目录下的所有 `.php` 文件，自动跳过 `vendor` / `node_modules` / `runtime` / `.git`，并对连续的名称 token 组合整体匹配，支持 fully-qualified（含前导 `\`）与大小写不敏感匹配。
+
+### 符号映射表
+
+| 旧符号（think-orm） | 新符号（Lychee ORM） |
+| --- | --- |
+| `think\Model` | `Lychee\orm\Model` |
+| `think\model\concern\SoftDelete` | `Lychee\orm\concern\SoftDelete` |
+| `think\model\relation\HasOne` | `Lychee\orm\relation\HasOne` |
+| `think\model\relation\HasMany` | `Lychee\orm\relation\HasMany` |
+| `think\model\relation\BelongsTo` | `Lychee\orm\relation\BelongsTo` |
+| `think\db\Query` | `Lychee\orm\Query` |
+| `think\facade\Db` | `Lychee\orm\facade\Db` |
+| `think\DbManager` | `Lychee\orm\ConnectionManager` |
+| `think\db\exception\DbException` | `Lychee\orm\exception\DbException` |
+| `think\db\exception\DataNotFoundException` | `Lychee\orm\exception\DataNotFoundException` |
+| `think\db\exception\ModelNotFoundException` | `Lychee\orm\exception\ModelNotFoundException` |
+
+> `think\Validate`、`think\exception\ValidateException` 等校验器相关符号不属于 ORM 范畴，命令不会改写。
+
+### 迁移后需要手动检查的差异
+
+命令只做符号替换，以下行为差异需人工审阅：
+
+1. **模型属性强类型化**。新 Model 的 `$name` / `$pk` / `$table` 等属性为强类型（`protected string $name = '';`）。如果项目里原来写的是 `protected $name = 'users';`，PHP 可以兼容，但建议补上类型声明。
+2. **分页返回类型**。`Query::select()` 在无 Model 时返回 `array<array>`，在有 Model 时返回 `Collection<Model>`。原来直接 `->select()->toArray()` 对数组会报错；如果使用了框架内置 `Controller::paginate()` 则已自动兼容。
+3. **多对多 `belongsToMany`**。新 ORM 暂未实现多对多关联，使用 `belongsToMany` 的地方需要改成手工 join 或两次 `whereIn` 查询。
+4. **复杂查询方法**。本 ORM 实现了常用链式方法子集。若使用了不常见的 ThinkORM 方法（如 `whereExp` / `useSoftDelete` 的高级形式 / 查询范围 `scopeXxx` / 全局 scope / `withJoin`），需结合 `where` 闭包、`whereRaw` 或 `join` 手工重写。
+5. **模型事件订阅器**。新 ORM 事件通过 `Model::event('before_insert', fn($m) => ...)` 注册，不支持 ThinkORM 的 observer 类订阅方式，需要改成闭包风格。
+6. **分页辅助 `paginate(15)`**。原生 `Db::table()->paginate(15)` 在新 ORM 中请改用 `page($page, $pageSize)->select()` 配合 `count()`，或走框架的 `Controller::paginate()`。
+
+### 迁移建议流程
+
+1. 先切换到干净的 Git 分支：`git switch -c migrate-orm`
+2. `php lee orm:migrate app --dry-run` 查看改写清单
+3. `php lee orm:migrate app` 实际执行
+4. 根据“手动检查差异”清单逐一审阅模型、关联、分页相关代码
+5. 跑一遍单元测试与关键接口冒烟测试
+6. 从 `composer.json` 移除 `watsonhaw/think-orm` 依赖，`composer update`
+
+### 回滚
+
+若需回滚，直接 `git checkout -- .` 或切回原分支即可——命令是文件级重写，无数据库变更。
