@@ -48,7 +48,7 @@ if (!function_exists('app')) {
      */
     function app(?string $abstract = null, array $vars = []): mixed
     {
-        $container = \think\Container::getInstance();
+        $container = \Lychee\container\Container::getInstance();
 
         if ($abstract === null) {
             return $container;

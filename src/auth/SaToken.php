@@ -9,7 +9,7 @@ use Lychee\auth\exception\TokenInvalidException;
 use Lychee\cache\CacheManager;
 use Lychee\config\Config;
 use Ramsey\Uuid\Uuid;
-use think\Container;
+use Lychee\container\Container;
 
 /**
  * SaToken 轻量级权限认证。

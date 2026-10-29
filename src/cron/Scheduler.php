@@ -7,7 +7,7 @@ namespace Lychee\cron;
 use Closure;
 use DateTimeImmutable;
 use DateTimeInterface;
-use think\Container;
+use Lychee\container\Container;
 
 /**
  * 定时任务调度器。
