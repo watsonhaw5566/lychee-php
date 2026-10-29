@@ -22,6 +22,7 @@ use Traversable;
  * @template TModel of Model
  * @implements ArrayAccess<TKey, TModel>
  * @implements IteratorAggregate<TKey, TModel>
+ * @phpstan-consistent-constructor
  */
 class Collection implements ArrayAccess, IteratorAggregate, Countable, JsonSerializable
 {

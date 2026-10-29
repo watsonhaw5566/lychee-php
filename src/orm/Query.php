@@ -24,6 +24,8 @@ use Lychee\orm\exception\ModelNotFoundException;
  * 独立使用（通过 facade\Db）时返回数组或原始标量。
  *
  * @template TModel of Model|null
+ *
+ * @phpstan-consistent-constructor
  */
 class Query
 {

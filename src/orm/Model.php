@@ -7,7 +7,6 @@ namespace Lychee\orm;
 use ArrayAccess;
 use Closure;
 use JsonSerializable;
-use Lychee\orm\concern\SoftDelete;
 use Lychee\orm\exception\DbException;
 use Lychee\orm\relation\BelongsTo;
 use Lychee\orm\relation\HasMany;
@@ -76,6 +75,8 @@ use Lychee\orm\relation\Relation;
  * @method static float avg(string $field)
  * @method static mixed min(string $field)
  * @method static mixed max(string $field)
+ *
+ * @phpstan-consistent-constructor
  */
 abstract class Model implements ArrayAccess, JsonSerializable
 {
@@ -303,8 +304,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
         $query->setModel($this);
 
         if (method_exists($this, 'applySoftDeleteScope')) {
-            /** @var SoftDelete $this */
-            $this->applySoftDeleteScope($query);
+            $this->{'applySoftDeleteScope'}($query);
         }
 
         return $query;
@@ -827,8 +827,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
         }
 
         if (method_exists($this, 'runSoftDelete')) {
-            /** @var SoftDelete $this */
-            $result = $this->runSoftDelete();
+            $result = (bool) $this->{'runSoftDelete'}();
         } else {
             $pk = $this->getKey();
             if ($pk === null) {
