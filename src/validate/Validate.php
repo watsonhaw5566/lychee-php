@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Lychee\validate;
 
 use Closure;
+use BadMethodCallException;
 
 /**
  * 轻量校验器。
@@ -360,7 +361,7 @@ class Validate
                 continue;
             }
 
-            $existing = is_string($rules[$field]) ? $rules[$field] : implode('|', (array) $rules[$field]);
+            $existing      = is_string($rules[$field]) ? $rules[$field] : implode('|', (array) $rules[$field]);
             $rules[$field] = $existing === '' ? $extra : ($existing . '|' . $extra);
         }
 
@@ -425,7 +426,7 @@ class Validate
                 $rule = (string) $v;
                 if (str_contains($rule, ':')) {
                     [$name, $raw] = explode(':', $rule, 2);
-                    $result[] = [$name, $this->parseParams($raw)];
+                    $result[]     = [$name, $this->parseParams($raw)];
                 } else {
                     $result[] = [$rule, []];
                 }
@@ -599,6 +600,6 @@ class Validate
             return $this->scene(lcfirst(substr($name, 5)));
         }
 
-        throw new \BadMethodCallException(sprintf('方法 %s::%s 不存在', static::class, $name));
+        throw new BadMethodCallException(sprintf('方法 %s::%s 不存在', static::class, $name));
     }
 }
