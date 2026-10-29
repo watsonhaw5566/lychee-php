@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Lychee\http;
 
 use Lychee\routing\RouteNotFoundException;
+use Lychee\validate\ValidateException;
 use Lychee\view\ExceptionRenderer;
-use think\exception\ValidateException;
 use Throwable;
 
 /**

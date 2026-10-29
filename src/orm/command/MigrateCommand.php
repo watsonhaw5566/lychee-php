@@ -34,7 +34,8 @@ use SplFileInfo;
  *   think\db\exception\DataNotFoundException→ Lychee\orm\exception\DataNotFoundException
  *   think\db\exception\ModelNotFoundException→ Lychee\orm\exception\ModelNotFoundException
  *
- * 不改写：think\Validate、think\exception\ValidateException 等校验器相关符号。
+ * 不改写：think\Validate、think\exception\ValidateException 等校验器相关符号
+ *   （由应用自行迁移到 Lychee\validate\Validate / Lychee\validate\ValidateException）。
  *
  * 用法：
  *   php lee orm:migrate                 迁移默认目录（app/）

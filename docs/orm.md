@@ -797,7 +797,7 @@ php lee orm:migrate app
 | `think\db\exception\DataNotFoundException` | `Lychee\orm\exception\DataNotFoundException` |
 | `think\db\exception\ModelNotFoundException` | `Lychee\orm\exception\ModelNotFoundException` |
 
-> `think\Validate`、`think\exception\ValidateException` 等校验器相关符号不属于 ORM 范畴，命令不会改写。
+> `think\Validate`、`think\exception\ValidateException` 等校验器相关符号不属于 ORM 范畴，命令不会改写。需要迁移时请手动替换为 `Lychee\validate\Validate` 与 `Lychee\validate\ValidateException`（见 [数据验证](./validation.md)）。
 
 ### 迁移后需要手动检查的差异
 

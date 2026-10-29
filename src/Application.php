@@ -44,8 +44,8 @@ use Lychee\view\ExceptionRenderer;
 use Lychee\view\View;
 use Lychee\websocket\command\ServerCommand;
 use Lychee\websocket\WebSocketServer;
+use Lychee\validate\Validate;
 use Psr\Log\LoggerInterface;
-use think\Validate;
 use ErrorException;
 use PDO;
 use Throwable;
@@ -494,12 +494,12 @@ class Application
     /**
      * 注册校验器语言闭包。
      *
-     * 通过 think\Validate::maker() 注册构造钩子，使所有 Validate 实例
+     * 通过 Lychee\validate\Validate::maker() 注册构造钩子，使所有 Validate 实例
      * （包括全局 validate() 函数创建的）默认使用内置中文提示。
      *
      * 可通过 config/app.php 的 validate_lang 配置切换：
      * - 'zh'（默认，不配置即为中文）：中文提示
-     * - 'en'：英文提示（think-validate 默认）
+     * - 'en'：英文提示
      */
     private function bootValidateLang(): void
     {

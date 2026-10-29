@@ -436,3 +436,49 @@ if (!function_exists('json')) {
         return new JsonResponse($data, $status, $headers);
     }
 }
+
+if (!function_exists('validate')) {
+    /**
+     * 创建一个校验器实例。
+     *
+     * - 传入规则数组时，直接应用到匿名 Validate 实例；
+     * - 传入字符串时视为验证器类名，支持 "Class.scene" 场景语法。
+     *
+     * 默认开启 failException，校验失败自动抛 ValidateException，
+     * 由 HTTP 内核统一返回 400。如需手动处理，传 failException = false。
+     *
+     * @param  array<string, string|array<int|string, mixed>>|string $validate
+     * @param  array<string, string>                                 $message
+     */
+    function validate(
+        array|string $validate = [],
+        array $message = [],
+        bool $batch = false,
+        bool $failException = true,
+    ): \Lychee\validate\Validate {
+        if (is_string($validate) && $validate !== '') {
+            $scene = null;
+            if (str_contains($validate, '.')) {
+                [$validate, $scene] = explode('.', $validate, 2);
+            }
+
+            /** @var \Lychee\validate\Validate $v */
+            $v = new $validate();
+
+            if ($scene !== null) {
+                $v->scene($scene);
+            }
+        } else {
+            $v = new \Lychee\validate\Validate();
+            if (is_array($validate) && $validate !== []) {
+                $v->rule($validate);
+            }
+        }
+
+        if ($message !== []) {
+            $v->message($message);
+        }
+
+        return $v->batch($batch)->failException($failException);
+    }
+}

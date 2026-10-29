@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace {{namespace}}\validate;
 
-use think\Validate;
+use Lychee\validate\Validate;
 
 /**
  * {{model}} 验证器。
  */
 class {{model}}Validate extends Validate
 {
-    protected $rule = [];
+    protected array $rule = [];
 
-    protected $message = [];
+    protected array $message = [];
 }

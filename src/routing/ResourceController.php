@@ -9,9 +9,9 @@ use Lychee\http\JsonResponse;
 use Lychee\http\Request;
 use Lychee\orm\Model;
 use Lychee\orm\Query;
+use Lychee\validate\Validate;
+use Lychee\validate\ValidateException;
 use ReflectionClass;
-use think\exception\ValidateException;
-use think\Validate;
 use RuntimeException;
 use Throwable;
 use ReflectionException;
@@ -84,7 +84,7 @@ abstract class ResourceController extends Controller
      * @param bool $batch 是否批量验证
      * @return true
      *
-     * @throws \think\exception\ValidateException
+     * @throws \Lychee\validate\ValidateException
      */
     protected function validate(
         array        $data,
@@ -117,13 +117,15 @@ abstract class ResourceController extends Controller
             $v->batch();
         }
 
-        return $v->failException()->check($data);
+        $v->failException()->check($data);
+
+        return true;
     }
 
     /**
      * 将校验异常的错误信息格式化为字符串。
      *
-     * think\Validate 的 getError() 在批量验证时返回数组，
+     * Lychee\validate\Validate 的 getError() 在批量验证时返回数组，
      * 此处统一拼接为分号分隔的字符串，避免失败响应 msg 字段类型不匹配。
      *
      * @param array|string $error

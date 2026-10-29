@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace Lychee\http;
 
-use think\File;
-
 /**
  * 上传文件信息封装。
  *
- * 继承 think\File（基于 SplFileInfo），因此可直接被 think-validate
+ * 继承 Lychee\http\File（基于 SplFileInfo），因此可直接被 Lychee\validate
  * 的 file/image/fileExt/fileMime/fileSize 等规则校验。
  *
  * 文件的实际存储由 filesystem 模块负责。
@@ -76,7 +74,7 @@ class UploadedFile extends File
     /**
      * 文件扩展名（取自原始文件名）。
      *
-     * 临时文件本身没有扩展名，因此覆盖 think\File 的实现。
+     * 临时文件本身没有扩展名，因此覆盖 File 的实现。
      */
     public function extension(): string
     {

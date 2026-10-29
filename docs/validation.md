@@ -1,8 +1,8 @@
 # 数据验证 Validation
 
-框架集成了 [topthink/think-validate](https://github.com/top-think/think-validate) 作为数据验证器。
+框架内置轻量校验器 `Lychee\validate\Validate`，提供与 think-validate 兼容的常用 API（`rule / message / batch / scene / failException / extend / check / getError` 等），零外部依赖。
 
-验证失败时抛出 `think\exception\ValidateException`，HTTP 内核会自动捕获并返回 **400** 状态码，`msg` 字段取自 think-validate 的实际校验错误信息：
+验证失败时抛出 `Lychee\validate\ValidateException`，HTTP 内核会自动捕获并返回 **400** 状态码，`msg` 字段取自校验器的实际错误信息：
 
 ```json
 {
@@ -11,14 +11,14 @@
 }
 ```
 
-`think\exception\ValidateException` 的构造函数接受 `$error`（字符串或数组）和可选的 `$key`（字段名）：
+`Lychee\validate\ValidateException` 的构造函数接受 `$error`（字符串或数组）和可选的 `$key`（字段名）：
 
 ```php
 // 单个错误
-throw new \think\exception\ValidateException('用户名必填');
+throw new \Lychee\validate\ValidateException('用户名必填');
 
 // 批量错误（数组形式）
-throw new \think\exception\ValidateException(['name' => '用户名必填', 'email' => '邮箱格式不正确']);
+throw new \Lychee\validate\ValidateException(['name' => '用户名必填', 'email' => '邮箱格式不正确']);
 ```
 
 > 如需完全自定义响应结构，可在控制器中 `try/catch` 捕获 `ValidateException`，自行返回 `JsonResponse`；或通过 `app.exception_handler` 配置自定义异常处理器（详见 [应用配置 App](./app)）。
@@ -27,8 +27,8 @@ throw new \think\exception\ValidateException(['name' => '用户名必填', 'emai
 
 ```php
 use Lychee\http\Request;
-use think\exception\ValidateException;
-use think\Validate;
+use Lychee\validate\Validate;
+use Lychee\validate\ValidateException;
 
 public function save(Request $request): JsonResponse
 {
@@ -61,23 +61,23 @@ public function save(Request $request): JsonResponse
 
 ## 验证器类
 
-把规则集中到独立的验证器类中，便于复用。继承 `think\Validate`，在 `$rule`、`$message` 属性中定义规则与提示：
+把规则集中到独立的验证器类中，便于复用。继承 `Lychee\validate\Validate`，在 `$rule`、`$message` 属性中定义规则与提示：
 
 ```php
 // app/validate/User.php
 namespace app\validate;
 
-use think\Validate;
+use Lychee\validate\Validate;
 
 class User extends Validate
 {
-    protected $rule = [
+    protected array $rule = [
         'name'  => 'require|max:25',
         'age'   => 'number|between:1,120',
         'email' => 'require|email',
     ];
 
-    protected $message = [
+    protected array $message = [
         'name.require' => '名称必须',
         'name.max'     => '名称最多不能超过25个字符',
         'age.number'   => '年龄必须是数字',
@@ -99,7 +99,7 @@ if (!$validate->check($data)) {
 
 ## validate() 助手函数
 
-think-validate 提供了全局 `validate()` 函数，可快速生成验证器实例。默认开启 `failException`，验证失败会直接抛出 `think\exception\ValidateException`，框架会自动捕获并返回 **400** 状态码；如需手动处理，可传 `false`：
+框架提供全局 `validate()` 函数，返回一个 `Lychee\validate\Validate` 实例。默认开启 `failException`，验证失败会直接抛出 `Lychee\validate\ValidateException`，HTTP 内核自动捕获并返回 **400** 状态码；如需手动处理，可关闭：
 
 ```php
 // 传入规则数组，直接验证（失败抛异常）
@@ -108,11 +108,8 @@ validate([
     'email' => 'email',
 ])->check($data);
 
-// 传入验证器类名（支持场景，用 "." 分隔）
-validate('app\validate\User.sceneEdit')->check($data);
-
 // 关闭自动抛异常，自行判断
-$v = validate([], [], false, false);
+$v = validate()->failException(false);
 $v->rule(['name' => 'require']);
 if (!$v->check($data)) {
     $errors = (array) $v->getError(true);
@@ -141,16 +138,23 @@ $errors = (array) $validate->getError(true); // 包含所有失败字段
 ```php
 class User extends Validate
 {
-    protected $rule = [
+    protected array $rule = [
         'name'  => 'require|max:25',
         'email' => 'require|email',
         'age'   => 'number',
     ];
 
-    protected $scene = [
+    protected array $scene = [
         'edit'  => ['name', 'age'],   // 编辑时只验证 name、age
         'login' => ['email'],          // 登录时只验证 email
     ];
+
+    // 也可用方法形式：$this->only() / remove() / append() 自由控制
+    public function sceneRegister(): void
+    {
+        $this->only(['name', 'email'])
+            ->append('email', 'confirm');
+    }
 }
 
 // 调用时指定场景
@@ -160,15 +164,37 @@ $validate->scene('edit')->check($data);
 
 ## 自定义验证规则
 
-通过 `extend()` 注册自定义规则：
+通过 `extend()` 注册实例级自定义规则。回调签名 `fn ($value, $param, $data, $field): bool|string`：
 
 ```php
 $validate = new Validate();
-$validate->extend('checkName', function ($value, $rule, $data) {
+$validate->extend('checkName', function ($value, $param, $data, $field) {
     return $value === 'admin' ? '用户名不能为 admin' : true;
 }, '用户名非法');
 
 $validate->rule(['name' => 'require|checkName'])->check($data);
+```
+
+也可以在验证器子类中用 `checkXxx` 方法扩展（与 ThinkPHP 习惯一致），规则调度顺序为 `extend` > 内置 `Rule` > 子类 `checkXxx` 方法：
+
+```php
+class User extends Validate
+{
+    protected array $rule = ['name' => 'require|notAdmin'];
+
+    protected function checkNotAdmin(mixed $value, array $params, array $data, string $field): bool|string
+    {
+        return $value !== 'admin' ? true : '用户名不能为 admin';
+    }
+}
+```
+
+## 默认语言
+
+通过 `useZh()` / `useEn()` 切换内置错误提示语言，默认 `en`。可通过 `Validate::maker()` 为所有实例注册构造钩子（框架启动时已根据 `app.lang` 自动调用）：
+
+```php
+Validate::maker(fn (Validate $v) => $v->useZh());
 ```
 
 ## 常用验证规则速查
@@ -197,6 +223,7 @@ $validate->rule(['name' => 'require|checkName'])->check($data);
 | `accepted` / `declined` | 接受 / 拒绝值 | `'agree' => 'accepted'` |
 | `array` | 数组 | `'tags' => 'array'` |
 | `file` / `image` | 文件 / 图片 | `'avatar' => 'image'` |
+| `fileExt` / `fileMime` / `fileSize` | 文件扩展名 / MIME / 大小上限 | `'doc' => 'fileExt:pdf,doc'` |
 
 多个规则用 `|` 分隔，也可写成数组形式：
 
@@ -207,4 +234,4 @@ $validate->rule([
 ]);
 ```
 
-更多规则与用法请参考 [think-validate 开发指南](https://doc.thinkphp.cn/@think-validate)。
+除 `require` 外的所有规则默认视为可选：当字段未提供或值为 `null`/`''` 时自动跳过。要求字段必填请显式加 `require`。
