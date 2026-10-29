@@ -8,6 +8,8 @@ use Closure;
 use Lychee\orm\exception\DataNotFoundException;
 use Lychee\orm\exception\DbException;
 use Lychee\orm\exception\ModelNotFoundException;
+use Generator;
+use PDO;
 
 /**
  * 查询构造器。
@@ -247,6 +249,21 @@ class Query
 
         $op = strtoupper((string) $op);
 
+        // 数组值自动路由到 IN / NOT IN / BETWEEN / NOT BETWEEN，
+        // 兼容 ThinkPHP 写法：where('id', 'in', [1,2,3])
+        if (is_array($value)) {
+            $routed = match ($op) {
+                'IN'          => $this->whereIn($field, $value, $boolean),
+                'NOT IN'      => $this->whereNotIn($field, $value, $boolean),
+                'BETWEEN'     => $this->whereBetween($field, $value, null, $boolean),
+                'NOT BETWEEN' => $this->whereNotBetween($field, $value, null, $boolean),
+                default       => null,
+            };
+            if ($routed !== null) {
+                return $this;
+            }
+        }
+
         $this->wheres[] = [
             'type'    => 'basic',
             'boolean' => $boolean,
@@ -261,11 +278,11 @@ class Query
     /**
      * @param array<int, mixed> $values
      */
-    public function whereIn(string $field, array $values): static
+    public function whereIn(string $field, array $values, string $boolean = 'AND'): static
     {
         $this->wheres[] = [
             'type'    => 'in',
-            'boolean' => 'AND',
+            'boolean' => $boolean,
             'field'   => $field,
             'value'   => array_values($values),
             'not'     => false,
@@ -277,11 +294,11 @@ class Query
     /**
      * @param array<int, mixed> $values
      */
-    public function whereNotIn(string $field, array $values): static
+    public function whereNotIn(string $field, array $values, string $boolean = 'AND'): static
     {
         $this->wheres[] = [
             'type'    => 'in',
-            'boolean' => 'AND',
+            'boolean' => $boolean,
             'field'   => $field,
             'value'   => array_values($values),
             'not'     => true,
@@ -314,7 +331,7 @@ class Query
         return $this->where($field, 'NOT LIKE', $value);
     }
 
-    public function whereBetween(string $field, mixed $min, mixed $max = null): static
+    public function whereBetween(string $field, mixed $min, mixed $max = null, string $boolean = 'AND'): static
     {
         if ($max === null && is_array($min) && count($min) === 2) {
             [$min, $max] = $min;
@@ -322,7 +339,7 @@ class Query
 
         $this->wheres[] = [
             'type'    => 'between',
-            'boolean' => 'AND',
+            'boolean' => $boolean,
             'field'   => $field,
             'value'   => [$min, $max],
             'not'     => false,
@@ -331,7 +348,7 @@ class Query
         return $this;
     }
 
-    public function whereNotBetween(string $field, mixed $min, mixed $max = null): static
+    public function whereNotBetween(string $field, mixed $min, mixed $max = null, string $boolean = 'AND'): static
     {
         if ($max === null && is_array($min) && count($min) === 2) {
             [$min, $max] = $min;
@@ -339,7 +356,7 @@ class Query
 
         $this->wheres[] = [
             'type'    => 'between',
-            'boolean' => 'AND',
+            'boolean' => $boolean,
             'field'   => $field,
             'value'   => [$min, $max],
             'not'     => true,
@@ -383,6 +400,84 @@ class Query
             'field'   => $callback,
             'not'     => $not,
         ];
+
+        return $this;
+    }
+
+    public function whereNotExists(Closure $callback): static
+    {
+        return $this->whereExists($callback, true);
+    }
+
+    /**
+     * 比较两个字段。
+     *
+     * 例如 whereColumn('end_time', '>', 'start_time')。
+     */
+    public function whereColumn(string $field, string $op, string $field2 = null): static
+    {
+        if ($field2 === null) {
+            $field2 = $op;
+            $op     = '=';
+        }
+
+        $this->wheres[] = [
+            'type'    => 'basic',
+            'boolean' => 'AND',
+            'field'   => $field,
+            'op'      => strtoupper($op),
+            'value'   => new Raw($this->wrap($field2)),
+        ];
+
+        return $this;
+    }
+
+    /**
+     * 按自然时间区间过滤。
+     *
+     * 支持：today / yesterday / week / month / year / 或 Y-m-d~Y-m-d 区间。
+     */
+    public function whereTime(string $field, string $expression): static
+    {
+        $expression = strtolower(trim($expression));
+
+        [$start, $end] = match ($expression) {
+            'today'     => [date('Y-m-d'), date('Y-m-d')],
+            'yesterday' => [date('Y-m-d', strtotime('-1 day')), date('Y-m-d', strtotime('-1 day'))],
+            'week'      => [date('Y-m-d', strtotime('this week')), date('Y-m-d', strtotime('this week +6 days'))],
+            'month'     => [date('Y-m-01'), date('Y-m-t')],
+            'year'      => [date('Y-01-01'), date('Y-12-31')],
+            default     => null,
+        };
+
+        if ($start !== null) {
+            return $this->whereBetweenTime($field, $start, $end);
+        }
+
+        // 支持 "Y-m-d~Y-m-d" 或 "Y-m-d,Y-m-d" 区间
+        if (preg_match('/^([0-9]{4}-[0-9]{2}-[0-9]{2})\s*[~,]\s*([0-9]{4}-[0-9]{2}-[0-9]{2})$/', $expression, $m)) {
+            return $this->whereBetweenTime($field, $m[1], $m[2]);
+        }
+
+        // 退化为当天
+        return $this->whereBetweenTime($field, $expression, $expression);
+    }
+
+    /**
+     * 条件子句：$condition 为真时执行 $callback，否则执行 $default（若提供）。
+     *
+     * 用于避免 if 打断链式调用。
+     *
+     * @param callable(static): void $callback
+     * @param callable(static): void|null $default
+     */
+    public function when(mixed $condition, callable $callback, ?callable $default = null): static
+    {
+        if ($condition) {
+            $callback($this);
+        } elseif ($default !== null) {
+            $default($this);
+        }
 
         return $this;
     }
@@ -677,25 +772,197 @@ class Query
     /**
      * 取出一列。
      *
+     * 支持单字段 `column('name')` 或多字段 `column('id,name,email')`；
+     * 多字段时若指定 $key，则以 $key 的值为键返回 `[key => [field1=>.., field2=>..]]`。
+     *
      * @return array<int|string, mixed>
      */
     public function column(string $field, ?string $key = null): array
     {
-        $this->fields     = $key !== null ? [$field, $key] : [$field];
+        $fields = array_map('trim', explode(',', $field));
+
+        if (count($fields) === 1) {
+            // 保持原有单字段行为不变
+            $this->fields     = $key !== null ? [$fields[0], $key] : [$fields[0]];
+            [$sql, $bindings] = $this->toSelectSql();
+            $rows             = $this->connection->select($sql, $bindings);
+
+            $result = [];
+            foreach ($rows as $row) {
+                $value = $row[$fields[0]] ?? array_values($row)[0];
+                if ($key !== null && array_key_exists($key, $row)) {
+                    $result[$row[$key]] = $value;
+                } else {
+                    $result[] = $value;
+                }
+            }
+
+            return $result;
+        }
+
+        // 多字段：field1,field2 以 key 为键返回 [key => [field1=>.., field2=>..]]
+        $selectFields = $fields;
+        if ($key !== null && !in_array($key, $selectFields, true)) {
+            $selectFields[] = $key;
+        }
+        $this->fields     = $selectFields;
         [$sql, $bindings] = $this->toSelectSql();
         $rows             = $this->connection->select($sql, $bindings);
 
         $result = [];
         foreach ($rows as $row) {
-            $value = $row[$field] ?? array_values($row)[0];
+            $item = [];
+            foreach ($fields as $f) {
+                $item[$f] = $row[$f] ?? null;
+            }
             if ($key !== null && array_key_exists($key, $row)) {
-                $result[$row[$key]] = $value;
+                $result[$row[$key]] = $item;
             } else {
-                $result[] = $value;
+                $result[] = $item;
             }
         }
 
         return $result;
+    }
+
+    /**
+     * 分页查询，一步返回 total + list + 分页元信息。
+     *
+     * 与 {@see \Lychee\http\Controller::paginate()} 不同，本方法返回数组而非 JsonResponse，
+     * 便于在 service 层或需要二次加工数据的场景使用。
+     *
+     * @param int  $page     当前页码（最小 1）
+     * @param int  $pageSize 每页条数（自动限制在 1~200）
+     * @param bool $simple   true 时不统计 total（返回 0），仅取当前页
+     * @return array{total:int, list:Collection|array, per_page:int, current_page:int, last_page:int}
+     */
+    public function paginate(int $page = 1, int $pageSize = 15, bool $simple = false): array
+    {
+        $page     = max(1, $page);
+        $pageSize = max(1, min(200, $pageSize));
+
+        $total = 0;
+        if (!$simple) {
+            // clone 一个干净实例跑 count，避免 limit/offset 与 fields 污染
+            $countQuery         = clone $this;
+            $countQuery->limit  = null;
+            $countQuery->offset = null;
+            $total              = $countQuery->count();
+        }
+
+        $list = $this->page($page, $pageSize)->select();
+
+        return [
+            'total'        => $total,
+            'list'         => $list,
+            'per_page'     => $pageSize,
+            'current_page' => $page,
+            'last_page'    => $pageSize > 0 ? (int) ceil($total / $pageSize) : 1,
+        ];
+    }
+
+    /**
+     * 分批处理结果集，避免一次性加载大量数据到内存。
+     *
+     * @param int                                        $size     每批条数
+     * @param callable(Collection|array, int): bool|null $callback 回调返回 false 可终止后续批次
+     * @return bool 全部处理完返回 true，被回调中止返回 false
+     */
+    public function chunk(int $size, callable $callback): bool
+    {
+        $page = 1;
+
+        do {
+            $result = $this->page($page, $size)->select();
+            $count  = is_array($result) ? count($result) : $result->count();
+
+            if ($count === 0) {
+                break;
+            }
+
+            if ($callback($result, $page) === false) {
+                return false;
+            }
+
+            if ($count < $size) {
+                break;
+            }
+
+            $page++;
+        } while (true);
+
+        return true;
+    }
+
+    /**
+     * 按主键游标分批处理，比 {@see chunk()} 更高效（避免深分页 offset）。
+     *
+     * @param int                                        $size  每批条数
+     * @param callable(Collection|array, int): bool|null $callback
+     * @param string|null                                $column 游标列名，默认主键
+     * @return bool
+     */
+    public function chunkById(int $size, callable $callback, ?string $column = null): bool
+    {
+        $column = $column ?? $this->pk;
+        $lastId = 0;
+        $page   = 1;
+
+        do {
+            // 每轮基于原查询克隆，避免 where/order/limit 在 $this 上累积
+            $query  = (clone $this)->where($column, '>', $lastId)->order($column, 'ASC')->limit($size);
+            $result = $query->select();
+            $count  = is_array($result) ? count($result) : $result->count();
+
+            if ($count === 0) {
+                break;
+            }
+
+            // 取最后一条的游标值
+            $items  = is_array($result) ? $result : $result->all();
+            $last   = end($items);
+            $lastId = is_array($last) ? ($last[$column] ?? 0) : ($last instanceof Model ? $last->getAttr($column) : 0);
+
+            if ($callback($result, $page) === false) {
+                return false;
+            }
+
+            if ($count < $size) {
+                break;
+            }
+
+            $page++;
+        } while (true);
+
+        return true;
+    }
+
+    /**
+     * 用 PDO 逐行 yield，内存友好的流式查询。
+     *
+     * @return Generator<int, array<string, mixed>|Model>
+     */
+    public function cursor(): Generator
+    {
+        [$sql, $bindings] = $this->toSelectSql();
+        $pdo              = $this->connection->getPdo();
+        $statement        = $pdo->prepare($sql);
+
+        foreach ($bindings as $key => $value) {
+            $param = is_int($key) ? $key + 1 : $key;
+            $statement->bindValue($param, $value);
+        }
+        $statement->execute();
+
+        while (($row = $statement->fetch(PDO::FETCH_ASSOC)) !== false) {
+            if ($this->model !== null) {
+                yield $this->model::createFromDatabase($row);
+            } else {
+                yield $row;
+            }
+        }
+
+        $statement->closeCursor();
     }
 
     // ── Aggregates ──────────────────────────────────────────────────

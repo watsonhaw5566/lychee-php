@@ -82,7 +82,7 @@ abstract class Controller
     /**
      * 分页响应。
      *
-     * 传入 Query / Model 时自动执行 count 统计与分页查询；
+     * 传入 Query / Model 时委托 {@see Query::paginate()} 执行 count 统计与分页查询；
      * 传入数组时直接作为当页数据返回（total 为 0）。
      *
      * @param mixed $items 查询构建器、模型或当页数据数组
@@ -102,15 +102,13 @@ abstract class Controller
 
         // 如果传入的是查询构建器对象
         if ($items instanceof Query || $items instanceof Model) {
-            $query    = $items instanceof Model ? $items->db() : $items;
-            $pageSize = max(1, min(200, $pageSize)); // 限制每页记录数范围
+            $query = $items instanceof Model ? $items->db() : $items;
+            $page  = max(1, $page);
 
-            // 自动计算总数
-            $total = $query->count();
-
-            // 获取当前页数据
-            $result = $query->page($page, $pageSize)->select();
-            $items  = is_array($result) ? $result : $result->toArray();
+            $result = $query->paginate($page, $pageSize);
+            $total  = $result['total'];
+            $list   = $result['list'];
+            $items  = is_array($list) ? $list : $list->toArray();
         }
 
         // 确保 $items 是数组
