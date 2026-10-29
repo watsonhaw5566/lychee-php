@@ -108,6 +108,13 @@ $list = Db::table('users')
     ->limit(10)
     ->select();
 
+// where 操作符自动识别：值为数组时自动路由到 IN / BETWEEN
+Db::table('users')->where('id', 'in', [1, 2, 3])->select();          // 等价 whereIn
+Db::table('users')->where('id', 'not in', [1, 2])->select();
+Db::table('users')->where('age', 'between', [18, 30])->select();     // 等价 whereBetween
+Db::table('users')->where('age', 'not between', [18, 30])->select();
+Db::table('users')->whereOr('id', 'in', [1, 2])->select();           // OR 同样生效
+
 // 模糊查询
 Db::table('users')->whereLike('name', '%张%')->select();
 
@@ -119,9 +126,22 @@ Db::table('users')->whereNotIn('id', [1, 2])->select();
 Db::table('users')->whereBetween('age', 18, 30)->select();
 Db::table('orders')->whereBetweenTime('create_time', '2024-01-01', '2024-01-31')->select();
 
+// 自然时间区间（today / yesterday / week / month / year）
+Db::table('orders')->whereTime('create_time', 'today')->select();
+Db::table('orders')->whereTime('create_time', 'week')->select();
+Db::table('orders')->whereTime('create_time', '2024-01-01~2024-01-31')->select();
+
+// 字段间比较
+Db::table('orders')->whereColumn('end_time', '>', 'start_time')->select();
+Db::table('orders')->whereColumn('left', 'right')->select();           // 默认 =
+
 // NULL 判断
 Db::table('users')->whereNull('deleted_at')->select();
 Db::table('users')->whereNotNull('email')->select();
+
+// EXISTS / NOT EXISTS
+Db::table('users')->whereExists(fn ($q) => $q->table('orders')->whereRaw('orders.user_id = users.id'))->select();
+Db::table('users')->whereNotExists(fn ($q) => $q->table('orders')->whereRaw('orders.user_id = users.id'))->select();
 
 // 原生片段
 Db::table('users')->whereRaw('score > ? AND status = ?', [60, 1])->select();
@@ -130,6 +150,12 @@ Db::table('users')->whereRaw('score > ? AND status = ?', [60, 1])->select();
 Db::table('users')->where(function ($q) {
     $q->where('role', 'admin')->whereOr('role', 'manager');
 })->select();
+
+// 条件子句 when：避免 if 打断链式调用
+Db::table('users')
+    ->when($keyword, fn ($q) => $q->whereLike('name', "%{$keyword}%"))
+    ->when($status !== null, fn ($q) => $q->where('status', $status))
+    ->select();
 
 // 聚合
 $count = Db::table('users')->where('status', 1)->count();
@@ -144,10 +170,40 @@ Db::table('users')->field(['id', 'name'])->select();
 // 分页（offset + limit）
 Db::table('users')->page(2, 20)->select();
 
+// 一步分页（返回 total + list + 分页元信息，适合 service 层二次加工）
+$result = Db::table('users')->where('status', 1)->paginate(2, 20);
+// $result = ['total' => 100, 'list' => [...], 'per_page' => 20, 'current_page' => 2, 'last_page' => 5]
+
+// 简单分页（不统计 total，性能更优）
+Db::table('users')->paginate(2, 20, simple: true);
+
+// 分批处理（避免一次性加载大量数据）
+Db::table('orders')->where('status', 1)->chunk(500, function ($orders) {
+    foreach ($orders as $order) {
+        // ...
+    }
+});
+
+// 按主键游标分批（比 chunk 更高效，避免深分页 offset）
+Db::table('orders')->where('status', 1)->chunkById(500, function ($orders) {
+    foreach ($orders as $order) {
+        // ...
+    }
+});
+
+// 流式查询（PDO 逐行 yield，内存友好）
+foreach (Db::table('orders')->where('status', 1)->cursor() as $order) {
+    // ...
+}
+
 // 单字段取值
 $name  = Db::table('users')->where('id', 1)->value('name');
 $names = Db::table('users')->where('status', 1)->column('name');
 $map   = Db::table('users')->where('status', 1)->column('name', 'id'); // [id => name]
+
+// 多字段取值
+$rows = Db::table('users')->column('id,name,email');              // [['id'=>..,'name'=>..,'email'=>..], ...]
+$map  = Db::table('users')->column('name,email', 'id');           // [id => ['name'=>..,'email'=>..]]
 
 // JOIN
 Db::table('users')
@@ -215,6 +271,65 @@ use Lychee\orm\facade\Db;
 
 Db::table('users')->order(Db::raw('FIELD(id, ?, ?, ?)', [3, 1, 2]))->select();
 Db::table('users')->update(['view_count' => Db::raw('view_count + 1')]);
+```
+
+## 集合 Collection
+
+`Model::select()` 返回 `Lychee\orm\Collection`，封装一组模型实例，提供常用集合操作。集合实现了 `ArrayAccess` / `IteratorAggregate` / `Countable`，可直接当数组使用。
+
+```php
+use app\model\User;
+
+$users = User::where('status', 1)->select();
+
+// 基础
+$users->count();
+$users->isEmpty();
+$users->first();
+$users->last();
+
+// 取字段
+$names = $users->column('name');           // ['Tom', 'Jerry', ...]
+$map   = $users->column('name', 'id');     // [1 => 'Tom', 2 => 'Jerry', ...]
+$names = $users->pluck('name');            // column 的别名
+
+// 重新索引 / 分组
+$users->keyBy('id');                       // Collection，键为 id
+$users->groupBy('role');                   // [role => Collection]
+
+// 遍历与变换
+$users->each(fn ($u) => $u->doSomething());
+$mapped = $users->map(fn ($u) => $u->name);
+$filtered = $users->filter(fn ($u) => $u->age > 18);
+
+// 归并
+$total = $users->reduce(fn ($carry, $u) => $carry + $u->age, 0);
+
+// 聚合
+$total = $users->sum('age');
+$avg   = $users->avg('age');
+$min   = $users->min('age');
+$max   = $users->max('age');
+
+// 判断包含
+$users->contains('name', 'Tom');           // 是否存在 name=Tom 的项
+$users->contains(fn ($u) => $u->age > 60); // 回调判断
+
+// 排序
+$sorted = $users->sortBy('age');           // 升序，保持键
+$sorted = $users->sortBy('age', SORT_NUMERIC);
+
+// 去重 / 扁平化
+$unique = $users->unique('role');
+$flat   = $nested->flatten();              // 项为数组时扁平化一层
+$flat   = $collections->collapse();        // flatten 的别名
+
+// 批量删除
+$users->delete();
+
+// 转数组 / JSON
+$users->toArray();
+$users->toJson();
 ```
 
 ## 模型
@@ -296,6 +411,15 @@ User::where('id', 1)->delete();
 
 // 按主键批量删除
 User::destroy([1, 2, 3]);
+
+// 字段自增 / 自减（实例方法，执行后同步刷新内存值）
+$user = User::find(1);
+$user->increment('score', 5);   // score += 5
+$user->decrement('score', 2);   // score -= 2
+
+// 重新加载
+$fresh = $user->fresh();        // 返回新实例，不修改自身
+$user->refresh();               // 刷新自身数据与 origin
 ```
 
 控制器中可通过依赖注入获取模型实例：
@@ -508,6 +632,14 @@ Db::transaction(function () {
     Db::table('users')->where('id', 1)->dec('balance', 100);
     Db::table('orders')->insert(['user_id' => 1, 'amount' => 100]);
 });
+
+// 模型级事务（在该模型所属连接上执行）
+use app\model\Order;
+
+Order::transaction(function () {
+    Order::where('id', 1)->update(['status' => 1]);
+    // ...
+});
 ```
 
 手动控制：
@@ -676,7 +808,7 @@ php lee orm:migrate app
 3. **多对多 `belongsToMany`**。新 ORM 暂未实现多对多关联，使用 `belongsToMany` 的地方需要改成手工 join 或两次 `whereIn` 查询。
 4. **复杂查询方法**。本 ORM 实现了常用链式方法子集。若使用了不常见的 ThinkORM 方法（如 `whereExp` / `useSoftDelete` 的高级形式 / 查询范围 `scopeXxx` / 全局 scope / `withJoin`），需结合 `where` 闭包、`whereRaw` 或 `join` 手工重写。
 5. **模型事件订阅器**。新 ORM 事件通过 `Model::event('before_insert', fn($m) => ...)` 注册，不支持 ThinkORM 的 observer 类订阅方式，需要改成闭包风格。
-6. **分页辅助 `paginate(15)`**。原生 `Db::table()->paginate(15)` 在新 ORM 中请改用 `page($page, $pageSize)->select()` 配合 `count()`，或走框架的 `Controller::paginate()`。
+6. **分页**。`Query::paginate($page, $pageSize)` 已直接支持，返回 `['total','list','per_page','current_page','last_page']` 数组；控制器层也可使用 `Controller::paginate()` 直接输出分页 JSON 响应。ThinkPHP 的 `Db::table()->paginate(15)` 单参数写法需改成显式传 `$page`。
 
 ### 迁移建议流程
 

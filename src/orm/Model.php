@@ -203,6 +203,16 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
+     * 在当前模型所属连接上执行事务闭包。
+     *
+     * 用法：Booking::transaction(fn () => ...)
+     */
+    public static function transaction(Closure $callback): mixed
+    {
+        return (new static())->getConnection()->transaction($callback);
+    }
+
+    /**
      * 注册实例构造钩子。
      *
      * 用途：全局注入通用字段配置（如时间字段名、租户 ID 等）。
@@ -316,6 +326,65 @@ abstract class Model implements ArrayAccess, JsonSerializable
     public function db(): Query
     {
         return $this->newQuery();
+    }
+
+    /**
+     * 递增模型的某个字段值。
+     *
+     * @return int 受影响行数（>0 表示成功）
+     */
+    public function increment(string $field, int|float $step = 1): int
+    {
+        $pk = $this->getKey();
+        if ($pk === null) {
+            return 0;
+        }
+
+        $affected = $this->newQueryForWrite()->where($this->pk, $pk)->inc($field, $step);
+        if ($affected > 0 && array_key_exists($field, $this->data)) {
+            $this->data[$field] = ($this->data[$field] ?? 0) + $step;
+        }
+
+        return $affected;
+    }
+
+    /**
+     * 递减模型的某个字段值。
+     *
+     * @return int 受影响行数（>0 表示成功）
+     */
+    public function decrement(string $field, int|float $step = 1): int
+    {
+        return $this->increment($field, -$step);
+    }
+
+    /**
+     * 从数据库重新加载当前模型，返回新实例（不修改自身）。
+     */
+    public function fresh(): ?static
+    {
+        $pk = $this->getKey();
+        if ($pk === null) {
+            return null;
+        }
+
+        return static::query()->find($pk);
+    }
+
+    /**
+     * 从数据库重新加载当前模型并刷新自身数据。
+     */
+    public function refresh(): static
+    {
+        $fresh = $this->fresh();
+        if ($fresh !== null) {
+            $this->data     = $fresh->data;
+            $this->origin   = $fresh->origin;
+            $this->exists   = $fresh->exists;
+            $this->relation = [];
+        }
+
+        return $this;
     }
 
     /**

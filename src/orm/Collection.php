@@ -240,6 +240,206 @@ class Collection implements ArrayAccess, IteratorAggregate, Countable, JsonSeria
     }
 
     /**
+     * 归并集合为单个值。
+     *
+     * @param callable(mixed, TModel, array-key): mixed $callback
+     * @param mixed $initial
+     * @return mixed
+     */
+    public function reduce(callable $callback, mixed $initial = null): mixed
+    {
+        $result = $initial;
+        foreach ($this->items as $key => $item) {
+            $result = $callback($result, $item, $key);
+        }
+
+        return $result;
+    }
+
+    /**
+     * 对集合中某项的指定字段求和；$field 为 null 时直接对项求和。
+     *
+     * @param string|null $field
+     * @return int|float
+     */
+    public function sum(?string $field = null): int|float
+    {
+        $result = 0;
+        foreach ($this->items as $item) {
+            $value = $field === null
+                ? $item
+                : ($item instanceof Model ? $item->getAttr($field) : ($item[$field] ?? 0));
+            $result += is_numeric($value) ? $value + 0 : 0;
+        }
+
+        return $result;
+    }
+
+    /**
+     * 对集合中某项的指定字段求平均；空集合返回 0。
+     *
+     * @param string|null $field
+     */
+    public function avg(?string $field = null): float
+    {
+        if ($this->items === []) {
+            return 0.0;
+        }
+
+        return $this->sum($field) / count($this->items);
+    }
+
+    /**
+     * 返回集合中指定字段的最小值。
+     *
+     * @param string|null $field
+     */
+    public function min(?string $field = null): mixed
+    {
+        $values = [];
+        foreach ($this->items as $item) {
+            $values[] = $field === null
+                ? $item
+                : ($item instanceof Model ? $item->getAttr($field) : ($item[$field] ?? null));
+        }
+
+        return $values === [] ? null : min($values);
+    }
+
+    /**
+     * 返回集合中指定字段的最大值。
+     *
+     * @param string|null $field
+     */
+    public function max(?string $field = null): mixed
+    {
+        $values = [];
+        foreach ($this->items as $item) {
+            $values[] = $field === null
+                ? $item
+                : ($item instanceof Model ? $item->getAttr($field) : ($item[$field] ?? null));
+        }
+
+        return $values === [] ? null : max($values);
+    }
+
+    /**
+     * 判断集合是否包含满足条件的项。
+     *
+     * $key 为字符串时按字段值是否等于 $value 判断；
+     * 为 callable 时按回调返回值判断。
+     *
+     * @param string|callable(TModel, array-key): bool $key
+     * @param mixed $value
+     */
+    public function contains(string|callable $key, mixed $value = null): bool
+    {
+        if (is_callable($key)) {
+            foreach ($this->items as $k => $item) {
+                if ($key($item, $k)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        foreach ($this->items as $item) {
+            $v = $item instanceof Model ? $item->getAttr($key) : ($item[$key] ?? null);
+            if ($v === $value) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 按指定字段或回调排序，返回新的集合（保持键）。
+     *
+     * @param string|callable(TModel): mixed $callback
+     * @param int $flags SORT_REGULAR / SORT_NUMERIC / SORT_STRING 等
+     * @return static<array-key, TModel>
+     */
+    public function sortBy(string|callable $callback, int $flags = SORT_REGULAR): static
+    {
+        $results = [];
+        foreach ($this->items as $key => $item) {
+            $results[$key] = is_callable($callback)
+                ? $callback($item)
+                : ($item instanceof Model ? $item->getAttr($callback) : ($item[$callback] ?? null));
+        }
+
+        asort($results, $flags);
+
+        $sorted = [];
+        foreach (array_keys($results) as $key) {
+            $sorted[$key] = $this->items[$key];
+        }
+
+        return new static($sorted);
+    }
+
+    /**
+     * 按指定字段或回调去重，返回新的集合。
+     *
+     * @param string|callable(TModel): mixed|null $key
+     * @return static<array-key, TModel>
+     */
+    public function unique(string|callable|null $key = null): static
+    {
+        $exists = [];
+        $result = [];
+        foreach ($this->items as $index => $item) {
+            $value = $key === null
+                ? $item
+                : (is_callable($key)
+                    ? $key($item)
+                    : ($item instanceof Model ? $item->getAttr($key) : ($item[$key] ?? null)));
+
+            $hash = is_object($value) ? spl_object_hash($value) : (is_array($value) ? md5(serialize($value)) : (string) $value);
+            if (!isset($exists[$hash])) {
+                $exists[$hash]  = true;
+                $result[$index] = $item;
+            }
+        }
+
+        return new static($result);
+    }
+
+    /**
+     * 将集合（项为数组）扁平化一层。
+     *
+     * @return static<array-key, mixed>
+     */
+    public function flatten(): static
+    {
+        $result = [];
+        foreach ($this->items as $item) {
+            if (is_array($item) || $item instanceof self) {
+                $list = $item instanceof self ? $item->all() : $item;
+                foreach ($list as $v) {
+                    $result[] = $v;
+                }
+            } else {
+                $result[] = $item;
+            }
+        }
+
+        return new static($result);
+    }
+
+    /**
+     * {@see flatten} 的别名，用于项为集合的场景。
+     *
+     * @return static<array-key, mixed>
+     */
+    public function collapse(): static
+    {
+        return $this->flatten();
+    }
+
+    /**
      * @return static<array-key, TModel>
      */
     public function values(): static
