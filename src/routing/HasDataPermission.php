@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Lychee\routing;
 
-use think\db\Query;
-use think\Model;
+use Lychee\orm\Model;
+use Lychee\orm\Query;
 
 /**
  * 数据权限 Trait：按需 use，不强制。

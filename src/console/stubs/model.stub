@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace {{namespace}}\model;
 
-use think\Model;
+use Lychee\orm\Model;
 
 /**
  * {{model}} 模型。

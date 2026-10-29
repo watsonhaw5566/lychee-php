@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Lychee\routing;
 
-use think\db\Query;
-use think\Model;
+use Lychee\orm\Model;
+use Lychee\orm\Query;
 
 /**
  * 多租户 Trait（基于表字段 tenant_id 隔离，共享数据库 + 共享表）。

@@ -7,15 +7,14 @@ namespace Lychee\routing;
 use Lychee\http\Controller;
 use Lychee\http\JsonResponse;
 use Lychee\http\Request;
+use Lychee\orm\Model;
+use Lychee\orm\Query;
 use ReflectionClass;
-use think\db\Query;
 use think\exception\ValidateException;
-use think\Model;
 use think\Validate;
 use RuntimeException;
 use Throwable;
 use ReflectionException;
-use InvalidArgumentException;
 
 /**
  * 资源控制器：基于模型类的零代码 CRUD（base* 方法）。
@@ -73,40 +72,6 @@ abstract class ResourceController extends Controller
      * @var array<int, string>
      */
     protected array $append = [];
-
-    // ── 分页响应 ────────────────────────────────────────────────────
-
-    /**
-     * 分页响应。
-     *
-     * @throws \think\db\exception\DbException
-     */
-    protected function paginate(
-        mixed  $query = null,
-        int    $current = 1,
-        int    $pageSize = 10,
-        string $msg = 'success',
-        int    $code = 200,
-    ): JsonResponse {
-        if (!$query instanceof Model && !$query instanceof Query) {
-            throw new InvalidArgumentException('paginate() 第一个参数必须是 Query 或 Model 实例');
-        }
-
-        $current  = max(1, $current);
-        $pageSize = max(1, min(200, $pageSize));
-
-        $paginator = $query->paginate(['list_rows' => $pageSize, 'page' => $current]);
-
-        return new JsonResponse([
-            'errno' => 0,
-            'code'  => $code,
-            'msg'   => $msg,
-            'data'  => [
-                'total' => $paginator->total(),
-                'list'  => $paginator->items(),
-            ],
-        ], $code);
-    }
 
     // ── 验证快捷方式 ────────────────────────────────────────────────
 
