@@ -387,6 +387,16 @@ abstract class Model implements ArrayAccess, JsonSerializable
         return static::query()->{$method}(...$arguments);
     }
 
+    /**
+     * 实例方法代理到查询构造器。
+     *
+     * 允许写出 `$user->where(...)->select()` 这种风格，与容器注入的模型实例配合使用。
+     */
+    public function __call(string $method, array $arguments): mixed
+    {
+        return $this->newQuery()->{$method}(...$arguments);
+    }
+
     // ── 内部构造（由 Query 调用） ────────────────────────────────────────
 
     /**
