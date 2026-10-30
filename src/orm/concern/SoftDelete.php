@@ -67,7 +67,8 @@ trait SoftDelete
     /**
      * 应用软删除的全局查询过滤。
      *
-     * 由 Model::newQuery() 调用。
+     * 由 Model::newQuery() 调用。添加的 where 子句会被标记为 softDelete，
+     * 以便 withTrashed() / onlyTrashed() 可以在后续移除它们。
      */
     public function applySoftDeleteScope(Query $query): void
     {
@@ -77,6 +78,7 @@ trait SoftDelete
 
         if ($query->getOnlyTrashed()) {
             $query->whereNotNull($this->deleteTime);
+            $query->markLastWhereSoftDelete();
 
             return;
         }
@@ -86,6 +88,7 @@ trait SoftDelete
         } else {
             $query->where($this->deleteTime, $this->defaultSoftDelete);
         }
+        $query->markLastWhereSoftDelete();
     }
 
     /**
@@ -113,7 +116,7 @@ trait SoftDelete
         return $affected > 0;
     }
 
-    protected function getSoftDeleteValue(): mixed
+    public function getSoftDeleteValue(): mixed
     {
         // 默认写入当前时间戳；如需 datetime 格式，模型可覆盖此方法
         $format = $this->getDateFormat();

@@ -388,6 +388,7 @@ class UploadController extends Controller
 | `initialize()` | 初始化钩子，在中间件之后、方法调用前执行 |
 | `json($data, $status, $headers)` | 全局助手，组装任意结构的 JSON 响应 |
 | `$this->paginate($items, $page, $pageSize, $message, $httpStatus)` | 分页 JSON 响应 |
+| `$this->validateRequest($rules, $message)` | 一行完成取参 + 校验，失败抛 ValidateException（HTTP 400） |
 
 > `Lychee\routing\ResourceController` 继承自此基类，因此资源控制器同样拥有以上能力。
 
@@ -400,12 +401,15 @@ class UploadController extends Controller
 ```php
 protected function paginate(
     mixed  $items = [],       // Query、Model 或当页数据数组
-    int    $page = 1,         // 当前页码
-    int    $pageSize = 10,    // 每页条数，自动限制在 1~200
+    ?int   $page = null,      // 当前页码；null 时自动从 Request 读取（?page= / ?current=）
+    ?int   $pageSize = null,  // 每页条数；null 时自动从 Request 读取（?pageSize= / ?limit=），限制在 1~200
     string $message = 'success',
     int    $httpStatus = 200,
 ): JsonResponse
 ```
+
+`$page` / `$pageSize` 传 `null`（默认值）时会自动从当前 Request 读取，便于一行完成分页。
+手动传值时则以传入值为准。
 
 传入 `Query` / `Model` 时，框架会先执行 `count()` 统计总数，再查询当前页数据；
 传入数组时数组原样作为当页数据，`total` 为 0。非数组（如 `null`、字符串）会被归一为空数组。
@@ -416,18 +420,13 @@ use Lychee\orm\facade\Db;
 
 class OrderController extends Controller
 {
-    // 传入 Query：自动 count + 分页
+    // 最简写法：页码 / 每页条数自动从 ?page= &pageSize= 读取
     public function list(): JsonResponse
     {
-        $page     = (int) $this->request->param('page', 1);
-        $pageSize = (int) $this->request->param('pageSize', 10);
-
-        $query = Db::table('orders')->where('status', 1);
-
-        return $this->paginate($query, $page, $pageSize);
+        return $this->paginate(Db::table('orders')->where('status', 1));
     }
 
-    // 传入 Query（由模型产生）：Model::where() 静态调用返回的是 Query
+    // 显式指定分页参数
     public function vipList(): JsonResponse
     {
         return $this->paginate(
@@ -472,6 +471,31 @@ class OrderController extends Controller
 > 与 `ResourceController::paginate()` 的区别：基础控制器版本接受任意 `Query` / `Model` / 数组，
 > 自行通过 `count()` + `page()` 完成分页；资源控制器的重写版本只接受 `Query` / `Model`，
 > 内部使用 Lychee ORM 分页器。两者响应结构一致。
+
+### 取参 + 校验一体化 `validateRequest()`
+
+`validateRequest()` 把"从 Request 取参"和"校验"合并为一步，校验失败自动抛 `ValidateException`
+（由异常处理器转为 HTTP 400），通过则直接返回干净的参数数组。
+
+```php
+public function save(): JsonResponse
+{
+    $data = $this->validateRequest([
+        'name'  => 'require|max:25',
+        'email' => 'require|email',
+    ], [
+        'name.require' => '用户名必填',
+    ]);
+
+    // $data 已是通过校验的请求参数
+    $user = User::create($data);
+
+    return json(['data' => $user]);
+}
+```
+
+> 资源控制器 `ResourceController` 另提供 `$this->validate($data, $validate)` 方法，
+> 支持传入验证器类名 / 场景语法 / 规则数组，适合需要复用验证器类的场景。
 
 ## 不继承基类的控制器
 

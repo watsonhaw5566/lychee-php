@@ -170,9 +170,20 @@ Db::table('users')->field(['id', 'name'])->select();
 // 分页（offset + limit）
 Db::table('users')->page(2, 20)->select();
 
-// 一步分页（返回 total + list + 分页元信息，适合 service 层二次加工）
-$result = Db::table('users')->where('status', 1)->paginate(2, 20);
-// $result = ['total' => 100, 'list' => [...], 'per_page' => 20, 'current_page' => 2, 'last_page' => 5]
+// page 单参数重载：仅传每页条数，当前页码自动从 Request 读取（?page= / ?current=）
+Db::table('users')->page(20)->select();
+
+// 一步分页（返回 Paginator 对象，适合 service 层二次加工）
+$paginator = Db::table('users')->where('status', 1)->paginate(2, 20);
+
+// Paginator 通过语义化方法访问数据
+$paginator->items();          // 当前页数据数组（自动 ->all()，省去每次手写）
+$paginator->total();          // 100
+$paginator->perPage();        // 20
+$paginator->currentPage();    // 2
+$paginator->lastPage();       // 5
+$paginator->isEmpty();        // false
+$paginator->list();           // 原始 list（Collection 或数组）
 
 // 简单分页（不统计 total，性能更优）
 Db::table('users')->paginate(2, 20, simple: true);
@@ -257,6 +268,14 @@ Db::table('users')->where('id', 1)->dec('score', 2);
 Db::table('users')->where('id', 1)->delete();
 ```
 
+> 若通过模型查询且模型启用了 SoftDelete，`Query::delete()` 默认执行**软删除**（写入 delete_time），
+> 与 `$model->delete()` 行为一致，避免误用导致数据丢失。需要真正删除时使用 `forceDelete()`：
+>
+> ```php
+> Post::where('status', 0)->delete();      // 软删除
+> Post::where('status', 0)->forceDelete(); // 硬删除
+> ```
+
 ### 原生查询
 
 ```php
@@ -327,6 +346,22 @@ $flat   = $collections->collapse();        // flatten 的别名
 // 批量删除
 $users->delete();
 
+// 条件过滤（集合内按字段筛选，返回新的 Collection）
+$adults    = $users->where('age', 18);
+$inGroup   = $users->whereIn('id', [1, 2, 3]);
+$notInGroup = $users->whereNotIn('id', [4, 5]);
+
+// 集合运算（模型按主键比较，数组按值比较）
+$diff      = $users->diff($otherUsers);      // 差集
+$intersect = $users->intersect($otherUsers); // 交集
+
+// 按键筛选
+$only = $users->only([0, 1]);      // 仅保留键为 0、1 的项
+$except = $users->except([0]);     // 排除键为 0 的项
+
+// 集合内分页（对已加载到内存的集合做客户端分页，返回 Paginator）
+$paginator = $users->paginate(2, 10);
+
 // 转数组 / JSON
 $users->toArray();
 $users->toJson();
@@ -352,7 +387,8 @@ use Lychee\orm\Model;
  */
 class User extends Model
 {
-    // 不含前缀的表名（将自动拼接连接的 prefix）
+    // 不含前缀的表名（将自动拼接连接的 prefix）；
+    // 留空（默认 ''）时自动从类名推断（User -> user，UserOrder -> user_order）
     protected string $name = 'users';
 
     // 或直接指定完整表名
@@ -368,6 +404,14 @@ class User extends Model
     // protected array $disuse = [];
 }
 ```
+
+> **表名自动推断**：`$name` 为空字符串 `''`（默认值）时，框架从类名推断表名（去命名空间、驼峰转下划线）。
+> 例如 `app\model\UserOrder` → `user_order`。需要显式指定时声明 `protected string $name = 'xxx'`。
+>
+> **字段名冲突防护**：`hidden` / `visible` / `append` / `json` / `readonly` / `disuse` / `type` / `field`
+> 等配置统一收敛到 `$modelConfig` 数组，不再占用模型属性名空间。因此即使数据库存在同名字段
+> （如 `hidden`、`type`），`$model->hidden = 1` 也会正确写入数据而非触发类型错误。
+> 子类仍可通过 `protected array $hidden = [...]` 声明配置（构造时自动合并到 `$modelConfig`）。
 
 ### 模型 CRUD
 
@@ -412,6 +456,15 @@ User::where('id', 1)->delete();
 // 按主键批量删除
 User::destroy([1, 2, 3]);
 
+// 批量保存模型实例（自动区分新增 / 更新，在事务内执行）
+$existing = User::find(1);
+$existing->name = 'b';
+$users = [
+    new User(['name' => 'a']),
+    $existing,
+];
+User::saveAll($users);
+
 // 字段自增 / 自减（实例方法，执行后同步刷新内存值）
 $user = User::find(1);
 $user->increment('score', 5);   // score += 5
@@ -438,6 +491,43 @@ class UserController
         return $this->user->where('status', 1)->select();
     }
 }
+```
+
+### 查询范围（Scope）
+
+框架**不**采用 `scopeXxx` 魔术方法（会导致 IDE 无法补全），推荐直接在模型中定义**真实的 `static` 方法**返回 `Query`。IDE 可完整支持补全、跳转与重构。
+
+```php
+class User extends Model
+{
+    // 仅活跃用户
+    public static function active(): Query
+    {
+        return static::query()->where('status', 1);
+    }
+
+    // 成年用户
+    public static function adult(): Query
+    {
+        return static::query()->where('age', '>=', 18);
+    }
+}
+
+// 调用（IDE 可补全 active / adult）
+User::active()->select();
+User::adult()->order('id', 'desc')->select();
+```
+
+需要从已有查询上继续叠加条件时，让方法接受可选的 `Query` 参数：
+
+```php
+public static function active(?Query $query = null): Query
+{
+    return ($query ?? static::query())->where('status', 1);
+}
+
+// 从已有查询继续
+User::active(User::where('age', '>', 18))->select();
 ```
 
 ### 字段类型转换
@@ -620,6 +710,20 @@ $post->restore();
 
 // 强制删除
 Post::find(1)->forceDelete();
+```
+
+**关联中加载已软删除的记录**：在关联定义上链式调用 `withTrashed()`，可加载被软删除的关联数据
+（例如列表中展示"活动已删除"但仍需关联数据）。
+
+```php
+class Order extends Model
+{
+    public function activity(): BelongsTo
+    {
+        // 包含已软删除的活动
+        return $this->belongsTo(Activity::class, 'activity_id', 'id')->withTrashed();
+    }
+}
 ```
 
 ## 事务

@@ -439,6 +439,178 @@ class Collection implements ArrayAccess, IteratorAggregate, Countable, JsonSeria
         return $this->flatten();
     }
 
+    // ── 条件过滤（集合内按字段筛选）─────────────────────────────────
+
+    /**
+     * 按字段值过滤集合。
+     *
+     * @return static<array-key, TModel>
+     */
+    public function where(string $field, mixed $value): static
+    {
+        return $this->filter(fn ($item) => $this->itemValue($item, $field) === $value);
+    }
+
+    /**
+     * 按字段值在给定集合内过滤。
+     *
+     * @param array<int, mixed> $values
+     * @return static<array-key, TModel>
+     */
+    public function whereIn(string $field, array $values): static
+    {
+        return $this->filter(fn ($item) => in_array($this->itemValue($item, $field), $values, true));
+    }
+
+    /**
+     * 按字段值不在给定集合内过滤。
+     *
+     * @param array<int, mixed> $values
+     * @return static<array-key, TModel>
+     */
+    public function whereNotIn(string $field, array $values): static
+    {
+        return $this->filter(fn ($item) => !in_array($this->itemValue($item, $field), $values, true));
+    }
+
+    // ── 集合运算 ────────────────────────────────────────────────────
+
+    /**
+     * 差集：返回当前集合中不在 $items 里的项。
+     *
+     * 模型按主键比较，数组按值比较，对象按实例比较。
+     *
+     * @param Collection<array-key, TModel>|array<array-key, mixed> $items
+     * @return static<array-key, TModel>
+     */
+    public function diff(Collection|array $items): static
+    {
+        $other = $items instanceof Collection ? $items->all() : $items;
+        $keys  = [];
+        foreach ($other as $item) {
+            $keys[$this->itemIdentity($item)] = true;
+        }
+
+        $result = [];
+        foreach ($this->items as $key => $item) {
+            if (!isset($keys[$this->itemIdentity($item)])) {
+                $result[$key] = $item;
+            }
+        }
+
+        return new static($result);
+    }
+
+    /**
+     * 交集：返回当前集合中同时存在于 $items 里的项。
+     *
+     * @param Collection<array-key, TModel>|array<array-key, mixed> $items
+     * @return static<array-key, TModel>
+     */
+    public function intersect(Collection|array $items): static
+    {
+        $other = $items instanceof Collection ? $items->all() : $items;
+        $keys  = [];
+        foreach ($other as $item) {
+            $keys[$this->itemIdentity($item)] = true;
+        }
+
+        $result = [];
+        foreach ($this->items as $key => $item) {
+            if (isset($keys[$this->itemIdentity($item)])) {
+                $result[$key] = $item;
+            }
+        }
+
+        return new static($result);
+    }
+
+    /**
+     * 仅保留指定键的项。
+     *
+     * @param array<int, array-key> $keys
+     * @return static<array-key, TModel>
+     */
+    public function only(array $keys): static
+    {
+        return new static(array_intersect_key($this->items, array_flip($keys)));
+    }
+
+    /**
+     * 排除指定键的项。
+     *
+     * @param array<int, array-key> $keys
+     * @return static<array-key, TModel>
+     */
+    public function except(array $keys): static
+    {
+        return new static(array_diff_key($this->items, array_flip($keys)));
+    }
+
+    // ── 集合内分页（客户端分页）─────────────────────────────────────
+
+    /**
+     * 对已加载到内存的集合做客户端分页，返回 {@see Paginator}。
+     *
+     * 常用于统计结果集等已在内存中的数据分页。
+     *
+     * @param int $page     当前页码（最小 1）
+     * @param int $pageSize 每页条数（自动限制在 1~200）
+     */
+    public function paginate(int $page = 1, int $pageSize = 15): Paginator
+    {
+        $page     = max(1, $page);
+        $pageSize = max(1, min(200, $pageSize));
+
+        $total  = count($this->items);
+        $offset = max(0, ($page - 1) * $pageSize);
+        $slice  = array_slice($this->items, $offset, $pageSize, true);
+
+        return new Paginator($total, new static($slice), $pageSize, $page);
+    }
+
+    // ── 内部工具 ────────────────────────────────────────────────────
+
+    /**
+     * 读取集合项的某个字段值。
+     */
+    protected function itemValue(mixed $item, string $field): mixed
+    {
+        if ($item instanceof Model) {
+            return $item->getAttr($field);
+        }
+
+        if (is_array($item)) {
+            return $item[$field] ?? null;
+        }
+
+        return null;
+    }
+
+    /**
+     * 生成集合项的可比较标识，用于 diff / intersect。
+     *
+     * 模型优先用主键，否则用对象哈希；数组用序列化哈希；标量用字符串值。
+     */
+    protected function itemIdentity(mixed $item): string
+    {
+        if ($item instanceof Model) {
+            $key = $item->getKey();
+
+            return $key !== null ? 'm:' . $key : 'o:' . spl_object_hash($item);
+        }
+
+        if (is_object($item)) {
+            return 'o:' . spl_object_hash($item);
+        }
+
+        if (is_array($item)) {
+            return 'a:' . md5(serialize($item));
+        }
+
+        return 's:' . (string) $item;
+    }
+
     /**
      * @return static<array-key, TModel>
      */
