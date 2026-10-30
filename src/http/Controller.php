@@ -142,20 +142,56 @@ abstract class Controller
     /**
      * 一行完成取参 + 校验。
      *
-     * 从当前 Request 读取全部参数，用给定规则校验，失败自动抛 ValidateException（HTTP 400）；
+     * 从当前 Request 读取全部参数，用给定规则或验证器类校验，失败自动抛 ValidateException（HTTP 400）；
      * 通过则直接返回干净的参数数组。
      *
-     * @param array<string, string|array<int|string, mixed>> $rules   校验规则
-     * @param array<string, string>                          $message 自定义提示
+     * 用法：
+     *   // 规则数组
+     *   $data = $this->validateRequest(['username' => 'required|max:20']);
+     *
+     *   // 验证器类名（短名自动解析为 app\validate\User）
+     *   $data = $this->validateRequest('User');
+     *
+     *   // 验证器 + 场景
+     *   $data = $this->validateRequest('User.edit');
+     *
+     * @param array<string, string|array<int|string, mixed>>|string $rules   规则数组，或验证器类名（支持 "Class.scene"）
+     * @param array<string, string>                                 $message 自定义提示
      * @return array<string, mixed> 请求参数
      *
      * @throws \Lychee\validate\ValidateException 校验失败时抛出
      */
-    protected function validateRequest(array $rules, array $message = []): array
+    protected function validateRequest(array|string $rules, array $message = []): array
     {
         $data = $this->request->param();
 
-        \validate($rules, $message)->check($data);
+        if (is_string($rules) && $rules !== '') {
+            $scene = null;
+            if (str_contains($rules, '.')) {
+                [$rules, $scene] = explode('.', $rules, 2);
+            }
+
+            $class = str_contains($rules, '\\')
+                ? $rules
+                : $this->app->getNamespace() . '\\validate\\' . $rules;
+
+            $v = new $class();
+
+            if ($scene !== null) {
+                $v->scene($scene);
+            }
+        } else {
+            $v = new \Lychee\validate\Validate();
+            if (is_array($rules) && $rules !== []) {
+                $v->rule($rules);
+            }
+        }
+
+        if ($message !== []) {
+            $v->message($message);
+        }
+
+        $v->failException()->check($data);
 
         return $data;
     }
