@@ -185,6 +185,19 @@ $paginator->lastPage();       // 5
 $paginator->isEmpty();        // false
 $paginator->list();           // 原始 list（Collection 或数组）
 
+// 也支持数组访问（ArrayAccess，兼容 ThinkPHP 写法）
+$paginator['total'];        // 100
+$paginator['list'];         // 当前页数据
+$paginator['current'];      // 2
+$paginator['pageSize'];     // 20
+$paginator['current_page']; // 2（下划线风格）
+$paginator['per_page'];     // 20
+$paginator['last_page'];    // 5
+
+// 序列化输出同时包含驼峰（current/pageSize）与下划线（current_page/per_page）两套键名
+$paginator->toArray();
+json_encode($paginator);
+
 // 简单分页（不统计 total，性能更优）
 Db::table('users')->paginate(2, 20, simple: true);
 
@@ -453,8 +466,18 @@ $user->delete();
 // 条件删除
 User::where('id', 1)->delete();
 
-// 按主键批量删除
+// 按主键批量删除（返回成功删除条数）
 User::destroy([1, 2, 3]);
+User::destroy(1);                       // 单个主键
+
+// 按条件删除（关联数组视为 where 条件）
+User::destroy(['status' => 0]);
+
+// 强制硬删除（忽略软删除，第二参数传 true）
+User::destroy([1, 2, 3], true);
+User::destroy(['status' => 0], true);
+
+// 启用 SoftDelete 的模型，destroy() 默认走软删除
 
 // 批量保存模型实例（自动区分新增 / 更新，在事务内执行）
 $existing = User::find(1);

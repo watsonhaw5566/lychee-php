@@ -465,20 +465,47 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
-     * 按主键批量删除。
+     * 按主键或条件批量删除。
      *
-     * @param array<int, mixed>|mixed $ids
+     * 用法（与 ThinkPHP 对齐）：
+     *   User::destroy(1);                 // 按主键删除
+     *   User::destroy([1, 2, 3]);         // 按主键列表删除
+     *   User::destroy(['status' => 0]);   // 按条件删除（关联数组视为 where 条件）
+     *   User::destroy(1, true);           // 强制硬删除（忽略软删除）
+     *
+     * 启用 SoftDelete trait 时默认走软删除，$force = true 时真实删除。
+     * 每个实例都会触发 before_delete / after_delete 事件。
+     *
+     * @param mixed $ids   主键、主键数组、或条件数组（关联数组）
+     * @param bool  $force true 时强制硬删除
+     * @return int 成功删除的记录数
      */
-    public static function destroy(mixed $ids): int
+    public static function destroy(mixed $ids, bool $force = false): int
     {
-        $ids = is_array($ids) ? $ids : [$ids];
-        if ($ids === []) {
+        if (empty($ids)) {
             return 0;
         }
 
+        $instance = new static();
+        $query    = static::query();
+
+        // 关联数组视为 where 条件；否则按主键删除
+        if (is_array($ids) && key($ids) !== 0 && key($ids) !== null) {
+            foreach ($ids as $field => $value) {
+                $query->where($field, $value);
+            }
+        } else {
+            $idList = is_array($ids) ? $ids : [$ids];
+            $query->whereIn($instance->getPk(), $idList);
+        }
+
         $count = 0;
-        foreach (static::query()->whereIn((new static())->getPk(), $ids)->select() as $model) {
-            if ($model instanceof Model && $model->delete()) {
+        foreach ($query->select() as $model) {
+            if (!$model instanceof Model) {
+                continue;
+            }
+            $result = $force ? $model->forceDelete() : $model->delete();
+            if ($result) {
                 $count++;
             }
         }
