@@ -85,30 +85,42 @@ abstract class Controller
      * 传入 Query / Model 时委托 {@see Query::paginate()} 执行 count 统计与分页查询；
      * 传入数组时直接作为当页数据返回（total 为 0）。
      *
-     * @param mixed $items 查询构建器、模型或当页数据数组
-     * @param int $page 当前页码
-     * @param int $pageSize 每页条数（自动限制在 1~200）
-     * @param string $message 提示信息
-     * @param int $httpStatus HTTP 状态码
+     * 页码与每页条数传 null 时自动从 Request 读取（?page= / ?current=、?pageSize= / ?limit=），
+     * 便于在控制器中一行完成分页：`return $this->paginate(User::where('status', 1));`。
+     *
+     * @param mixed       $items      查询构建器、模型或当页数据数组
+     * @param int|null    $page       当前页码；null 时从 Request 读取
+     * @param int|null    $pageSize   每页条数；null 时从 Request 读取（自动限制在 1~200）
+     * @param string      $message    提示信息
+     * @param int         $httpStatus HTTP 状态码
      */
     protected function paginate(
         mixed  $items = [],
-        int    $page = 1,
-        int    $pageSize = 10,
+        ?int   $page = null,
+        ?int   $pageSize = null,
         string $message = 'success',
         int    $httpStatus = 200,
     ): JsonResponse {
         $total = 0;
 
+        if ($page === null) {
+            $page = (int) ($this->request->param('page') ?? $this->request->param('current', 1));
+        }
+        if ($pageSize === null) {
+            $pageSize = (int) ($this->request->param('pageSize') ?? $this->request->param('limit', 10));
+        }
+
+        $page     = max(1, $page);
+        $pageSize = max(1, min(200, $pageSize));
+
         // 如果传入的是查询构建器对象
         if ($items instanceof Query || $items instanceof Model) {
-            $query = $items instanceof Model ? $items->db() : $items;
-            $page  = max(1, $page);
-
+            $query  = $items instanceof Model ? $items->db() : $items;
             $result = $query->paginate($page, $pageSize);
-            $total  = $result['total'];
-            $list   = $result['list'];
-            $items  = is_array($list) ? $list : $list->toArray();
+
+            $total = $result->total();
+            $list  = $result->list();
+            $items = is_array($list) ? $list : $list->toArray();
         }
 
         // 确保 $items 是数组
@@ -125,5 +137,26 @@ abstract class Controller
                 'total' => $total,
             ],
         ], $httpStatus);
+    }
+
+    /**
+     * 一行完成取参 + 校验。
+     *
+     * 从当前 Request 读取全部参数，用给定规则校验，失败自动抛 ValidateException（HTTP 400）；
+     * 通过则直接返回干净的参数数组。
+     *
+     * @param array<string, string|array<int|string, mixed>> $rules   校验规则
+     * @param array<string, string>                          $message 自定义提示
+     * @return array<string, mixed> 请求参数
+     *
+     * @throws \Lychee\validate\ValidateException 校验失败时抛出
+     */
+    protected function validateRequest(array $rules, array $message = []): array
+    {
+        $data = $this->request->param();
+
+        \validate($rules, $message)->check($data);
+
+        return $data;
     }
 }

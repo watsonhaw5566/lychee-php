@@ -13,6 +13,7 @@ use Lychee\orm\relation\HasMany;
 use Lychee\orm\relation\HasOne;
 use Lychee\orm\relation\Relation;
 use Throwable;
+use ReflectionClass;
 
 /**
  * ORM 模型基类（Active Record）。
@@ -104,8 +105,8 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /** 完整数据表名（含前缀）；为空时按 name 或类名推断 */
     protected string $table = '';
 
-    /** 不含前缀的表名（将自动拼接连接的 prefix） */
-    protected string $name = '';
+    /** 不含前缀的表名（将自动拼接连接的 prefix）；为 null 时从类名自动推断 */
+    protected ?string $name = null;
 
     /** 表名后缀（用于分表） */
     protected string $suffix = '';
@@ -113,29 +114,33 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /** 主键字段名 */
     protected string $pk = 'id';
 
-    /** 字段白名单；为空时按数据库表结构自动获取 */
-    protected array $field = [];
-
-    /** 废弃字段：查询与写入都会跳过（即使数据库中仍存在） */
-    protected array $disuse = [];
-
-    /** 只读字段：仅在 INSERT 时写入，UPDATE 时忽略 */
-    protected array $readonly = [];
-
-    /** 隐藏字段：toArray / JSON 序列化时排除 */
-    protected array $hidden = [];
-
-    /** 显示字段：toArray / JSON 序列化时的白名单（优先级高于 hidden） */
-    protected array $visible = [];
-
-    /** 追加输出字段：会调用 getXxxAttr 作为虚拟字段 */
-    protected array $append = [];
-
-    /** 字段类型映射：int/float/bool/string/array/object/json/datetime/timestamp */
-    protected array $type = [];
-
-    /** JSON 字段列表（等价于 type 中设 'json'） */
-    protected array $json = [];
+    /**
+     * 模型配置集中存放，避免与数据库字段同名冲突（如 hidden / type / json 等）。
+     *
+     * 子类可通过声明同名属性（如 protected array $hidden = [...]）进行配置，
+     * 构造时会自动合并到本数组；也可直接覆盖 $modelConfig。
+     *
+     * @var array{
+     *     field:array<int,string>,
+     *     disuse:array<int,string>,
+     *     readonly:array<int,string>,
+     *     hidden:array<int,string>,
+     *     visible:array<int,string>,
+     *     append:array<int,string>,
+     *     type:array<string,string>,
+     *     json:array<int,string>,
+     * }
+     */
+    protected array $modelConfig = [
+        'field'    => [],
+        'disuse'   => [],
+        'readonly' => [],
+        'hidden'   => [],
+        'visible'  => [],
+        'append'   => [],
+        'type'     => [],
+        'json'     => [],
+    ];
 
     /** JSON 解码时是否关联数组 */
     protected bool $jsonAssoc = false;
@@ -166,8 +171,13 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /** 实例是否已存在于数据库中 */
     protected bool $exists = false;
 
+    /** 子类声明的配置属性名缓存（用于构造时合并到 $modelConfig） */
+    protected static array $declaredConfigCache = [];
+
     public function __construct(array $data = [])
     {
+        $this->mergeDeclaredConfig();
+
         if (!empty(static::$makers[static::class])) {
             foreach (static::$makers[static::class] as $maker) {
                 $maker($this);
@@ -177,6 +187,35 @@ abstract class Model implements ArrayAccess, JsonSerializable
         if ($data !== []) {
             foreach ($data as $k => $v) {
                 $this->setAttr((string) $k, $v);
+            }
+        }
+    }
+
+    /**
+     * 将子类通过 `protected array $hidden = [...]` 等方式声明的配置属性
+     * 合并到 $modelConfig，保持向后兼容。
+     *
+     * 仅在首次实例化该子类时反射一次，结果按类缓存。
+     */
+    protected function mergeDeclaredConfig(): void
+    {
+        $class = static::class;
+
+        if (!isset(self::$declaredConfigCache[$class])) {
+            $names = array_keys($this->modelConfig);
+            $ref   = new ReflectionClass($class);
+            $found = [];
+            foreach ($names as $name) {
+                if ($ref->hasProperty($name)) {
+                    $found[] = $name;
+                }
+            }
+            self::$declaredConfigCache[$class] = $found;
+        }
+
+        foreach (self::$declaredConfigCache[$class] as $name) {
+            if (property_exists($this, $name) && is_array($this->{$name})) {
+                $this->modelConfig[$name] = array_merge($this->modelConfig[$name], $this->{$name});
             }
         }
     }
@@ -236,7 +275,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
             return $this->table . $this->suffix;
         }
 
-        $name   = $this->name !== '' ? $this->name : $this->inferTableName();
+        $name   = $this->name !== null ? $this->name : $this->inferTableName();
         $prefix = (string) $this->getConnection()->getConfig('prefix', '');
 
         return $prefix . $name . $this->suffix;
@@ -245,7 +284,8 @@ abstract class Model implements ArrayAccess, JsonSerializable
     protected function inferTableName(): string
     {
         $class = static::class;
-        $short = substr($class, (int) strrpos($class, '\\') + 1);
+        $pos   = strrpos($class, '\\');
+        $short = $pos === false ? $class : substr($class, $pos + 1);
 
         // 驼峰转蛇形
         return strtolower((string) preg_replace('/(?<!^)[A-Z]/', '_$0', $short));
@@ -276,7 +316,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function getActiveFields(): array
     {
-        $all = $this->field;
+        $all = $this->modelConfig['field'];
         if ($all === []) {
             $table = $this->getTable();
             $key   = $this->connection . ':' . $table;
@@ -286,11 +326,11 @@ abstract class Model implements ArrayAccess, JsonSerializable
             $all = self::$tableFieldsCache[$key];
         }
 
-        if ($this->disuse === []) {
+        if ($this->modelConfig['disuse'] === []) {
             return $all;
         }
 
-        return array_values(array_diff($all, $this->disuse));
+        return array_values(array_diff($all, $this->modelConfig['disuse']));
     }
 
     // ── Query 入口 ───────────────────────────────────────────────────────
@@ -444,6 +484,32 @@ abstract class Model implements ArrayAccess, JsonSerializable
         }
 
         return $count;
+    }
+
+    /**
+     * 批量保存模型实例（自动区分新增 / 更新），在事务内执行。
+     *
+     * 每个实例的 $exists 属性决定走 insert 还是 update，单个 save() 的事件
+     * （before_insert / after_update 等）照常触发。
+     *
+     * @param array<int, static> $models
+     * @return array<int, static> 保存后的模型实例（与入参同序）
+     */
+    public static function saveAll(array $models): array
+    {
+        if ($models === []) {
+            return [];
+        }
+
+        (new static())->getConnection()->transaction(function () use ($models): void {
+            foreach ($models as $model) {
+                if ($model instanceof static) {
+                    $model->save();
+                }
+            }
+        });
+
+        return $models;
     }
 
     /**
@@ -605,10 +671,10 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
     protected function getFieldType(string $name): ?string
     {
-        if (isset($this->type[$name])) {
-            return (string) $this->type[$name];
+        if (isset($this->modelConfig['type'][$name])) {
+            return (string) $this->modelConfig['type'][$name];
         }
-        if (in_array($name, $this->json, true)) {
+        if (in_array($name, $this->modelConfig['json'], true)) {
             return 'json';
         }
 
@@ -675,7 +741,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function hidden(array $fields): static
     {
-        $this->hidden = array_values(array_unique(array_merge($this->hidden, $fields)));
+        $this->modelConfig['hidden'] = array_values(array_unique(array_merge($this->modelConfig['hidden'], $fields)));
 
         return $this;
     }
@@ -685,7 +751,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function visible(array $fields): static
     {
-        $this->visible = array_values(array_unique(array_merge($this->visible, $fields)));
+        $this->modelConfig['visible'] = array_values(array_unique(array_merge($this->modelConfig['visible'], $fields)));
 
         return $this;
     }
@@ -695,8 +761,8 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function append(array|string $attrs): static
     {
-        $attrs        = is_array($attrs) ? $attrs : [$attrs];
-        $this->append = array_values(array_unique(array_merge($this->append, $attrs)));
+        $attrs                       = is_array($attrs) ? $attrs : [$attrs];
+        $this->modelConfig['append'] = array_values(array_unique(array_merge($this->modelConfig['append'], $attrs)));
 
         return $this;
     }
@@ -728,7 +794,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
         }
 
         // append 虚拟字段
-        foreach ($this->append as $key) {
+        foreach ($this->modelConfig['append'] as $key) {
             $data[$key] = $this->getAttr($key);
         }
 
@@ -749,17 +815,17 @@ abstract class Model implements ArrayAccess, JsonSerializable
         }
 
         // 废弃字段过滤
-        if ($this->disuse !== []) {
-            foreach ($this->disuse as $k) {
+        if ($this->modelConfig['disuse'] !== []) {
+            foreach ($this->modelConfig['disuse'] as $k) {
                 unset($data[$k]);
             }
         }
 
         // visible 优先于 hidden
-        if ($this->visible !== []) {
-            $data = array_intersect_key($data, array_flip($this->visible));
-        } elseif ($this->hidden !== []) {
-            $data = array_diff_key($data, array_flip($this->hidden));
+        if ($this->modelConfig['visible'] !== []) {
+            $data = array_intersect_key($data, array_flip($this->modelConfig['visible']));
+        } elseif ($this->modelConfig['hidden'] !== []) {
+            $data = array_diff_key($data, array_flip($this->modelConfig['hidden']));
         }
 
         return $data;
@@ -855,7 +921,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
         $data = $this->getDataForWrite(true);
 
         // 去除 readonly
-        foreach ($this->readonly as $k) {
+        foreach ($this->modelConfig['readonly'] as $k) {
             unset($data[$k]);
         }
 

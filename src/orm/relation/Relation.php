@@ -58,6 +58,28 @@ abstract class Relation
     }
 
     /**
+     * 关联查询包含已软删除的记录。
+     *
+     * 用法：$this->belongsTo(DrawLots::class)->withTrashed()
+     */
+    public function withTrashed(): static
+    {
+        $this->query->withTrashed();
+
+        return $this;
+    }
+
+    /**
+     * 关联查询仅包含已软删除的记录。
+     */
+    public function onlyTrashed(): static
+    {
+        $this->query->onlyTrashed();
+
+        return $this;
+    }
+
+    /**
      * 把关联对象的链式调用全部转发给内部 Query。
      */
     public function __call(string $method, array $arguments): mixed

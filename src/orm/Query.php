@@ -10,6 +10,7 @@ use Lychee\orm\exception\DbException;
 use Lychee\orm\exception\ModelNotFoundException;
 use Generator;
 use PDO;
+use Throwable;
 
 /**
  * 查询构造器。
@@ -524,12 +525,45 @@ class Query
         return $this;
     }
 
-    public function page(int $page, int $pageSize): static
+    /**
+     * 设置分页。
+     *
+     * 两种签名：
+     *   page($page, $pageSize)  显式指定页码与每页条数
+     *   page($pageSize)         仅指定每页条数，当前页码从 Request 自动读取
+     *                            （?page= / ?current=），读取失败时回退到 1。
+     */
+    public function page(int $page, ?int $pageSize = null): static
     {
+        if ($pageSize === null) {
+            // 单参数模式：$page 实际是每页条数，页码从 Request 解析
+            $pageSize = $page;
+            $page     = $this->resolveCurrentPage();
+        }
+
         $this->limit  = $pageSize;
         $this->offset = max(0, ($page - 1) * $pageSize);
 
         return $this;
+    }
+
+    /**
+     * 从当前 HTTP 请求解析页码。
+     *
+     * 优先读取 ?page=，其次 ?current=，均缺失时回退到 1。
+     * 非 HTTP 上下文（容器中无 Request）也回退到 1。
+     */
+    protected function resolveCurrentPage(): int
+    {
+        try {
+            /** @var \Lychee\http\Request $request */
+            $request = \app(\Lychee\http\Request::class);
+            $page    = $request->param('page') ?? $request->param('current', 1);
+
+            return max(1, (int) $page);
+        } catch (Throwable) {
+            return 1;
+        }
     }
 
     public function group(string $group): static
@@ -614,6 +648,8 @@ class Query
     public function withTrashed(): static
     {
         $this->withTrashed = true;
+        $this->onlyTrashed = false;
+        $this->removeSoftDeleteWheres();
 
         return $this;
     }
@@ -621,8 +657,39 @@ class Query
     public function onlyTrashed(): static
     {
         $this->onlyTrashed = true;
+        $this->withTrashed = false;
+        $this->removeSoftDeleteWheres();
+
+        // 重新应用作用域，追加「仅已删除」条件（delete_time IS NOT NULL）
+        if ($this->model !== null && method_exists($this->model, 'applySoftDeleteScope')) {
+            $this->model->applySoftDeleteScope($this);
+        }
 
         return $this;
+    }
+
+    /**
+     * 将最后一条 where 子句标记为软删除作用域，便于 withTrashed() 移除。
+     */
+    public function markLastWhereSoftDelete(): void
+    {
+        if ($this->wheres === []) {
+            return;
+        }
+
+        $key                              = array_key_last($this->wheres);
+        $this->wheres[$key]['softDelete'] = true;
+    }
+
+    /**
+     * 移除软删除作用域添加的 where 子句。
+     */
+    protected function removeSoftDeleteWheres(): void
+    {
+        $this->wheres = array_values(array_filter(
+            $this->wheres,
+            static fn (array $w): bool => !($w['softDelete'] ?? false),
+        ));
     }
 
     public function failException(bool $fail = true): static
@@ -828,15 +895,17 @@ class Query
     /**
      * 分页查询，一步返回 total + list + 分页元信息。
      *
-     * 与 {@see \Lychee\http\Controller::paginate()} 不同，本方法返回数组而非 JsonResponse，
-     * 便于在 service 层或需要二次加工数据的场景使用。
+     * 与 {@see \Lychee\http\Controller::paginate()} 不同，本方法返回 {@see Paginator} 对象
+     * 而非 JsonResponse，便于在 service 层或需要二次加工数据的场景使用。
+     *
+     * Paginator 通过语义化方法访问数据（$paginator->items() / ->total() / ->isEmpty() 等），
+     * 无需每次手写 ->all()。
      *
      * @param int  $page     当前页码（最小 1）
      * @param int  $pageSize 每页条数（自动限制在 1~200）
      * @param bool $simple   true 时不统计 total（返回 0），仅取当前页
-     * @return array{total:int, list:Collection|array, per_page:int, current_page:int, last_page:int}
      */
-    public function paginate(int $page = 1, int $pageSize = 15, bool $simple = false): array
+    public function paginate(int $page = 1, int $pageSize = 15, bool $simple = false): Paginator
     {
         $page     = max(1, $page);
         $pageSize = max(1, min(200, $pageSize));
@@ -852,13 +921,7 @@ class Query
 
         $list = $this->page($page, $pageSize)->select();
 
-        return [
-            'total'        => $total,
-            'list'         => $list,
-            'per_page'     => $pageSize,
-            'current_page' => $page,
-            'last_page'    => $pageSize > 0 ? (int) ceil($total / $pageSize) : 1,
-        ];
+        return new Paginator($total, $list, $pageSize, $page);
     }
 
     /**
@@ -1084,7 +1147,49 @@ class Query
         return $this->connection->execute($sql, $bindings);
     }
 
+    /**
+     * 删除。
+     *
+     * 若绑定的模型使用了 SoftDelete trait，则默认执行软删除（更新 delete_time 字段）；
+     * 否则执行硬删除。需要真正删除时调用 {@see forceDelete()}。
+     */
     public function delete(): int
+    {
+        if ($this->model !== null && method_exists($this->model, 'runSoftDelete')) {
+            return $this->softDelete();
+        }
+
+        return $this->hardDelete();
+    }
+
+    /**
+     * 强制硬删除（忽略 SoftDelete，真正从数据库移除记录）。
+     */
+    public function forceDelete(): int
+    {
+        // 包含已软删除的记录，确保能真正删除
+        if ($this->model !== null && method_exists($this->model, 'runSoftDelete')) {
+            $this->withTrashed();
+        }
+
+        return $this->hardDelete();
+    }
+
+    /**
+     * 软删除：将匹配记录的 delete_time 字段写入当前时间。
+     */
+    protected function softDelete(): int
+    {
+        $field = $this->model->getDeleteTimeField();
+        $value = $this->model->getSoftDeleteValue();
+
+        return $this->update([$field => $value]);
+    }
+
+    /**
+     * 真正执行 DELETE SQL。
+     */
+    protected function hardDelete(): int
     {
         $bindings = [];
         $sql      = 'DELETE FROM ' . $this->wrap($this->table) . $this->compileWheres($bindings);
