@@ -144,7 +144,7 @@ return $this->paginate($query, $current, $pageSize);
 }
 ```
 
-> `ResourceController` 重写了 `paginate()`：只接受 `Query` / `Model`，内部调用 think-orm
+> `ResourceController` 重写了 `paginate()`：只接受 `Query` / `Model`，内部调用 Lychee ORM
 > 的分页器，供 `index()` 等 CRUD 方法使用。基础控制器 `Lychee\http\Controller` 提供的
 > 通用版本还支持直接传入数组，详见下文[基础控制器](#基础控制器-controller)章节。
 
@@ -417,7 +417,7 @@ protected function paginate(
 
 ```php
 use App\model\Order;
-use think\facade\Db;
+use Lychee\orm\facade\Db;
 
 class OrderController extends Controller
 {
@@ -476,7 +476,7 @@ class OrderController extends Controller
 
 > 与 `ResourceController::paginate()` 的区别：基础控制器版本接受任意 `Query` / `Model` / 数组，
 > 自行通过 `count()` + `page()` 完成分页；资源控制器的重写版本只接受 `Query` / `Model`，
-> 内部使用 think-orm 分页器。两者响应结构一致。
+> 内部使用 Lychee ORM 分页器。两者响应结构一致。
 
 ## 不继承基类的控制器
 
