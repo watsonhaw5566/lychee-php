@@ -1,6 +1,6 @@
 # 数据验证 Validation
 
-框架内置轻量校验器 `Lychee\validate\Validate`，提供与 think-validate 兼容的常用 API（`rule / message / batch / scene / failException / extend / check / getError` 等），零外部依赖。
+框架内置轻量校验器 `Lychee\validate\Validate`，提供常用 API（`rule / message / batch / scene / failException / extend / check / getError` 等），零外部依赖。
 
 验证失败时抛出 `Lychee\validate\ValidateException`，HTTP 内核会自动捕获并返回 **400** 状态码，`msg` 字段取自校验器的实际错误信息：
 
@@ -175,7 +175,7 @@ $validate->extend('checkName', function ($value, $param, $data, $field) {
 $validate->rule(['name' => 'require|checkName'])->check($data);
 ```
 
-也可以在验证器子类中用 `checkXxx` 方法扩展（与 ThinkPHP 习惯一致），规则调度顺序为 `extend` > 内置 `Rule` > 子类 `checkXxx` 方法：
+也可以在验证器子类中用 `checkXxx` 方法扩展，规则调度顺序为 `extend` > 内置 `Rule` > 子类 `checkXxx` 方法：
 
 ```php
 class User extends Validate

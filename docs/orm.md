@@ -1,8 +1,8 @@
 # 数据库 ORM
 
-框架内置轻量级 ORM（命名空间 `Lychee\orm`），参考 ThinkORM 的常用 API 设计，专注于 IDE 友好与可读的实现。底层基于 PDO 直连 + 预编译语句，提供查询构造器、Active Record 模型、关联预加载、软删除、事务、断线重连、SQL 日志等能力。
+框架内置轻量级 ORM（命名空间 `Lychee\orm`），提供常用链式查询 API，专注于 IDE 友好与可读的实现。底层基于 PDO 直连 + 预编译语句，提供查询构造器、Active Record 模型、关联预加载、软删除、事务、断线重连、SQL 日志等能力。
 
-> 仅实现 ThinkORM 的常用功能子集；若需要更复杂的能力（视图模型、关联统计、事件订阅器等），请评估是否可用现有 API 组合实现。
+> 仅实现常用功能子集；若需要更复杂的能力（视图模型、关联统计、事件订阅器等），请评估是否可用现有 API 组合实现。
 
 ## 配置
 
@@ -661,7 +661,7 @@ try {
 
 ## 模型事件
 
-模型在新增、更新、删除前后会自动触发对应事件。推荐在模型内用**静态方法**声明回调（与 ThinkPHP 用法一致），也可以通过 `Model::event()` 注册**闭包**。
+模型在新增、更新、删除前后会自动触发对应事件。推荐在模型内用**静态方法**声明回调，也可以通过 `Model::event()` 注册**闭包**。
 
 ### 支持的事件
 
@@ -699,7 +699,7 @@ class User extends Model
     // 更新前拦截
     public static function onBeforeUpdate(User $user): bool|null
     {
-        if ($user->name === 'thinkphp') {
+        if ($user->name === 'forbidden') {
             return false; // 阻断本次更新
         }
         return null;
@@ -757,68 +757,3 @@ Db::connect('sqlite')->select('SELECT 1');
 | `Lychee\orm\exception\DbException` | 通用数据库异常（配置错误、SQL 异常等） |
 | `Lychee\orm\exception\DataNotFoundException` | `select()->failException()` 结果为空 |
 | `Lychee\orm\exception\ModelNotFoundException` | `findOrFail()` 查不到记录 |
-
----
-
-## 从 think-orm 迁移到 Lychee ORM
-
-框架内置 `orm:migrate` 命令，基于 PHP 词法分析（`token_get_all`）批量改写项目中 `think\*` 的 `use` 语句与 FQN 引用。仅替换符号，不改动业务逻辑、注释与格式。
-
-### 一键迁移
-
-```bash
-# 预览将会改写哪些文件（不写盘）
-php lee orm:migrate app --dry-run
-
-# 确认无误后执行实际替换
-php lee orm:migrate app
-```
-
-参数：
-
-- `path`（可选）：目标目录，相对项目根路径，默认 `app`
-- `--dry-run`：仅列出会被修改的文件清单，不实际写入
-
-命令会递归扫描目录下的所有 `.php` 文件，自动跳过 `vendor` / `node_modules` / `runtime` / `.git`，并对连续的名称 token 组合整体匹配，支持 fully-qualified（含前导 `\`）与大小写不敏感匹配。
-
-### 符号映射表
-
-| 旧符号（think-orm） | 新符号（Lychee ORM） |
-| --- | --- |
-| `think\Model` | `Lychee\orm\Model` |
-| `think\model\concern\SoftDelete` | `Lychee\orm\concern\SoftDelete` |
-| `think\model\relation\HasOne` | `Lychee\orm\relation\HasOne` |
-| `think\model\relation\HasMany` | `Lychee\orm\relation\HasMany` |
-| `think\model\relation\BelongsTo` | `Lychee\orm\relation\BelongsTo` |
-| `think\db\Query` | `Lychee\orm\Query` |
-| `think\facade\Db` | `Lychee\orm\facade\Db` |
-| `think\DbManager` | `Lychee\orm\ConnectionManager` |
-| `think\db\exception\DbException` | `Lychee\orm\exception\DbException` |
-| `think\db\exception\DataNotFoundException` | `Lychee\orm\exception\DataNotFoundException` |
-| `think\db\exception\ModelNotFoundException` | `Lychee\orm\exception\ModelNotFoundException` |
-
-> `think\Validate`、`think\exception\ValidateException` 等校验器相关符号不属于 ORM 范畴，命令不会改写。需要迁移时请手动替换为 `Lychee\validate\Validate` 与 `Lychee\validate\ValidateException`（见 [数据验证](./validation.md)）。
-
-### 迁移后需要手动检查的差异
-
-命令只做符号替换，以下行为差异需人工审阅：
-
-1. **模型属性强类型化**。新 Model 的 `$name` / `$pk` / `$table` 等属性为强类型（`protected string $name = '';`）。如果项目里原来写的是 `protected $name = 'users';`，PHP 可以兼容，但建议补上类型声明。
-2. **分页返回类型**。`Query::select()` 在无 Model 时返回 `array<array>`，在有 Model 时返回 `Collection<Model>`。原来直接 `->select()->toArray()` 对数组会报错；如果使用了框架内置 `Controller::paginate()` 则已自动兼容。
-3. **多对多 `belongsToMany`**。新 ORM 暂未实现多对多关联，使用 `belongsToMany` 的地方需要改成手工 join 或两次 `whereIn` 查询。
-4. **复杂查询方法**。本 ORM 实现了常用链式方法子集。若使用了不常见的 ThinkORM 方法（如 `whereExp` / `useSoftDelete` 的高级形式 / 查询范围 `scopeXxx` / 全局 scope / `withJoin`），需结合 `where` 闭包、`whereRaw` 或 `join` 手工重写。
-5. **模型事件订阅器**。新 ORM 事件通过 `Model::event('before_insert', fn($m) => ...)` 注册，不支持 ThinkORM 的 observer 类订阅方式，需要改成闭包风格。
-6. **分页**。`Query::paginate($page, $pageSize)` 已直接支持，返回 `['total','list','per_page','current_page','last_page']` 数组；控制器层也可使用 `Controller::paginate()` 直接输出分页 JSON 响应。ThinkPHP 的 `Db::table()->paginate(15)` 单参数写法需改成显式传 `$page`。
-
-### 迁移建议流程
-
-1. 先切换到干净的 Git 分支：`git switch -c migrate-orm`
-2. `php lee orm:migrate app --dry-run` 查看改写清单
-3. `php lee orm:migrate app` 实际执行
-4. 根据“手动检查差异”清单逐一审阅模型、关联、分页相关代码
-5. 跑一遍单元测试与关键接口冒烟测试
-6. 从 `composer.json` 移除 `watsonhaw/think-orm` 依赖，`composer update`
-
-### 回滚
-
-若需回滚，直接 `git checkout -- .` 或切回原分支即可——命令是文件级重写，无数据库变更。

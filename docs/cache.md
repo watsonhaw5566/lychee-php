@@ -101,9 +101,8 @@ cache('redis')->has('key');
 cache('redis')->delete('key');
 ```
 
-> 注意：本框架的 `cache()` 语义为「通道优先」，与 think-cache 原生助手
-> （`cache('key')` 直接读写键名）不同。读取键名为 `redis` 的缓存应写为
-> `cache()->get('redis')`。
+> 注意：本框架的 `cache()` 语义为「通道优先」，第一参数为通道名而非键名。
+> 读取键名为 `redis` 的缓存应写为 `cache()->get('redis')`。
 
 ## 数值计数
 
@@ -159,16 +158,3 @@ cache()->setMultiple(['key1' => 1, 'key2' => 2], 3600);
 // 批量删除
 cache()->deleteMultiple(['key1', 'key2']);
 ```
-
-## 从旧版 think-cache 助手迁移
-
-旧版助手以键名为第一参数，需按下表调整：
-
-| 旧写法 | 新写法 |
-|---|---|
-| `cache('key')` | `cache()->get('key')` |
-| `cache('key', $value)` | `cache()->set('key', $value)` |
-| `cache('key', $value, 3600)` | `cache()->set('key', $value, 3600)` |
-| `cache('?key')` | `cache()->has('key')` |
-| `cache('key', null)` | `cache()->delete('key')` |
-| `app('cache')->store('redis')->get('key')` | 保持不变（或 `cache('redis')->get('key')`） |

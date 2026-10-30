@@ -88,7 +88,7 @@ your-app/
 
 ## 应用公共文件 common.php
 
-在 `app/common.php` 中定义的函数会在框架启动时自动加载，可在全局范围内使用，类似 ThinkPHP 的 `common.php`。文件不存在时自动跳过，不影响启动。
+在 `app/common.php` 中定义的函数会在框架启动时自动加载，可在全局范围内使用。文件不存在时自动跳过，不影响启动。
 
 ```php
 // app/common.php

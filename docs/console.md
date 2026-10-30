@@ -78,7 +78,7 @@ php lee make:rest User
 | 文件 | 说明 |
 |------|------|
 | `app/controller/UserController.php` | 继承 `ResourceController`，自动绑定 Model 与 Validate，预置 6 个资源方法 |
-| `app/model/User.php` | 继承 `think\Model`，表名按类名自动推断 |
+| `app/model/User.php` | 继承 `Lychee\orm\Model`，表名按类名自动推断 |
 | `app/validate/UserValidate.php` | 继承 `Lychee\validate\Validate`，预置空的 `$rule` 与 `$message` |
 
 控制器自动绑定的资源路径为模型名的小写形式（`User` → `/user`），并生成以下方法骨架，方便直接修改业务逻辑：
