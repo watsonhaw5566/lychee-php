@@ -388,7 +388,7 @@ class UploadController extends Controller
 | `initialize()` | 初始化钩子，在中间件之后、方法调用前执行 |
 | `json($data, $status, $headers)` | 全局助手，组装任意结构的 JSON 响应 |
 | `$this->paginate($items, $page, $pageSize, $message, $httpStatus)` | 分页 JSON 响应 |
-| `$this->validateRequest($rules, $message)` | 一行完成取参 + 校验，失败抛 ValidateException（HTTP 400） |
+| `$this->validateRequest($rules, $message)` | 一行完成取参 + 校验（支持规则数组或验证器类名/场景），失败抛 ValidateException（HTTP 400） |
 
 > `Lychee\routing\ResourceController` 继承自此基类，因此资源控制器同样拥有以上能力。
 
@@ -492,6 +492,19 @@ public function save(): JsonResponse
 
     return json(['data' => $user]);
 }
+```
+
+除了规则数组，`validateRequest()` 也支持传入验证器类名（短名自动解析为 `app\validate\类名`）及场景语法：
+
+```php
+// 使用验证器类 app\validate\User
+$data = $this->validateRequest('User');
+
+// 使用验证器类的 edit 场景
+$data = $this->validateRequest('User.edit');
+
+// 完全限定类名
+$data = $this->validateRequest(\app\validate\User::class);
 ```
 
 > 资源控制器 `ResourceController` 另提供 `$this->validate($data, $validate)` 方法，
