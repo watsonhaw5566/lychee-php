@@ -12,6 +12,7 @@ use Lychee\orm\relation\BelongsTo;
 use Lychee\orm\relation\HasMany;
 use Lychee\orm\relation\HasOne;
 use Lychee\orm\relation\Relation;
+use Throwable;
 
 /**
  * ORM 模型基类（Active Record）。
@@ -60,7 +61,6 @@ use Lychee\orm\relation\Relation;
  * @method static Query join(string $table, string $condition, string $type = 'INNER')
  * @method static Query leftJoin(string $table, string $condition)
  * @method static Query rightJoin(string $table, string $condition)
- * @method static Query with(string|array $relations)
  * @method static Query append(string|array $attrs)
  * @method static Query hidden(array $fields)
  * @method static Query visible(array $fields)
@@ -1083,6 +1083,30 @@ abstract class Model implements ArrayAccess, JsonSerializable
     protected function studly(string $value): string
     {
         return str_replace(' ', '', ucwords(str_replace(['-', '_'], ' ', $value)));
+    }
+
+    /**
+     * 判断字段是否定义了访问器（getXxxAttr）。
+     */
+    public function isAccessor(string $name): bool
+    {
+        return method_exists($this, 'get' . $this->studly($name) . 'Attr');
+    }
+
+    /**
+     * 判断字段是否为关联方法（返回 Relation 实例）。
+     */
+    public function isRelation(string $name): bool
+    {
+        if (!method_exists($this, $name) || $this->hasAttr($name)) {
+            return false;
+        }
+
+        try {
+            return $this->{$name}() instanceof Relation;
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     public function getData(): array

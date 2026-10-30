@@ -62,16 +62,14 @@ abstract class ResourceController extends Controller
     protected array $pageFields = ['current', 'pageSize'];
 
     /**
-     * index / read 时预加载的关联列表。
+     * index / read 时需要的关联与追加属性（混合列表，自动分流）。
+     *
+     * 代码会自动判断每个名字是关联（走 with）还是访问器（走 append），
+     * 调用方无需区分两者顺序。
+     *
      * @var array<int, string>
      */
-    protected array $with = [];
-
-    /**
-     * index / read 时追加的访问器属性列表。
-     * @var array<int, string>
-     */
-    protected array $append = [];
+    protected array $relations = [];
 
     // ── 验证快捷方式 ────────────────────────────────────────────────
 
@@ -257,6 +255,32 @@ abstract class ResourceController extends Controller
         return substr($field, 0, -strlen($suffix));
     }
 
+    /**
+     * 将混合的 relations 列表拆分为 [关联列表, 追加属性列表]。
+     *
+     * 判定规则（与 ORM 内部一致）：
+     *   - 存在 getXxxAttr 方法        → append（访问器）
+     *   - 存在同名方法且返回 Relation  → with（关联）
+     *   - 都不匹配则忽略
+     *
+     * @return array{0: array<int, string>, 1: array<int, string>}
+     */
+    protected function splitRelations(Model $model, array $relations): array
+    {
+        $with   = [];
+        $append = [];
+
+        foreach ($relations as $name) {
+            if ($model->isAccessor($name)) {
+                $append[] = $name;
+            } elseif ($model->isRelation($name)) {
+                $with[] = $name;
+            }
+        }
+
+        return [$with, $append];
+    }
+
     // ── 数据权限（由 HasDataPermission trait 覆盖）──────────────────
 
     /**
@@ -324,7 +348,7 @@ abstract class ResourceController extends Controller
             $where = $all;
         }
 
-        return $this->baseIndex($where, $current, $pageSize, $this->append, $this->with);
+        return $this->baseIndex($where, $current, $pageSize, $this->relations);
     }
 
     /**
@@ -336,15 +360,13 @@ abstract class ResourceController extends Controller
      * @param array $where 查询条件（支持 _like / _range / _between / _in 后缀 DSL）
      * @param int $current 当前页码
      * @param int $pageSize 每页条数
-     * @param array $append 追加属性
-     * @param array $with 关联预加载
+     * @param array $relations 关联与追加属性的混合列表（自动分流到 with / append）
      */
     protected function baseIndex(
         array $where = [],
         int   $current = 1,
         int   $pageSize = 20,
-        array $append = [],
-        array $with = [],
+        array $relations = [],
     ): JsonResponse {
         try {
             $order = $this->request->param('order', $this->order);
@@ -360,11 +382,12 @@ abstract class ResourceController extends Controller
             $query = $this->getModelClass()->db();
             $this->applyWhere($query, $where);
 
-            if (!empty($append)) {
-                $query->append($append);
-            }
-            if (!empty($with)) {
+            [$with, $append] = $this->splitRelations($query->getModel(), $relations);
+            if ($with) {
                 $query->with($with);
+            }
+            if ($append) {
+                $query->append($append);
             }
 
             if (is_string($order)) {
@@ -449,22 +472,23 @@ abstract class ResourceController extends Controller
 
     public function read(int $id): JsonResponse
     {
-        return $this->baseRead($id, $this->append, $this->with);
+        return $this->baseRead($id, $this->relations);
     }
 
     /**
      * 通用读取方法（可被子类复用）。
      *
      * @param int $id 主键 ID
-     * @param array $append 追加属性
-     * @param array $with 关联预加载
+     * @param array $relations 关联与追加属性的混合列表（自动分流到 with / append）
      */
-    protected function baseRead(int $id, array $append = [], array $with = []): JsonResponse
+    protected function baseRead(int $id, array $relations = []): JsonResponse
     {
         try {
             $query = $this->getModelClass()->db();
 
-            if (!empty($with)) {
+            [$with, $append] = $this->splitRelations($query->getModel(), $relations);
+
+            if ($with) {
                 $query->with($with);
             }
 
@@ -481,7 +505,7 @@ abstract class ResourceController extends Controller
                 ]);
             }
 
-            if (!empty($append)) {
+            if ($append) {
                 $data->append($append);
             }
 
