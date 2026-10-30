@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Lychee\orm;
 
+use ArrayAccess;
 use JsonSerializable;
 
 /**
  * 分页结果对象。
  *
- * 通过语义化方法访问分页数据：
+ * 同时支持语义化方法与数组访问（ArrayAccess）：
  *   $paginator->items()       // 当前页数据数组（自动 ->all()）
  *   $paginator->total()       // 总记录数
  *   $paginator->perPage()     // 每页条数
@@ -17,9 +18,12 @@ use JsonSerializable;
  *   $paginator->lastPage()    // 最后一页
  *   $paginator->isEmpty()     // 是否为空
  *
- * 避免每次都写 `$paginator['list']->all()` 的样板代码。
+ *   $paginator['list']        // 数组访问（兼容 ThinkPHP 写法）
+ *   $paginator['total']
+ *   $paginator['current']     // 当前页
+ *   $paginator['pageSize']    // 每页条数
  */
-class Paginator implements JsonSerializable
+class Paginator implements ArrayAccess, JsonSerializable
 {
     protected int $total;
 
@@ -106,24 +110,80 @@ class Paginator implements JsonSerializable
         return is_array($this->list) ? count($this->list) : $this->list->count();
     }
 
+    // ── ArrayAccess ────────────────────────────────────────────────
+
+    /**
+     * 支持键：total / list / current / pageSize / current_page / per_page / last_page。
+     *
+     * @param mixed $offset
+     */
+    public function offsetExists(mixed $offset): bool
+    {
+        return in_array($offset, ['total', 'list', 'current', 'pageSize', 'current_page', 'per_page', 'last_page'], true);
+    }
+
+    /**
+     * @param mixed $offset
+     * @return mixed
+     */
+    public function offsetGet(mixed $offset): mixed
+    {
+        return match ($offset) {
+            'total'        => $this->total,
+            'list'         => $this->list,
+            'current'      => $this->currentPage,
+            'pageSize'     => $this->perPage,
+            'current_page' => $this->currentPage,
+            'per_page'     => $this->perPage,
+            'last_page'    => $this->lastPage,
+            default        => null,
+        };
+    }
+
+    /**
+     * 分页结果只读，禁止写入。
+     *
+     * @param mixed $offset
+     * @param mixed $value
+     */
+    public function offsetSet(mixed $offset, mixed $value): void
+    {
+        // no-op
+    }
+
+    /**
+     * 分页结果只读，禁止删除。
+     *
+     * @param mixed $offset
+     */
+    public function offsetUnset(mixed $offset): void
+    {
+        // no-op
+    }
+
     // ── 序列化 ─────────────────────────────────────────────────────
 
     /**
-     * @return array{total:int, list:array, per_page:int, current_page:int, last_page:int}
+     * 同时输出驼峰（current / pageSize）与下划线（current_page / per_page）两套键名，
+     * 兼容 ThinkPHP 风格与前端驼峰习惯。
+     *
+     * @return array{total:int, list:array, current:int, pageSize:int, current_page:int, per_page:int, last_page:int}
      */
     public function jsonSerialize(): array
     {
         return [
             'total'        => $this->total,
             'list'         => $this->list instanceof Collection ? $this->list->toArray() : $this->list,
-            'per_page'     => $this->perPage,
+            'current'      => $this->currentPage,
+            'pageSize'     => $this->perPage,
             'current_page' => $this->currentPage,
+            'per_page'     => $this->perPage,
             'last_page'    => $this->lastPage,
         ];
     }
 
     /**
-     * @return array{total:int, list:array, per_page:int, current_page:int, last_page:int}
+     * @return array{total:int, list:array, current:int, pageSize:int, current_page:int, per_page:int, last_page:int}
      */
     public function toArray(): array
     {
