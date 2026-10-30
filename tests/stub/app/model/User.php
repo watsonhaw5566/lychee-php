@@ -18,5 +18,5 @@ use Lychee\orm\Model;
  */
 class User extends Model
 {
-    protected ?string $name = 'users';
+    protected string $name = 'users';
 }

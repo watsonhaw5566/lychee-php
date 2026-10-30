@@ -105,8 +105,8 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /** 完整数据表名（含前缀）；为空时按 name 或类名推断 */
     protected string $table = '';
 
-    /** 不含前缀的表名（将自动拼接连接的 prefix）；为 null 时从类名自动推断 */
-    protected ?string $name = null;
+    /** 不含前缀的表名（将自动拼接连接的 prefix）；为空时从类名自动推断 */
+    protected string $name = '';
 
     /** 表名后缀（用于分表） */
     protected string $suffix = '';
@@ -275,7 +275,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
             return $this->table . $this->suffix;
         }
 
-        $name   = $this->name !== null ? $this->name : $this->inferTableName();
+        $name   = $this->name !== '' ? $this->name : $this->inferTableName();
         $prefix = (string) $this->getConnection()->getConfig('prefix', '');
 
         return $prefix . $name . $this->suffix;

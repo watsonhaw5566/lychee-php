@@ -388,8 +388,8 @@ use Lychee\orm\Model;
 class User extends Model
 {
     // 不含前缀的表名（将自动拼接连接的 prefix）；
-    // 不声明时自动从类名推断（User -> user，UserOrder -> user_order）
-    protected ?string $name = 'users';
+    // 留空（默认 ''）时自动从类名推断（User -> user，UserOrder -> user_order）
+    protected string $name = 'users';
 
     // 或直接指定完整表名
     // protected string $table = 'pre_users';
@@ -405,8 +405,8 @@ class User extends Model
 }
 ```
 
-> **表名自动推断**：`$name` 为 `null`（默认值）时，框架从类名推断表名（去命名空间、驼峰转下划线）。
-> 例如 `app\model\UserOrder` → `user_order`。需要显式指定时声明 `protected ?string $name = 'xxx'`。
+> **表名自动推断**：`$name` 为空字符串 `''`（默认值）时，框架从类名推断表名（去命名空间、驼峰转下划线）。
+> 例如 `app\model\UserOrder` → `user_order`。需要显式指定时声明 `protected string $name = 'xxx'`。
 >
 > **字段名冲突防护**：`hidden` / `visible` / `append` / `json` / `readonly` / `disuse` / `type` / `field`
 > 等配置统一收敛到 `$modelConfig` 数组，不再占用模型属性名空间。因此即使数据库存在同名字段
