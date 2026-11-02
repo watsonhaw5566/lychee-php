@@ -95,6 +95,22 @@ abstract class Relation
     }
 
     /**
+     * 父模型上用于关联的键名。
+     *
+     * - HasMany / HasOne：localKey（父表本地键，通常是 id）
+     * - BelongsTo：foreignKey（当前模型上的外键）
+     */
+    abstract public function getParentKey(): string;
+
+    /**
+     * 子模型（关联表）上用于匹配的键名。
+     *
+     * - HasMany / HasOne：foreignKey（子表外键）
+     * - BelongsTo：localKey（目标模型的本地键，通常是 id）
+     */
+    abstract public function getRelatedKey(): string;
+
+    /**
      * lazy 加载当前关联。
      *
      * @return TRelated|Collection<array-key, TRelated>|null
@@ -108,6 +124,44 @@ abstract class Relation
      * @param string            $name   关联在父模型上的属性名
      */
     abstract public function eagerLoad(array $models, string $name): void;
+
+    /**
+     * 统计每个父模型的关联记录数。
+     *
+     * 内部执行一条 `GROUP BY` 聚合查询，避免 N+1。
+     *
+     * @param  array<int, Model> $models 父模型列表
+     * @return array<mixed, int>         父模型关联键 => 数量
+     */
+    public function getRelationCount(array $models): array
+    {
+        $keys = $this->collectKeys($models, $this->getParentKey());
+        if ($keys === []) {
+            return [];
+        }
+
+        $relatedKey = $this->getRelatedKey();
+
+        // 用 field 别名 + group by 实现计数，复用现有查询构造器
+        $rows = $this->query
+            ->field("{$relatedKey} AS related_key, COUNT(*) AS aggregate_count")
+            ->whereIn($relatedKey, $keys)
+            ->group($relatedKey)
+            ->select();
+
+        $result = [];
+        if (is_array($rows)) {
+            foreach ($rows as $row) {
+                $result[$row['related_key']] = (int) $row['aggregate_count'];
+            }
+        } else {
+            foreach ($rows->all() as $model) {
+                $result[$model->getAttr('related_key')] = (int) $model->getAttr('aggregate_count');
+            }
+        }
+
+        return $result;
+    }
 
     /**
      * 从父模型列表抽出关联键集合。

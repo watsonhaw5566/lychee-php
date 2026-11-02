@@ -19,6 +19,16 @@ use Lychee\orm\Model;
  */
 class BelongsTo extends Relation
 {
+    public function getParentKey(): string
+    {
+        return $this->foreignKey;
+    }
+
+    public function getRelatedKey(): string
+    {
+        return $this->localKey;
+    }
+
     public function getResults(): ?Model
     {
         $value = $this->parent->getAttr($this->foreignKey);

@@ -163,6 +163,9 @@ $sum   = Db::table('orders')->sum('amount');
 $avg   = Db::table('users')->avg('age');
 $max   = Db::table('users')->max('age');
 
+// 判断是否存在匹配记录（比 count() > 0 更高效，命中首行即返回）
+Db::table('users')->where('status', 1)->exists();       // true / false
+
 // 指定字段
 Db::table('users')->field('id,name')->select();
 Db::table('users')->field(['id', 'name'])->select();
@@ -761,6 +764,33 @@ $user = User::find(1);
 $user->profile; // 自动触发查询
 $user->posts;
 ```
+
+### 关联计数 withCount
+
+需要在列表中展示关联记录数（如"每个用户的文章数"）时，用 `withCount()` 预加载计数，
+结果以 `{relation}_count` 字段附加到模型实例，避免 N+1 查询。
+
+```php
+// 单个关联计数
+$users = User::withCount('posts')->select();
+foreach ($users as $user) {
+    echo $user->posts_count; // 该用户的文章数
+}
+
+// 同时统计多个关联
+$users = User::withCount(['posts', 'orders'])->select();
+echo $users[0]->posts_count;
+echo $users[0]->orders_count;
+
+// 单条查询同样支持
+$user = User::withCount('posts')->find(1);
+echo $user->posts_count;
+
+// toArray / JSON 序列化时会自动包含 {relation}_count 字段
+```
+
+> 内部对每个关联执行一条 `GROUP BY` 聚合查询统计数量，关联数为 0 的模型也会正确写入 `0`。
+> `withCount` 结果仅附加到内存中的模型实例，不会写入数据库（不在表字段白名单内，`save()` 时自动忽略）。
 
 ### 软删除
 

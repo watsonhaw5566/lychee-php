@@ -8,6 +8,7 @@ use Closure;
 use Lychee\orm\exception\DataNotFoundException;
 use Lychee\orm\exception\DbException;
 use Lychee\orm\exception\ModelNotFoundException;
+use Lychee\orm\relation\Relation;
 use Generator;
 use PDO;
 use Throwable;
@@ -75,6 +76,9 @@ class Query
 
     /** @var array<int, string> 关联预加载列表 */
     protected array $with = [];
+
+    /** @var array<int, string> 关联计数预加载列表（结果以 {relation}_count 附加到模型） */
+    protected array $withCount = [];
 
     /** @var array<int, string> 追加虚拟字段 */
     protected array $append = [];
@@ -615,6 +619,26 @@ class Query
     }
 
     /**
+     * 预加载关联计数，结果以 `{relation}_count` 字段附加到模型实例。
+     *
+     * 用法：
+     *   User::withCount('posts')->select();
+     *   // 每个 $user 上有 $user->posts_count
+     *
+     * 支持同时统计多个关联：
+     *   User::withCount(['posts', 'orders'])->select();
+     *
+     * @param string|array<int, string> $relations
+     */
+    public function withCount(string|array $relations): static
+    {
+        $relations       = is_array($relations) ? $relations : [$relations];
+        $this->withCount = array_values(array_unique(array_merge($this->withCount, $relations)));
+
+        return $this;
+    }
+
+    /**
      * @param string|array<int, string> $attrs
      */
     public function append(string|array $attrs): static
@@ -752,6 +776,9 @@ class Query
             if ($this->with !== []) {
                 $this->model::eagerLoadRelations([$model], $this->with);
             }
+            if ($this->withCount !== []) {
+                $this->eagerLoadCounts([$model], $this->withCount);
+            }
 
             return $model;
         }
@@ -792,6 +819,10 @@ class Query
                 $this->model::eagerLoadRelations($items, $this->with);
             }
 
+            if ($this->withCount !== []) {
+                $this->eagerLoadCounts($items, $this->withCount);
+            }
+
             if ($items === [] && $this->failOnEmpty) {
                 throw new DataNotFoundException('data not found: ' . $this->model::class);
             }
@@ -816,6 +847,43 @@ class Query
         }
         if ($this->append !== []) {
             $model->append($this->append);
+        }
+    }
+
+    /**
+     * 预加载关联计数，把结果以 `{relation}_count` 写入每个模型实例。
+     *
+     * 每个关联执行一条 GROUP BY 聚合查询，避免 N+1。
+     *
+     * @param array<int, Model> $models
+     * @param array<int, string> $relations
+     */
+    protected function eagerLoadCounts(array $models, array $relations): void
+    {
+        if ($models === [] || $relations === []) {
+            return;
+        }
+
+        foreach ($relations as $relation) {
+            // 暂不支持点号嵌套的 withCount
+            $name = str_contains($relation, '.') ? strstr($relation, '.', true) : $relation;
+            if (!$name || !method_exists($models[0], (string) $name)) {
+                continue;
+            }
+            /** @var Relation $relationObj */
+            $relationObj = $models[0]->{$name}();
+            if (!$relationObj instanceof Relation) {
+                continue;
+            }
+
+            $counts     = $relationObj->getRelationCount($models);
+            $parentKey  = $relationObj->getParentKey();
+            $countField = $name . '_count';
+
+            foreach ($models as $m) {
+                $key = $m->getAttr($parentKey);
+                $m->setAttr($countField, $counts[$key] ?? 0);
+            }
         }
     }
 
@@ -1029,6 +1097,28 @@ class Query
     }
 
     // ── Aggregates ──────────────────────────────────────────────────
+
+    /**
+     * 判断当前查询是否存在匹配记录。
+     *
+     * 使用 `SELECT 1 ... LIMIT 1`，比 `count() > 0` 更高效（数据库命中首行即返回）。
+     */
+    public function exists(): bool
+    {
+        $bindings = [];
+        $sql      = 'SELECT 1 FROM ' . $this->tableClause();
+
+        foreach ($this->joins as $join) {
+            $sql .= ' ' . $join['type'] . ' JOIN ' . $this->wrapTable($join['table']) . ' ON ' . $join['condition'];
+        }
+
+        $sql .= $this->compileWheres($bindings);
+        $sql .= ' LIMIT 1';
+
+        $rows = $this->connection->select($sql, $bindings);
+
+        return $rows !== [];
+    }
 
     public function count(string $field = '*'): int
     {
