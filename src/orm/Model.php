@@ -94,6 +94,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /** 已解析的数据表字段元信息缓存 */
     protected static array $tableFieldsCache = [];
 
+    /** 字段类型推导结果缓存，键为 'connection:table:field'，值为 ORM 标准类型或 'null' 标记 */
+    protected static array $typeInferenceCache = [];
+
     /** 已解析的 PHPDoc @property 注解缓存，供 ide-helper 复用 */
     protected static array $modelMetaCache = [];
 
@@ -698,12 +701,102 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
     protected function getFieldType(string $name): ?string
     {
+        // 1. 优先使用手动配置的 $type
         if (isset($this->modelConfig['type'][$name])) {
             return (string) $this->modelConfig['type'][$name];
         }
+
+        // 2. 检查 $json 列表
         if (in_array($name, $this->modelConfig['json'], true)) {
             return 'json';
         }
+
+        // 3. 从数据库元信息自动推导类型
+        return $this->inferFieldType($name);
+    }
+
+    /**
+     * 从数据库字段元信息推导字段类型。
+     *
+     * 支持自动推导 int / float / json 三种常见类型，
+     * 避免手动配置 $type 和 $json。
+     *
+     * 推导规则：
+     *   MySQL:
+     *     - int/bigint/smallint/tinyint/mediumint 或 *int unsigned → 'int'
+     *     - float/double/decimal → 'float'
+     *     - json → 'json'
+     *   SQLite:
+     *     - INTEGER → 'int'
+     *     - REAL/NUMERIC → 'float'
+     *     - BLOB (当列名包含 json 标记) → 'json'
+     */
+    protected function inferFieldType(string $name): ?string
+    {
+        try {
+            $table  = $this->getTable();
+            $key    = $this->connection . ':' . $table . ':' . $name;
+            $cached = self::$typeInferenceCache[$key] ?? null;
+
+            if ($cached !== null) {
+                return $cached; // 返回缓存值（可能为 'null'，表示无推导结果）
+            }
+
+            $fields = $this->getConnection()->getFields($table);
+            if (!isset($fields[$name])) {
+                self::$typeInferenceCache[$key] = 'null';
+
+                return null;
+            }
+
+            $dbType = strtolower($fields[$name]['type'] ?? '');
+            $mapped = self::mapDatabaseType($dbType);
+
+            self::$typeInferenceCache[$key] = $mapped ?? 'null';
+
+            return $mapped;
+        } catch (Throwable) {
+            // 获取表结构失败时静默跳过，保持原行为
+            return null;
+        }
+    }
+
+    /**
+     * 将数据库字段类型映射到 ORM 标准类型。
+     *
+     * @param string $dbType 数据库返回的字段类型（如 'int(11)'、'decimal(10,2)'、'json' 等）
+     * @return string|null ORM 标准类型（'int'/'float'/'json'）或 null
+     */
+    protected static function mapDatabaseType(string $dbType): ?string
+    {
+        // 去除末尾的注释和空格
+        $dbType = trim($dbType);
+
+        // 处理 MySQL 类型
+        if (str_contains($dbType, 'int')) {
+            // int / bigint / smallint / tinyint / mediumint / INT UNSIGNED / BIGINT UNSIGNED 等
+            return 'int';
+        }
+
+        if (str_contains($dbType, 'float') || str_contains($dbType, 'double') || str_contains($dbType, 'decimal')) {
+            return 'float';
+        }
+
+        if (str_contains($dbType, 'json')) {
+            return 'json';
+        }
+
+        // 处理 SQLite 类型
+        if ($dbType === 'integer' || $dbType === 'int') {
+            return 'int';
+        }
+
+        if ($dbType === 'real' || str_contains($dbType, 'numeric')) {
+            return 'float';
+        }
+
+        // TEXT 类型如果列名包含 json 相关标记（备选），这里不处理，
+        // 因为 TEXT 通常用于普通字符串，json 应显式通过 $json 配置或数据库的 'json' 类型
 
         return null;
     }

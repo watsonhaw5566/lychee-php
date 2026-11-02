@@ -574,6 +574,65 @@ class User extends Model
 }
 ```
 
+#### 类型推导优先级
+
+ORM 采用三层优先级自动推导字段类型，**无需手动配置大多数常见字段**：
+
+1. **手动配置优先** - `$type` 属性明确指定的类型最高优先
+2. **$json 列表其次** - `$json` 数组中声明的字段标记为 `json` 类型
+3. **自动推导最后** - 从数据库表结构自动推导字段类型
+
+因此可以大幅简化模型配置，直接删除自动推导支持的字段声明：
+
+```php
+class Order extends Model
+{
+    // 之前需要手动配置的字段现在可以省去
+    // protected array $type = [
+    //     'id'         => 'int',           // 数据库 int/bigint 自动推导为 int
+    //     'user_id'    => 'int',           // 外键字段自动推导
+    //     'price'      => 'float',         // 数据库 decimal/float 自动推导为 float
+    //     'amount'     => 'float',
+    //     'metadata'   => 'json',          // 数据库 json 自动推导为 json
+    // ];
+
+    // 仅保留需要显式指定的字段（如自定义序列化需求）
+    protected array $type = [
+        'created_at' => 'datetime',        // 时间戳自定义格式需要显式指定
+    ];
+
+    protected array $json = ['extra'];     // 或保留 $json，两者等价
+}
+```
+
+#### 自动推导支持的类型
+
+| 数据库类型 | ORM 标准类型 | 说明 |
+| --- | --- | --- |
+| `INT` / `INTEGER` / `BIGINT` / `SMALLINT` | `int` | 整数类型（MySQL int/bigint/smallint；SQLite INTEGER） |
+| `DECIMAL` / `FLOAT` / `DOUBLE` / `REAL` | `float` | 浮点类型（MySQL decimal/float/double；SQLite REAL） |
+| `JSON` | `json` | JSON 类型（MySQL json；SQLite 存储为 TEXT 但声明为 JSON） |
+
+#### 缓存机制
+
+字段类型推导结果会被缓存，避免重复查询数据库表结构。缓存键格式为 `connection:table:field`，存储在静态属性 `$typeInferenceCache` 中，整个应用生命周期有效。
+
+#### 多数据库支持
+
+自动推导支持 **MySQL** 和 **SQLite** 两种数据库：
+
+- **MySQL**：识别 `int(11)` / `decimal(10,2)` 等带参数的类型
+- **SQLite**：识别 `INTEGER` / `REAL` 等标准类型
+
+#### 手动配置场景
+
+仍需手动配置 `$type` 的场景：
+
+- 时间戳字段需要自定义序列化格式（如 `timestamp` / `datetime`）
+- 某个整数字段不需要自动类型转换，保持字符串形式
+- 自定义类型转换逻辑（覆盖 `readTransform()` / `writeTransform()` 方法）
+- 为向后兼容性维持现有手动配置
+
 ### 废弃字段 `$disuse`
 
 当数据表存在历史遗留的废弃字段，可在模型里声明让 ORM 在查询与写入时自动忽略：
