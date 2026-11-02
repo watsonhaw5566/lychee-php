@@ -17,6 +17,16 @@ use Lychee\orm\Model;
  */
 class HasMany extends Relation
 {
+    public function getParentKey(): string
+    {
+        return $this->localKey;
+    }
+
+    public function getRelatedKey(): string
+    {
+        return $this->foreignKey;
+    }
+
     public function getResults(): Collection
     {
         $value = $this->parent->getAttr($this->localKey);

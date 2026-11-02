@@ -62,6 +62,8 @@ use ReflectionClass;
  * @method static Query join(string $table, string $condition, string $type = 'INNER')
  * @method static Query leftJoin(string $table, string $condition)
  * @method static Query rightJoin(string $table, string $condition)
+ * @method static Query with(string|array $relations)
+ * @method static Query withCount(string|array $relations)
  * @method static Query append(string|array $attrs)
  * @method static Query hidden(array $fields)
  * @method static Query visible(array $fields)
