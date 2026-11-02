@@ -2,8 +2,6 @@
 
 框架内置了一个轻量级验证码模块 `Lychee\captcha\Captcha`，支持**图形验证码**和**短信验证码**两种类型，共享同一套"生成-存储-过期-校验-作废"内核。
 
-核心实现位于 [Captcha.php](file:///Users/wangjue/PhpstormProjects/ant/lychee-php/src/captcha/Captcha.php)。
-
 ## 启用模块
 
 Captcha 是按需加载的可选模块。在 `config/` 目录下创建 `captcha.php` 配置文件即可自动启用：
