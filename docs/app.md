@@ -217,3 +217,121 @@ $debug = (bool) config('app.debug', env('APP_DEBUG', false));
 ::: tip
 生产环境务必设置 `APP_DEBUG=false` 且 `show_error_msg=false`，避免泄露服务器内部信息。
 :::
+
+## 调试输出 dump & dd
+
+框架提供 `dump()` 与 `dd()` 两个全局辅助函数，用于在开发过程中快速查看变量内容，无需再使用原生 `var_dump()` / `print_r()`。
+
+### 基本用法
+
+```php
+// 输出变量内容，继续执行后续代码
+dump($user);
+
+// 同时输出多个变量
+dump($user, $order, $cart);
+
+// 输出变量内容后终止执行（dump and die）
+dd($user);
+```
+
+### 输出模式
+
+框架会根据运行环境与调试模式自动选择输出格式：
+
+| 环境 | 调试模式 | 输出格式 |
+| --- | --- | --- |
+| CLI | 任意 | ANSI 彩色文本 |
+| Web | `APP_DEBUG=true` | 带样式的 HTML（配色与异常页一致，支持深色模式） |
+| Web | `APP_DEBUG=false` | 纯文本（不注入样式标签，避免影响页面布局） |
+
+#### CLI 输出示例
+
+```
+stdClass {
+  +name: "lychee" (6)
+  +tags: array:3 [
+    0 => "framework" (9)
+    1 => "php" (3)
+    2 => "lightweight" (11)
+  ]
+  +active: true
+  +count: 42
+}
+```
+
+#### Web 输出
+
+Web 调试模式下，输出会包裹在 `<pre class="lychee-dump">` 中，配色沿用荔枝品牌色系（主色 `#D6336C`、叶绿 `#7CB342`、果蒂棕 `#C19A6B`），并通过 CSS 变量自动适配页面的深色模式（`<html data-theme="dark">`）。
+
+### 支持的数据类型
+
+| 类型 | 输出说明 |
+| --- | --- |
+| `null` | `null` |
+| `bool` | `true` / `false` |
+| `int` / `float` | 数值本身 |
+| `string` | `"内容" (字节长度)` |
+| `array` | `array:元素数 [ ... ]` |
+| `object` | `类名 { 属性列表 }` |
+| `resource` | `resource(类型)` |
+
+### 对象属性可见性
+
+对象属性会通过反射读取（含 `private` / `protected`），并在属性名前标注可见性前缀：
+
+| 前缀 | 含义 |
+| --- | --- |
+| `+` | public |
+| `#` | protected |
+| `-` | private |
+
+```php
+class User
+{
+    public string $name = 'lychee';
+    protected string $email = 'dev@example.com';
+    private string $password = 'secret';
+}
+
+dump(new User());
+```
+
+输出：
+
+```
+User {
+  +name: "lychee" (6)
+  #email: "dev@example.com" (15)
+  -password: "secret" (6)
+}
+```
+
+### 自定义调试信息
+
+如果对象实现了 `__debugInfo()` 方法，框架会优先使用该方法的返回值作为属性列表，便于隐藏敏感字段：
+
+```php
+class User
+{
+    public string $name = 'lychee';
+    private string $password = 'secret';
+
+    /** @return array<string, mixed> */
+    public function __debugInfo(): array
+    {
+        return [
+            'name' => $this->name,
+            // password 不会出现在 dump 输出中
+        ];
+    }
+}
+```
+
+### 循环引用与深度限制
+
+框架内置循环引用检测，遇到已访问过的对象会标记为 `*RECURSION*`，避免无限递归。同时默认最大递归深度为 50 层，超出部分以 `…` 截断。
+
+::: warning
+`dump()` / `dd()` 是开发调试工具，生产环境中应确保已移除相关调用，避免在响应中输出敏感数据。
+:::
