@@ -62,14 +62,16 @@ abstract class ResourceController extends Controller
     protected array $pageFields = ['current', 'pageSize'];
 
     /**
-     * index / read 时需要的关联与追加属性（混合列表，自动分流）。
+     * index / read 时需要追加的属性与关联（混合列表，统一走 append）。
      *
-     * 代码会自动判断每个名字是关联（走 with）还是访问器（走 append），
-     * 调用方无需区分两者顺序。
+     * append() 会自动区分：
+     *   - 访问器字段（getXxxAttr）→ 调用访问器输出
+     *   - 关联方法（hasOne / hasMany / belongsTo）→ 自动预加载后输出
+     * 关联名支持蛇形（ad_platform）与驼峰（adPlatform），输出 key 与传入名一致。
      *
      * @var array<int, string>
      */
-    protected array $relations = [];
+    protected array $append = [];
 
     // ── 验证快捷方式 ────────────────────────────────────────────────
 
@@ -255,32 +257,6 @@ abstract class ResourceController extends Controller
         return substr($field, 0, -strlen($suffix));
     }
 
-    /**
-     * 将混合的 relations 列表拆分为 [关联列表, 追加属性列表]。
-     *
-     * 判定规则（与 ORM 内部一致）：
-     *   - 存在 getXxxAttr 方法        → append（访问器）
-     *   - 存在同名方法且返回 Relation  → with（关联）
-     *   - 都不匹配则忽略
-     *
-     * @return array{0: array<int, string>, 1: array<int, string>}
-     */
-    protected function splitRelations(Model $model, array $relations): array
-    {
-        $with   = [];
-        $append = [];
-
-        foreach ($relations as $name) {
-            if ($model->isAccessor($name)) {
-                $append[] = $name;
-            } elseif ($model->isRelation($name)) {
-                $with[] = $name;
-            }
-        }
-
-        return [$with, $append];
-    }
-
     // ── 数据权限（由 HasDataPermission trait 覆盖）──────────────────
 
     /**
@@ -348,7 +324,7 @@ abstract class ResourceController extends Controller
             $where = $all;
         }
 
-        return $this->baseIndex($where, $current, $pageSize, $this->relations);
+        return $this->baseIndex($where, $current, $pageSize, $this->append);
     }
 
     /**
@@ -360,13 +336,13 @@ abstract class ResourceController extends Controller
      * @param array $where 查询条件（支持 _like / _range / _between / _in 后缀 DSL）
      * @param int $current 当前页码
      * @param int $pageSize 每页条数
-     * @param array $relations 关联与追加属性的混合列表（自动分流到 with / append）
+     * @param array $append 追加属性与关联的混合列表（统一走 append，关联自动预加载）
      */
     protected function baseIndex(
         array $where = [],
         int   $current = 1,
         int   $pageSize = 20,
-        array $relations = [],
+        array $append = [],
     ): JsonResponse {
         try {
             $order = $this->request->param('order', $this->order);
@@ -378,14 +354,10 @@ abstract class ResourceController extends Controller
 
             // 注意：必须先通过 db() 拿到 Query 对象。
             // Model::__call 每次都会创建新的 Query，直接在 Model 上调用
-            // where/order/append/with 返回值会被丢弃，导致条件不生效。
+            // where/order/append 返回值会被丢弃，导致条件不生效。
             $query = $this->getModelClass()->db();
             $this->applyWhere($query, $where);
 
-            [$with, $append] = $this->splitRelations($query->getModel(), $relations);
-            if ($with) {
-                $query->with($with);
-            }
             if ($append) {
                 $query->append($append);
             }
@@ -472,24 +444,22 @@ abstract class ResourceController extends Controller
 
     public function read(int $id): JsonResponse
     {
-        return $this->baseRead($id, $this->relations);
+        return $this->baseRead($id, $this->append);
     }
 
     /**
      * 通用读取方法（可被子类复用）。
      *
      * @param int $id 主键 ID
-     * @param array $relations 关联与追加属性的混合列表（自动分流到 with / append）
+     * @param array $append 追加属性与关联的混合列表（统一走 append，关联自动预加载）
      */
-    protected function baseRead(int $id, array $relations = []): JsonResponse
+    protected function baseRead(int $id, array $append = []): JsonResponse
     {
         try {
             $query = $this->getModelClass()->db();
 
-            [$with, $append] = $this->splitRelations($query->getModel(), $relations);
-
-            if ($with) {
-                $query->with($with);
+            if ($append) {
+                $query->append($append);
             }
 
             $query = $this->applyDataPermission($query);
@@ -503,10 +473,6 @@ abstract class ResourceController extends Controller
                     'msg'   => $this->notExistMessage,
                     'data'  => null,
                 ]);
-            }
-
-            if ($append) {
-                $data->append($append);
             }
 
             return json([
