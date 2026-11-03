@@ -162,6 +162,29 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /** 时间字段序列化格式 */
     protected string $dateFormat = 'Y-m-d H:i:s';
 
+    /**
+     * 级联删除的关联方法名列表。
+     *
+     * 删除当前模型时，会按顺序自动删除这些关联的记录：
+     *   - HasMany：遍历所有子记录并逐个调用 delete() / forceDelete()
+     *   - HasOne / BelongsTo：删除单条关联记录
+     *
+     * 子记录的删除会触发其自身的 before_delete / after_delete 事件，
+     * 并递归处理子模型的 $cascade（嵌套级联）。
+     *
+     * 用法：
+     *   protected array $cascade = ['orders', 'profile'];
+     *
+     *   public function orders(): HasMany { return $this->hasMany(Order::class); }
+     *   public function profile(): HasOne { return $this->hasOne(Profile::class); }
+     *
+     * 整个删除流程（级联 + 自身）会在一个事务内执行，任一子记录删除失败
+     * （如 before_delete 返回 false）都会回滚，避免产生孤儿数据。
+     *
+     * @var array<int, string>
+     */
+    protected array $cascade = [];
+
     // ── 实例状态 ─────────────────────────────────────────────────────────
 
     /** 当前属性数据 */
@@ -481,6 +504,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * 启用 SoftDelete trait 时默认走软删除，$force = true 时真实删除。
      * 每个实例都会触发 before_delete / after_delete 事件。
      *
+     * 批量删除在一个事务内执行：若任一实例（含其级联关联）删除失败，
+     * 整个批次回滚。
+     *
      * @param mixed $ids   主键、主键数组、或条件数组（关联数组）
      * @param bool  $force true 时强制硬删除
      * @return int 成功删除的记录数
@@ -505,15 +531,17 @@ abstract class Model implements ArrayAccess, JsonSerializable
         }
 
         $count = 0;
-        foreach ($query->select() as $model) {
-            if (!$model instanceof Model) {
-                continue;
+        $instance->getConnection()->transaction(function () use ($query, $force, &$count): void {
+            foreach ($query->select() as $model) {
+                if (!$model instanceof Model) {
+                    continue;
+                }
+                $result = $force ? $model->forceDelete() : $model->delete();
+                if ($result) {
+                    $count++;
+                }
             }
-            $result = $force ? $model->forceDelete() : $model->delete();
-            if ($result) {
-                $count++;
-            }
-        }
+        });
 
         return $count;
     }
@@ -1095,6 +1123,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * 删除模型。
      *
      * 启用 SoftDelete trait 时写入 $deleteTime 字段，否则真删除。
+     *
+     * 若模型声明了 $cascade 关联列表，会在删除自身前依次删除关联记录，
+     * 整个流程在一个事务内执行，失败自动回滚。
      */
     public function delete(): bool
     {
@@ -1102,18 +1133,25 @@ abstract class Model implements ArrayAccess, JsonSerializable
             return false;
         }
 
-        if (method_exists($this, 'runSoftDelete')) {
-            $result = (bool) $this->{'runSoftDelete'}();
-        } else {
+        $result = $this->getConnection()->transaction(function () {
+            $this->cascadeDeleteRelations(false);
+
+            if (method_exists($this, 'runSoftDelete')) {
+                return (bool) $this->{'runSoftDelete'}();
+            }
+
             $pk = $this->getKey();
             if ($pk === null) {
                 return false;
             }
-            $result = $this->newQueryForWrite()->where($this->pk, $pk)->delete() > 0;
-            if ($result) {
+
+            $ok = $this->newQueryForWrite()->where($this->pk, $pk)->delete() > 0;
+            if ($ok) {
                 $this->exists = false;
             }
-        }
+
+            return $ok;
+        });
 
         if ($result) {
             $this->fireEvent('after_delete');
@@ -1124,6 +1162,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
     /**
      * 强制删除（无论是否 SoftDelete 都真实删除）。
+     *
+     * 若模型声明了 $cascade 关联列表，会在删除自身前依次强制删除关联记录，
+     * 整个流程在一个事务内执行，失败自动回滚。
      */
     public function forceDelete(): bool
     {
@@ -1132,16 +1173,71 @@ abstract class Model implements ArrayAccess, JsonSerializable
             return false;
         }
 
-        $query = $this->newQueryForWrite();
-        if (method_exists($this, 'getDeleteTimeField')) {
-            $query->withTrashed();
-        }
-        $result = $query->where($this->pk, $pk)->delete() > 0;
+        $result = $this->getConnection()->transaction(function () use ($pk) {
+            $this->cascadeDeleteRelations(true);
+
+            $query = $this->newQueryForWrite();
+            if (method_exists($this, 'getDeleteTimeField')) {
+                $query->withTrashed();
+            }
+
+            return $query->where($this->pk, $pk)->delete() > 0;
+        });
+
         if ($result) {
             $this->exists = false;
         }
 
         return $result;
+    }
+
+    /**
+     * 按 $cascade 列表依次删除关联记录。
+     *
+     * @param bool $force true 时对子记录调用 forceDelete()，否则调用 delete()
+     * @throws DbException 任一关联记录删除失败时抛出，以触发事务回滚
+     */
+    protected function cascadeDeleteRelations(bool $force): void
+    {
+        if ($this->cascade === []) {
+            return;
+        }
+
+        foreach ($this->cascade as $relationName) {
+            $method = $this->resolveRelationMethod((string) $relationName);
+            if ($method === null) {
+                continue;
+            }
+
+            $relation = $this->{$method}();
+            if (!$relation instanceof Relation) {
+                continue;
+            }
+
+            $related = $relation->getResults();
+
+            if ($related instanceof Collection) {
+                foreach ($related->all() as $item) {
+                    if ($item instanceof Model) {
+                        $ok = $force ? $item->forceDelete() : $item->delete();
+                        if (!$ok) {
+                            throw new DbException(sprintf(
+                                'cascade delete aborted: relation "%s" record failed to delete',
+                                $relationName,
+                            ));
+                        }
+                    }
+                }
+            } elseif ($related instanceof Model) {
+                $ok = $force ? $related->forceDelete() : $related->delete();
+                if (!$ok) {
+                    throw new DbException(sprintf(
+                        'cascade delete aborted: relation "%s" record failed to delete',
+                        $relationName,
+                    ));
+                }
+            }
+        }
     }
 
     /**
