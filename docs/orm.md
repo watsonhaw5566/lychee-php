@@ -907,13 +907,13 @@ use Lychee\orm\Model;
 class User extends Model
 {
     // 新增前补默认值
-    public static function onBeforeInsert(User $user): void
+    protected static function onBeforeInsert(User $user): void
     {
         $user->uuid ??= uuid();
     }
 
     // 更新前拦截
-    public static function onBeforeUpdate(User $user): bool|null
+    protected static function onBeforeUpdate(User $user): bool|null
     {
         if ($user->name === 'forbidden') {
             return false; // 阻断本次更新
@@ -922,14 +922,14 @@ class User extends Model
     }
 
     // 删除后级联清理
-    public static function onAfterDelete(User $user): void
+    protected static function onAfterDelete(User $user): void
     {
         Profile::destroy($user->id);
     }
 }
 ```
 
-事件名到方法名的映射规则：下划线转 StudlyCase 并加 `on` 前缀，例如 `before_insert` → `onBeforeInsert`。方法必须声明为 `public static`，且**无需继承任何额外接口或 trait**，框架会自动检测并调用。
+事件名到方法名的映射规则：下划线转 StudlyCase 并加 `on` 前缀，例如 `before_insert` → `onBeforeInsert`。方法推荐声明为 `protected static`（框架在 `Model` 父类作用域内调用，可正常访问子类 `protected` 成员），也可使用 `public static`；**无需继承任何额外接口或 trait**，框架会自动检测并调用。
 
 ### 方式二：闭包注册
 
