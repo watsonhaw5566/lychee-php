@@ -529,13 +529,13 @@ class User extends Model
     // 仅活跃用户
     public static function active(): Query
     {
-        return static::query()->where('status', 1);
+        return static::where('status', 1);
     }
 
     // 成年用户
     public static function adult(): Query
     {
-        return static::query()->where('age', '>=', 18);
+        return static::where('age', '>=', 18);
     }
 }
 
@@ -543,6 +543,9 @@ class User extends Model
 User::active()->select();
 User::adult()->order('id', 'desc')->select();
 ```
+
+> `static::where(...)` 通过 `__callStatic` 自动转发到查询构造器，等价于 `static::query()->where(...)`，写法更简洁。
+> Model 类的 `@method static` 注解保证 IDE 可补全 `where` / `order` / `find` 等查询方法。
 
 需要从已有查询上继续叠加条件时，让方法接受可选的 `Query` 参数：
 
@@ -692,6 +695,17 @@ User::where('status', 1)
     ->select();
 ```
 
+> **append 也支持关联**：`append()` 中的名字如果对应模型的关联方法（`hasOne` / `hasMany` / `belongsTo`），
+> 会自动加载该关联并随序列化输出；通过查询构造器链式调用（如 `User::query()->append(['posts'])->select()`）时，
+> 关联会被**预加载**（`IN` 批量查询），避免 N+1。
+>
+> 关联名支持**蛇形**与**驼峰**两种写法，输出 key 与传入的名字一致（前端友好）：
+> ```php
+> // 方法名为 adPlatform()，可这样调用：
+> User::query()->append(['ad_platform'])->find(1);   // 输出 key 为 ad_platform
+> User::query()->append(['adPlatform'])->find(1);     // 输出 key 为 adPlatform
+> ```
+
 ### 获取器 / 修改器
 
 ```php
@@ -764,6 +778,25 @@ $user = User::find(1);
 $user->profile; // 自动触发查询
 $user->posts;
 ```
+
+> **关联名支持蛇形 / 驼峰**：`with()`、懒加载属性访问、`append()` 中的关联名既可用方法原名（驼峰，如 `adPlatform`），
+> 也可用蛇形（如 `ad_platform`），框架会自动把 `ad_platform` 解析到 `adPlatform()` 方法。
+> 输出 / 缓存 key 与传入名一致，便于前端按蛇形字段对接。
+>
+> ```php
+> class Ad extends Model
+> {
+>     public function adPlatform(): \Lychee\orm\relation\BelongsTo
+>     {
+>         return $this->belongsTo(AdPlatform::class, 'ad_platform_id');
+>     }
+> }
+>
+> // 以下两种写法等价，都能命中 adPlatform() 关联
+> Ad::with('adPlatform')->select();
+> Ad::with('ad_platform')->select();   // 蛇形
+> $ad->ad_platform;                    // 懒加载，蛇形属性访问
+> ```
 
 ### 关联计数 withCount
 
