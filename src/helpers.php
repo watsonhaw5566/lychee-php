@@ -482,3 +482,73 @@ if (!function_exists('validate')) {
         return $v->batch($batch)->failException($failException);
     }
 }
+
+if (!function_exists('dump')) {
+    /**
+     * 调试输出变量（不终止执行）。
+     *
+     * 自动检测运行环境：
+     *   - CLI：输出 ANSI 彩色文本
+     *   - Web：输出带样式的 HTML（配色与异常页一致，支持深色模式）
+     *
+     * 非调试模式（APP_DEBUG=false）下降级为纯文本输出，
+     * 既保留调试能力，又避免在生产环境注入大量样式标签。
+     *
+     * 支持同时传入多个变量，逐个输出。
+     *
+     * @param mixed ...$vars 要输出的变量
+     */
+    function dump(mixed ...$vars): void
+    {
+        $isCli = PHP_SAPI === 'cli';
+        $debug = lychee_is_debug();
+
+        foreach ($vars as $var) {
+            $dumper = new \Lychee\support\Dumper(html: $isCli ? false : $debug);
+            echo $dumper->dump($var);
+        }
+    }
+}
+
+if (!function_exists('dd')) {
+    /**
+     * 调试输出变量并终止执行（dump and die）。
+     *
+     * @param mixed ...$vars 要输出的变量
+     */
+    function dd(mixed ...$vars): never
+    {
+        dump(...$vars);
+        exit(1);
+    }
+}
+
+if (!function_exists('lychee_is_debug')) {
+    /**
+     * 判断当前是否处于调试模式。
+     *
+     * 读取 config/app.debug，回退到环境变量 APP_DEBUG。
+     * 容器未就绪时（如启动早期）回退到环境变量，确保 dump() 始终可用。
+     */
+    function lychee_is_debug(): bool
+    {
+        try {
+            if (function_exists('config')) {
+                return (bool) config('app.debug', env('APP_DEBUG', false));
+            }
+        } catch (\Throwable) {
+            // 容器未就绪，回退到环境变量
+        }
+
+        $value = $_ENV['APP_DEBUG'] ?? $_SERVER['APP_DEBUG'] ?? getenv('APP_DEBUG');
+
+        if ($value === false || $value === null) {
+            return false;
+        }
+
+        return match (strtolower((string) $value)) {
+            'true', '1', 'on', 'yes' => true,
+            default                  => false,
+        };
+    }
+}
