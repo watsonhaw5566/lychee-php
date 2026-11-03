@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get tag name
+        id: tag
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build source archive
+        run: |
+          mkdir -p dist
+          git archive --prefix=lychee-php/ --format=tar.gz HEAD -o dist/lychee-php-${{ steps.tag.outputs.tag }}.tar.gz
+          git archive --prefix=lychee-php/ --format=zip HEAD -o dist/lychee-php-${{ steps.tag.outputs.tag }}.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.tag.outputs.tag }}
+          tag_name: ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            dist/lychee-php-${{ steps.tag.outputs.tag }}.tar.gz
+            dist/lychee-php-${{ steps.tag.outputs.tag }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
