@@ -947,6 +947,13 @@ abstract class Model implements ArrayAccess, JsonSerializable
             $data[$key] = $this->getAttr($key);
         }
 
+        // 废弃字段过滤（仅作用于数据库属性，不影响 append/关联数据）
+        if ($this->modelConfig['disuse'] !== []) {
+            foreach ($this->modelConfig['disuse'] as $k) {
+                unset($data[$k]);
+            }
+        }
+
         // append 虚拟字段 / 关联
         foreach ($this->modelConfig['append'] as $key) {
             if ($this->resolveRelationMethod($key) !== null) {
@@ -970,13 +977,6 @@ abstract class Model implements ArrayAccess, JsonSerializable
                 );
             } else {
                 $data[$key] = $value;
-            }
-        }
-
-        // 废弃字段过滤
-        if ($this->modelConfig['disuse'] !== []) {
-            foreach ($this->modelConfig['disuse'] as $k) {
-                unset($data[$k]);
             }
         }
 
