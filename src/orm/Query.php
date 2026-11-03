@@ -773,8 +773,9 @@ class Query
         if ($this->model !== null) {
             $model = $this->model::createFromDatabase($row);
             $this->applyModelPresentation($model);
-            if ($this->with !== []) {
-                $this->model::eagerLoadRelations([$model], $this->with);
+            $relations = $this->collectEagerRelations();
+            if ($relations !== []) {
+                $this->model::eagerLoadRelations([$model], $relations);
             }
             if ($this->withCount !== []) {
                 $this->eagerLoadCounts([$model], $this->withCount);
@@ -815,8 +816,9 @@ class Query
                 $items[] = $model;
             }
 
-            if ($this->with !== []) {
-                $this->model::eagerLoadRelations($items, $this->with);
+            $relations = $this->collectEagerRelations();
+            if ($relations !== []) {
+                $this->model::eagerLoadRelations($items, $relations);
             }
 
             if ($this->withCount !== []) {
@@ -848,6 +850,24 @@ class Query
         if ($this->append !== []) {
             $model->append($this->append);
         }
+    }
+
+    /**
+     * 汇总需要预加载的关联：with() 指定的关联 + append() 中的关联。
+     *
+     * append() 里若包含关联名（蛇形 / 驼峰均可），会在此一并预加载，
+     * 避免 toArray 时逐模型 lazy 加载导致 N+1。
+     *
+     * @return array<int, string>
+     */
+    protected function collectEagerRelations(): array
+    {
+        $relations = $this->with;
+        if ($this->append !== []) {
+            $relations = array_merge($relations, $this->append);
+        }
+
+        return array_values(array_unique($relations));
     }
 
     /**

@@ -599,14 +599,20 @@ abstract class Model implements ArrayAccess, JsonSerializable
         foreach ($relations as $relation) {
             // 子关联暂不支持点号嵌套，统一取顶层
             $name = str_contains($relation, '.') ? strstr($relation, '.', true) : $relation;
-            if (!$name || !method_exists($models[0], (string) $name)) {
+            if (!$name) {
+                continue;
+            }
+            // 支持蛇形 / 驼峰关联名
+            $method = $models[0]->resolveRelationMethod((string) $name);
+            if ($method === null) {
                 continue;
             }
             /** @var Relation $relationObj */
-            $relationObj = $models[0]->{$name}();
+            $relationObj = $models[0]->{$method}();
             if (!$relationObj instanceof Relation) {
                 continue;
             }
+            // 缓存键使用原始关联名，保证 toArray 输出 key 与传入一致
             $relationObj->eagerLoad($models, (string) $name);
         }
     }
@@ -810,12 +816,10 @@ abstract class Model implements ArrayAccess, JsonSerializable
             return $this->relation[$name];
         }
 
-        // 关联方法：lazy 加载
-        if (method_exists($this, $name) && !$this->hasAttr($name)) {
-            $relation = $this->{$name}();
-            if ($relation instanceof Relation) {
-                return $this->relation[$name] = $relation->getResults();
-            }
+        // 关联方法：lazy 加载（支持蛇形 / 驼峰关联名）
+        $method = $this->resolveRelationMethod($name);
+        if ($method !== null) {
+            return $this->relation[$name] = $this->{$method}()->getResults();
         }
 
         return $this->getAttr($name);
@@ -915,9 +919,14 @@ abstract class Model implements ArrayAccess, JsonSerializable
             $data[$key] = $this->getAttr($key);
         }
 
-        // append 虚拟字段
+        // append 虚拟字段 / 关联
         foreach ($this->modelConfig['append'] as $key) {
-            $data[$key] = $this->getAttr($key);
+            if ($this->resolveRelationMethod($key) !== null) {
+                // 关联：触发 lazy 加载（已预加载则直接取缓存）
+                $data[$key] = $this->{$key};
+            } else {
+                $data[$key] = $this->getAttr($key);
+            }
         }
 
         // 关联数据
@@ -1283,15 +1292,50 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
     /**
      * 判断字段是否为关联方法（返回 Relation 实例）。
+     *
+     * 支持蛇形（ad_platform）与驼峰（adPlatform）两种关联名。
      */
     public function isRelation(string $name): bool
     {
-        if (!method_exists($this, $name) || $this->hasAttr($name)) {
-            return false;
+        return $this->resolveRelationMethod($name) !== null;
+    }
+
+    /**
+     * 把外部传入的关联名解析为实际的关联方法名（驼峰）。
+     *
+     * - 'ad_platform' -> 'adPlatform'
+     * - 'adPlatform'  -> 'adPlatform'
+     * - 非关联方法（数据字段、普通方法、访问器）返回 null。
+     *
+     * 数据字段优先：若 $name 已是模型属性，则不视为关联。
+     */
+    public function resolveRelationMethod(string $name): ?string
+    {
+        if ($this->hasAttr($name)) {
+            return null;
         }
 
+        // 1. 驼峰原名
+        if (method_exists($this, $name) && $this->callReturnsRelation($name)) {
+            return $name;
+        }
+
+        // 2. 蛇形 -> 驼峰（ad_platform -> adPlatform）
+        $camel = lcfirst($this->studly($name));
+        if ($camel !== $name && method_exists($this, $camel) && $this->callReturnsRelation($camel)) {
+            return $camel;
+        }
+
+        return null;
+    }
+
+    /**
+     * 调用指定方法并判断是否返回 Relation 实例。
+     */
+    protected function callReturnsRelation(string $method): bool
+    {
         try {
-            return $this->{$name}() instanceof Relation;
+            return $this->{$method}() instanceof Relation;
         } catch (Throwable) {
             return false;
         }
