@@ -871,6 +871,110 @@ class Order extends Model
 }
 ```
 
+### 级联删除
+
+通过在模型上声明 `$cascade` 属性，可以在删除模型时自动连带删除其关联记录，避免手动逐层清理产生孤儿数据。
+
+```php
+use Lychee\orm\Model;
+use Lychee\orm\relation\HasMany;
+use Lychee\orm\relation\HasOne;
+
+class User extends Model
+{
+    // 声明需要级联删除的关联方法名
+    protected array $cascade = ['orders', 'profile'];
+
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class, 'user_id', 'id');
+    }
+
+    public function profile(): HasOne
+    {
+        return $this->hasOne(Profile::class, 'user_id', 'id');
+    }
+}
+```
+
+声明后正常删除即可，级联自动生效：
+
+```php
+$user = User::find(1);
+$user->delete();   // 自动删除 user 及其所有 orders、profile
+```
+
+#### 关联类型行为
+
+| 关联类型 | `getResults()` 返回 | 级联行为 |
+|----------|---------------------|----------|
+| `hasMany` | `Collection` | 遍历每条子记录调用 `delete()` |
+| `hasOne` | `?Model` | 单条关联记录调用 `delete()` |
+| `belongsTo` | `?Model` | 单条关联记录调用 `delete()`（慎用，会删除父记录） |
+
+#### 软删除与强制删除
+
+级联删除会跟随父模型的删除方式：
+
+```php
+// 父模型软删除 → 子记录也软删除（若子模型启用了 SoftDelete）
+$user->delete();
+
+// 父模型强制硬删除 → 子记录也硬删除
+$user->forceDelete();
+
+// destroy 同样支持级联，第二参数传 true 则全部硬删除
+User::destroy([1, 2, 3]);        // 软删除（含级联）
+User::destroy([1, 2, 3], true);  // 硬删除（含级联）
+```
+
+#### 嵌套级联
+
+子模型自身也可以声明 `$cascade`，删除时会递归向下清理：
+
+```php
+class Order extends Model
+{
+    use SoftDelete;
+
+    protected array $cascade = ['items'];
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(OrderItem::class, 'order_id', 'id');
+    }
+}
+
+// 删 user → 删 user 的 orders → 删每个 order 的 items
+User::find(1)->delete();
+```
+
+#### 事务与失败回滚
+
+- 单条 `delete()` / `forceDelete()`：级联 + 自身删除在**同一个事务**内执行。
+- `destroy()` 批量删除：整个批次在**同一个事务**内执行。
+- 任一关联记录删除失败（例如其 `before_delete` 事件返回 `false`），会抛出 `DbException` 并**回滚整个事务**，父记录也不会被删除。
+
+```php
+Order::event('before_delete', function ($order) {
+    if ($order->status === 'paid') {
+        return false;  // 已支付订单禁止删除
+    }
+});
+
+// 只要有一个 paid 订单，整次删除失败回滚
+User::find(1)->delete();
+```
+
+#### 事件触发
+
+级联删除的子记录会走完整的模型生命周期，触发其自身的 `before_delete` / `after_delete` 事件（`forceDelete` 不触发事件，与原有行为一致）。
+
+#### 注意事项
+
+- 级联删除基于**实例逐条删除**（非批量 SQL），会触发子模型事件并支持嵌套级联，但在数据量极大时会有 N+1 性能开销。
+- 对于超大数据量的级联清理，建议在数据库层配置外键 `ON DELETE CASCADE`，或自行使用查询构造器批量删除。
+
 ## 事务
 
 ```php
