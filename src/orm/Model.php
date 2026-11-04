@@ -392,6 +392,20 @@ abstract class Model implements ArrayAccess, JsonSerializable
         return array_values(array_diff($all, $this->modelConfig['disuse']));
     }
 
+    /**
+     * 获取模型声明的 JSON 字段列表。
+     *
+     * 返回合并后的 $modelConfig['json']（含子类声明的 protected array $json）。
+     * 供外部（如控制器的查询 DSL）判断某字段是否为 JSON 数组字段，
+     * 避免使用反射直接读取 protected 属性。
+     *
+     * @return array<int, string>
+     */
+    public function getJsonFields(): array
+    {
+        return $this->modelConfig['json'];
+    }
+
     // ── Query 入口 ───────────────────────────────────────────────────────
 
     /**
@@ -1555,7 +1569,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
         // 同时匹配驼峰（adPlatform）与蛇形（ad_platform）键名
         $relationKeys = [];
         foreach ($relationNames as $name) {
-            $relationKeys[$name]              = true;
+            $relationKeys[$name]               = true;
             $relationKeys[$this->snake($name)] = true;
         }
 

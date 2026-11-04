@@ -14,7 +14,6 @@ use Lychee\validate\ValidateException;
 use ReflectionClass;
 use RuntimeException;
 use Throwable;
-use ReflectionException;
 
 /**
  * 资源控制器：基于模型类的零代码 CRUD（base* 方法）。
@@ -171,7 +170,7 @@ abstract class ResourceController extends Controller
     protected function applyWhere(Model|Query $query, array $where): Model|Query
     {
         $model      = $query instanceof Model ? $query : $query->getModel();
-        $jsonFields = $this->getJsonFields($model);
+        $jsonFields = $model->getJsonFields();
 
         foreach ($where as $field => $value) {
             if ($value === null || $value === '') {
@@ -203,24 +202,6 @@ abstract class ResourceController extends Controller
         }
 
         return $query;
-    }
-
-    /** 获取模型声明的 JSON 字段列表 */
-    protected function getJsonFields(Model $model): array
-    {
-        try {
-            $ref = new ReflectionClass($model);
-            if (!$ref->hasProperty('json')) {
-                return [];
-            }
-
-            $prop = $ref->getProperty('json');
-            $prop->setAccessible(true);
-
-            return (array)$prop->getValue($model);
-        } catch (ReflectionException) {
-            return [];
-        }
     }
 
     /** 处理 _in 查询，JSON 数组字段使用 JSON_CONTAINS */
