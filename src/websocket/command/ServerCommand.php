@@ -94,11 +94,11 @@ class ServerCommand extends Command
             $queueWorker->createWorker();
 
             $queueConn  = $queueConfig['connection'] ?? 'default';
-            $queueCount = $queueConfig['count'] ?? 1;
+            $queueCount = $queueConfig['count']      ?? 1;
             $output->writeln("<info>Queue</info>     consumer x{$queueCount} (connection: <comment>{$queueConn}</comment>)");
         }
 
-        $cronConfig = $config['cron'] ?? null;
+        $cronConfig  = $config['cron'] ?? null;
         $cronEnabled = is_array($cronConfig) ? ($cronConfig['enable'] ?? true) : (bool) $cronConfig;
         if ($cronEnabled && $this->app->bound(\Lychee\cron\Scheduler::class)) {
             $cronWorker = new CronWorker($this->app, is_array($cronConfig) ? $cronConfig : []);

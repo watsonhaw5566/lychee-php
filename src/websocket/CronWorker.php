@@ -36,8 +36,8 @@ class CronWorker
         $workerClass = '\\Workerman\\Worker';
 
         /** @var object $worker */
-        $worker        = new $workerClass();
-        $worker->name  = 'CronScheduler';
+        $worker       = new $workerClass();
+        $worker->name = 'CronScheduler';
         // 定时任务必须单实例，否则同一分钟内会被多次触发
         $worker->count = 1;
 

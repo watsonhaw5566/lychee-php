@@ -8,6 +8,10 @@ use Lychee\console\Command;
 use Lychee\console\input\Option;
 use Lychee\console\Input;
 use Lychee\console\Output;
+use FilesystemIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use SplFileInfo;
 
 /**
  * Worker 开发模式命令。
@@ -132,11 +136,11 @@ class DevCommand extends Command
         $files = [];
 
         foreach ($dirs as $dir) {
-            $iterator = new \RecursiveIteratorIterator(
-                new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)
             );
 
-            /** @var \SplFileInfo $file */
+            /** @var SplFileInfo $file */
             foreach ($iterator as $file) {
                 if ($file->isFile() && strtolower($file->getExtension()) === 'php') {
                     $files[$file->getPathname()] = $file->getMTime();

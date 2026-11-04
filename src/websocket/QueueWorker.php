@@ -55,7 +55,7 @@ class QueueWorker
         $sleep      = max(0.1, (float) ($this->config['sleep'] ?? 1));
         $tries      = max(1, (int) ($this->config['tries'] ?? 3));
         $connection = $this->config['connection'] ?? null;
-        $queue      = $this->config['queue'] ?? null;
+        $queue      = $this->config['queue']      ?? null;
 
         $timerClass::add($sleep, function () use ($connection, $queue, $tries): void {
             $this->poll($connection, $queue, $tries);
