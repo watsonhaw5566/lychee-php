@@ -294,7 +294,9 @@ class PendingRequest
         $this->configureCurl($ch, $method, $url, $data);
 
         $responseHeaders = [];
-        curl_setopt($ch, CURLOPT_HEADERFUNCTION,
+        curl_setopt(
+            $ch,
+            CURLOPT_HEADERFUNCTION,
             function (CurlHandle $ch, string $line) use (&$responseHeaders) {
                 $parts = explode(':', $line, 2);
                 if (count($parts) === 2) {
@@ -378,13 +380,13 @@ class PendingRequest
         array &$headers,
     ): void {
         match ($this->bodyFormat) {
-            'json' => (function () use ($ch, $data, &$headers) {
+            'json'      => (function () use ($ch, $data, &$headers) {
                 $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $json);
                 $headers['Content-Type']   ??= 'application/json; charset=utf-8';
                 $headers['Content-Length'] ??= (string) strlen($json);
             })(),
-            'form' => (function () use ($ch, $data, &$headers) {
+            'form'      => (function () use ($ch, $data, &$headers) {
                 $body = http_build_query($data);
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
                 $headers['Content-Type'] ??= 'application/x-www-form-urlencoded';
@@ -412,7 +414,7 @@ class PendingRequest
 
         if ($mergedQuery !== []) {
             $separator = str_contains($url, '?') ? '&' : '?';
-            $url      .= $separator . http_build_query($mergedQuery);
+            $url .= $separator . http_build_query($mergedQuery);
         }
 
         return $url;

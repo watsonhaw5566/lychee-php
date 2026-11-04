@@ -16,9 +16,9 @@ class HttpClientTest extends TestCase
 
     public function test_response_status_helpers(): void
     {
-        $ok     = new ClientResponse('', 200);
+        $ok       = new ClientResponse('', 200);
         $notFound = new ClientResponse('', 404);
-        $error  = new ClientResponse('', 500);
+        $error    = new ClientResponse('', 500);
 
         $this->assertTrue($ok->ok());
         $this->assertTrue($ok->successful());
