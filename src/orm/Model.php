@@ -53,6 +53,10 @@ use ReflectionClass;
  * @method static Query whereBetweenTime(string $field, string $start, string $end)
  * @method static Query whereRaw(string $sql, array $bindings = [])
  * @method static Query whereExists(Closure $callback, bool $not = false)
+ * @method static Query whereNotExists(Closure $callback)
+ * @method static Query whereColumn(string $field, string $op, string $field2 = null)
+ * @method static Query whereTime(string $field, string $expression)
+ * @method static Query when(mixed $condition, callable $callback, ?callable $default = null)
  * @method static Query field(string|array $fields)
  * @method static Query order(string|array|Raw $field, string $direction = 'ASC')
  * @method static Query limit(int $limit, ?int $offset = null)
@@ -73,11 +77,33 @@ use ReflectionClass;
  * @method static Query alias(string $alias)
  * @method static Query distinct(bool $enable = true)
  * @method static Query lock(bool|string $lock = true)
+ * @method static Query table(string $table)
+ * @method static Query name(string $name)
+ *
+ * 以下方法来自 Query 类，通过 Model::__callStatic 魔术转发。
+ * 显式声明以让 phpstan 识别静态调用。
+ *
+ * @method static Collection|array select()
+ * @method static mixed value(string $field)
+ * @method static array column(string $field, ?string $key = null)
+ * @method static Paginator paginate(int $page = 1, int $pageSize = 15, bool $simple = false)
+ * @method static bool chunk(int $size, callable $callback)
+ * @method static bool chunkById(int $size, callable $callback, ?string $column = null)
+ * @method static \Generator cursor()
+ * @method static bool exists()
  * @method static int count(string $field = '*')
  * @method static int|float sum(string $field)
  * @method static float avg(string $field)
  * @method static mixed min(string $field)
  * @method static mixed max(string $field)
+ * @method static int insert(array $data)
+ * @method static int|string insertGetId(array $data)
+ * @method static int insertAll(array $rows)
+ * @method static int update(array $data)
+ * @method static int delete()
+ * @method static int forceDelete()
+ * @method static int inc(string $field, int|float $step = 1)
+ * @method static int dec(string $field, int|float $step = 1)
  *
  * @phpstan-consistent-constructor
  */
