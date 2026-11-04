@@ -76,6 +76,35 @@ class Request
     }
 
     /**
+     * 从 Workerman 请求对象构建 Lychee 请求。
+     *
+     * @param \Workerman\Protocols\Http\Request $workerRequest
+     */
+    public static function fromWorkerman(object $workerRequest): self
+    {
+        $method  = strtoupper($workerRequest->method());
+        $path    = parse_url($workerRequest->uri() ?? '/', PHP_URL_PATH) ?: '/';
+        $headers = $workerRequest->header() ?: [];
+        $rawBody = $workerRequest->rawBody() ?: '';
+
+        $contentType = self::getHeaderCaseInsensitive($headers, 'Content-Type') ?? '';
+        $body        = self::parseBody($rawBody, $contentType);
+
+        return new self(
+            method: $method,
+            path: $path,
+            query: $workerRequest->get() ?: [],
+            body: $body,
+            headers: $headers,
+            cookies: $workerRequest->cookie() ?: [],
+            rawBody: $rawBody,
+            ip: self::resolveIp($headers),
+            scheme: self::resolveScheme($headers),
+            files: self::normalizeWorkermanFiles($workerRequest->file() ?: []),
+        );
+    }
+
+    /**
      * 获取 GET 查询参数。
      *
      * @param string|null $key     参数名，为 null 时返回全部查询参数
@@ -388,6 +417,16 @@ class Request
             $headers['Content-Length'] = $_SERVER['CONTENT_LENGTH'];
         }
 
+        // Apache + mod_rewrite 场景下，Authorization 可能被重写到 REDIRECT_HTTP_AUTHORIZATION
+        if (!isset($headers['Authorization'])) {
+            foreach (['REDIRECT_HTTP_AUTHORIZATION', 'REDIRECT_AUTHORIZATION'] as $fallback) {
+                if (isset($_SERVER[$fallback]) && is_string($_SERVER[$fallback])) {
+                    $headers['Authorization'] = $_SERVER[$fallback];
+                    break;
+                }
+            }
+        }
+
         return $headers;
     }
 
@@ -521,5 +560,26 @@ class Request
         }
 
         return $files;
+    }
+
+    /**
+     * 将 Workerman 上传文件数组转为 UploadedFile 实例。
+     *
+     * Workerman 的 file() 返回格式为：
+     *   ['field' => ['name' => ..., 'tmp_name' => ..., 'size' => ..., 'type' => ..., 'error' => ...]]
+     *
+     * @param  array<string, array<string, mixed>> $files
+     * @return array<string, UploadedFile>
+     */
+    private static function normalizeWorkermanFiles(array $files): array
+    {
+        $result = [];
+        foreach ($files as $field => $file) {
+            if (isset($file['tmp_name']) && $file['tmp_name'] !== '') {
+                $result[$field] = UploadedFile::create($file);
+            }
+        }
+
+        return $result;
     }
 }

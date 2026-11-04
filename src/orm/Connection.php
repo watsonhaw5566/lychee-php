@@ -247,6 +247,18 @@ class Connection
     }
 
     /**
+     * 重置事务嵌套计数器（用于常驻进程请求间清理）。
+     *
+     * 若存在未关闭的事务则先回滚，确保连接回到干净状态。
+     */
+    public function resetTransactionLevel(): void
+    {
+        while ($this->transactionLevel > 0) {
+            $this->rollBack();
+        }
+    }
+
+    /**
      * 获取数据表字段列表（含类型信息）。
      *
      * 兼容 think-orm 的 Connection::getTableFields() 接口，

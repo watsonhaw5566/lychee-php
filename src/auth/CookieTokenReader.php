@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Lychee\auth;
 
+use Lychee\container\Container;
+
 /**
  * 从 Cookie 读取 token。
  *
@@ -18,7 +20,8 @@ class CookieTokenReader implements TokenReaderInterface
 
     public function read(): ?string
     {
-        $value = $_COOKIE[$this->tokenName] ?? null;
+        $request = Container::getInstance()->get('request');
+        $value   = $request->cookie($this->tokenName);
 
         return is_string($value) && $value !== '' ? $value : null;
     }

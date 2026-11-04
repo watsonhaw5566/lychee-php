@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Lychee\websocket;
 
 use Closure;
-use RuntimeException;
 use Lychee\container\Container;
 
 /**
  * WebSocket 服务管理器。
  *
- * 封装 Workerman\Worker，负责：
+ * 不再独立创建 Worker，而是由 HttpWorker 在同端口下委托调用。
+ * 负责：
  * - 按握手请求 path 路由到对应的 Handler
  * - 维护连接注册表，支持按 path 广播
  * - 可选的连接鉴权回调
@@ -27,29 +27,15 @@ class WebSocketServer
     /** @var Closure|null 鉴权回调 (Connection): bool */
     private ?Closure $authCallback = null;
 
-    private readonly string $host;
-    private readonly int $port;
-    private readonly int $count;
-    private readonly int $heartbeat;
-
-    /**
-     * @param  array<string, mixed> $config 来自 config/websocket.php 的完整配置
-     */
     public function __construct(
         private readonly Container $app,
-        array $config,
     ) {
-        $this->host      = (string) ($config['host'] ?? '0.0.0.0');
-        $this->port      = (int) ($config['port'] ?? 2346);
-        $this->count     = (int) ($config['count'] ?? 1);
-        $this->heartbeat = (int) ($config['heartbeat'] ?? 50);
     }
 
     /**
      * 设置连接鉴权回调。
      *
      * 回调接收 Connection，返回 false 时拒绝连接。
-     * 通常从 SaToken 校验 query 参数中的 token。
      */
     public function auth(Closure $callback): static
     {
@@ -59,35 +45,9 @@ class WebSocketServer
     }
 
     /**
-     * 启动 WebSocket 服务（阻塞运行，由 console 命令调用）。
-     *
-     * @throws RuntimeException 当 Workerman 未安装时
+     * WebSocket 握手完成回调（由 HttpWorker 委托调用）。
      */
-    public function start(): void
-    {
-        $workerClass = '\\Workerman\\Worker';
-
-        if (!class_exists($workerClass)) {
-            throw new RuntimeException(
-                'Workerman is not installed. Run: composer require workerman/workerman:^5.0'
-            );
-        }
-
-        /** @var object $worker */
-        $worker        = new $workerClass('websocket://' . $this->host . ':' . $this->port);
-        $worker->count = $this->count;
-
-        $worker->onWebSocketConnect = $this->onWebSocketConnect(...);
-        $worker->onMessage          = $this->onMessage(...);
-        $worker->onClose            = $this->onClose(...);
-
-        $workerClass::runAll();
-    }
-
-    /**
-     * 握手完成回调：缓存 path 并执行鉴权。
-     */
-    private function onWebSocketConnect(mixed $connection, mixed $request): void
+    public function onWebSocketConnect(mixed $connection, mixed $request): void
     {
         $path                      = parse_url($request->uri ?? '/', PHP_URL_PATH) ?: '/';
         $connection->websocketPath = $path;
@@ -110,9 +70,9 @@ class WebSocketServer
     }
 
     /**
-     * 消息回调：路由到对应 handler。
+     * WebSocket 消息回调（由 HttpWorker 委托调用）。
      */
-    private function onMessage(mixed $connection, mixed $data): void
+    public function onWebSocketMessage(mixed $connection, mixed $data): void
     {
         $path    = $connection->websocketPath ?? '/';
         $handler = $this->resolveHandler($path);
@@ -125,11 +85,17 @@ class WebSocketServer
     }
 
     /**
-     * 连接关闭回调。
+     * 连接关闭回调（由 HttpWorker 委托调用）。
+     *
+     * 仅处理 WebSocket 连接的关闭，普通 HTTP 连接忽略。
      */
-    private function onClose(mixed $connection): void
+    public function onConnectionClose(mixed $connection): void
     {
-        $path = $connection->websocketPath ?? '/';
+        $path = $connection->websocketPath ?? null;
+
+        if ($path === null) {
+            return;
+        }
 
         unset($this->connections[$path][$connection->id]);
 
@@ -146,7 +112,7 @@ class WebSocketServer
             return $this->handlers[$path];
         }
 
-        $handlers = (array) $this->app->get('config')->get('websocket.handlers', []);
+        $handlers = (array) $this->app->get('config')->get('worker.websocket.handlers', []);
         $class    = $handlers[$path] ?? null;
 
         if ($class === null || !class_exists($class)) {
