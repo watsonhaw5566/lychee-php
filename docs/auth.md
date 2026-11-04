@@ -184,3 +184,170 @@ $token  = satoken()->login($userId);
 $userId = satoken()->getCurrentLoginId();
 satoken()->logout();
 ```
+
+## 功能权限 Permission
+
+基于 `#[Permission]` Attribute + `PermissionMiddleware` 实现操作级别的功能权限拦截。
+
+### 核心概念
+
+| 组件 | 说明 |
+|------|------|
+| `Permission` | PHP 8 Attribute，声明方法或控制器所需权限 |
+| `PermissionMiddleware` | 中间件，读取 Attribute 并调用 SaToken 校验 |
+| `PermissionResolverInterface` | 权限解析器接口，业务层实现，查询用户权限列表 |
+| `NullPermissionResolver` | 默认解析器，全部放行（渐进式迁移友好） |
+
+### 1. 实现权限解析器
+
+框架默认使用 `NullPermissionResolver`（全部放行）。业务层需实现 `PermissionResolverInterface`，从数据库查询用户的权限列表：
+
+```php
+namespace App\auth;
+
+use Lychee\auth\PermissionResolverInterface;
+
+class DbPermissionResolver implements PermissionResolverInterface
+{
+    public function getPermissions(int $loginId): array
+    {
+        // 从数据库查询用户角色关联的权限标识列表
+        // 返回如 ['user.list', 'user.edit', 'order.delete']
+        return UserRole::getPermissionsByUserId($loginId);
+    }
+
+    public function hasPermission(int $loginId, string $permission): bool
+    {
+        return in_array($permission, $this->getPermissions($loginId), true);
+    }
+}
+```
+
+在 `ServiceProvider` 或启动文件中绑定到容器：
+
+```php
+$container->bind(
+    \Lychee\auth\PermissionResolverInterface::class,
+    \App\auth\DbPermissionResolver::class,
+);
+```
+
+### 2. 注册中间件
+
+将 `PermissionMiddleware` 注册为全局中间件，放在 `SatokenMiddleware` **之后**：
+
+```php
+// config/middleware.php
+return [
+    \Lychee\auth\SatokenMiddleware::class,
+    \Lychee\auth\PermissionMiddleware::class,
+];
+```
+
+也可以只在需要权限控制的控制器上挂载：
+
+```php
+#[Middleware(SatokenMiddleware::class)]
+#[Middleware(PermissionMiddleware::class)]
+class OrderController extends ResourceController
+{
+    // ...
+}
+```
+
+### 3. 声明权限
+
+#### 方法级
+
+```php
+use Lychee\auth\Permission;
+
+class OrderController extends ResourceController
+{
+    #[Permission('order.export')]
+    public function export(): JsonResponse
+    {
+        // 仅拥有 order.export 权限的用户可访问
+    }
+}
+```
+
+#### 多权限（OR 逻辑）
+
+```php
+// 拥有 order.edit 或 order.admin 任意一个即可
+#[Permission('order.edit', 'order.admin')]
+public function update(Request $request, int $id): JsonResponse
+{
+    // ...
+}
+```
+
+#### 类级
+
+```php
+// 该控制器所有方法都需要 report.view 权限
+#[Permission('report.view')]
+class ReportController extends Controller
+{
+    public function daily() {}
+    public function monthly() {}
+
+    // 方法级声明会覆盖类级
+    #[Permission('report.admin')]
+    public function delete(int $id) {}
+}
+```
+
+### 4. ResourceController 自动推断
+
+继承 `ResourceController` 的控制器，CRUD 方法无需手动标注。`PermissionMiddleware` 会根据控制器名和方法名自动推断权限：
+
+| 方法 | 推断权限 | 示例（BillCustomerController） |
+|------|---------|------|
+| `index` | `{module}.list` | `bill_customer.list` |
+| `save` | `{module}.create` | `bill_customer.create` |
+| `read` | `{module}.read` | `bill_customer.read` |
+| `update` | `{module}.edit` | `bill_customer.edit` |
+| `delete` | `{module}.delete` | `bill_customer.delete` |
+
+模块名从控制器短类名推断：去掉 `Controller` 后缀，PascalCase 转 snake_case。
+
+**优先级**：方法级 `#[Permission]` > 类级 `#[Permission]` > 自动推断。手动标注会覆盖自动推断。
+
+**未标注的非 CRUD 方法默认放行**，支持渐进式迁移。
+
+### 5. 直接调用权限 API
+
+除了中间件自动拦截，也可以在业务代码中手动校验：
+
+```php
+$auth = satoken();
+
+// 判断是否有权限（返回 bool）
+if ($auth->hasPermission('order.export')) {
+    // ...
+}
+
+// 判断是否拥有任意一个权限（OR 逻辑）
+$auth->hasAnyPermission('order.edit', 'order.admin');
+
+// 校验权限，不通过抛出 NoPermissionException
+$auth->checkPermission('order.delete');
+
+// 校验任意一个权限，全部不通过才抛异常
+$auth->checkAnyPermission('order.edit', 'order.admin');
+```
+
+### 权限不足响应
+
+权限校验不通过时，`PermissionMiddleware` 返回 403 JSON 响应：
+
+```json
+{
+    "errno": 0,
+    "code": 403,
+    "msg": "无权限：order.delete",
+    "data": null
+}
+```

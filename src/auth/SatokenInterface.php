@@ -39,4 +39,34 @@ interface SatokenInterface
 
     /** @param array<string, mixed> $extra */
     public function setExtra(?string $token = null, array $extra = []): bool;
+
+    /**
+     * 判断当前登录用户是否拥有指定权限。
+     *
+     * @param string $permission 权限标识，如 'user.edit'
+     */
+    public function hasPermission(string $permission): bool;
+
+    /**
+     * 判断当前登录用户是否拥有指定权限中的任意一个（OR 逻辑）。
+     *
+     * @param string ...$permissions 权限标识列表
+     */
+    public function hasAnyPermission(string ...$permissions): bool;
+
+    /**
+     * 校验当前登录用户是否拥有指定权限，不通过则抛出 NoPermissionException。
+     *
+     * @param string $permission 权限标识
+     * @throws \Lychee\auth\exception\NoPermissionException
+     */
+    public function checkPermission(string $permission): void;
+
+    /**
+     * 校验当前登录用户是否拥有任意一个权限，全部不通过则抛出 NoPermissionException。
+     *
+     * @param string ...$permissions 权限标识列表
+     * @throws \Lychee\auth\exception\NoPermissionException
+     */
+    public function checkAnyPermission(string ...$permissions): void;
 }

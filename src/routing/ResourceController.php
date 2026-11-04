@@ -14,7 +14,6 @@ use Lychee\validate\ValidateException;
 use ReflectionClass;
 use RuntimeException;
 use Throwable;
-use ReflectionException;
 
 /**
  * 资源控制器：基于模型类的零代码 CRUD（base* 方法）。
@@ -171,7 +170,7 @@ abstract class ResourceController extends Controller
     protected function applyWhere(Model|Query $query, array $where): Model|Query
     {
         $model      = $query instanceof Model ? $query : $query->getModel();
-        $jsonFields = $this->getJsonFields($model);
+        $jsonFields = $model->getJsonFields();
 
         foreach ($where as $field => $value) {
             if ($value === null || $value === '') {
@@ -203,24 +202,6 @@ abstract class ResourceController extends Controller
         }
 
         return $query;
-    }
-
-    /** 获取模型声明的 JSON 字段列表 */
-    protected function getJsonFields(Model $model): array
-    {
-        try {
-            $ref = new ReflectionClass($model);
-            if (!$ref->hasProperty('json')) {
-                return [];
-            }
-
-            $prop = $ref->getProperty('json');
-            $prop->setAccessible(true);
-
-            return (array)$prop->getValue($model);
-        } catch (ReflectionException) {
-            return [];
-        }
     }
 
     /** 处理 _in 查询，JSON 数组字段使用 JSON_CONTAINS */
@@ -372,12 +353,7 @@ abstract class ResourceController extends Controller
 
             return $this->paginate($query, $current, $pageSize);
         } catch (Throwable $e) {
-            return json([
-                'errno' => 0,
-                'code'  => 400,
-                'msg'   => $e->getMessage(),
-                'data'  => null,
-            ]);
+            return $this->fail($e->getMessage());
         }
     }
 
@@ -406,12 +382,7 @@ abstract class ResourceController extends Controller
             if (!empty($fields)) {
                 $error = $this->checkUnique($model, $postData, null, $fields);
                 if ($error !== null) {
-                    return json([
-                        'errno' => 0,
-                        'code'  => 400,
-                        'msg'   => $error,
-                        'data'  => null,
-                    ]);
+                    return $this->fail($error);
                 }
             }
 
@@ -419,26 +390,11 @@ abstract class ResourceController extends Controller
 
             $ret = $model->create($postData);
 
-            return json([
-                'errno' => 0,
-                'code'  => 200,
-                'msg'   => 'success',
-                'data'  => $ret,
-            ]);
+            return $this->success($ret);
         } catch (ValidateException $e) {
-            return json([
-                'errno' => 0,
-                'code'  => 400,
-                'msg'   => $this->formatValidateError($e->getError()),
-                'data'  => null,
-            ]);
+            return $this->fail($this->formatValidateError($e->getError()));
         } catch (Throwable $e) {
-            return json([
-                'errno' => 0,
-                'code'  => 400,
-                'msg'   => $e->getMessage(),
-                'data'  => null,
-            ]);
+            return $this->fail($e->getMessage());
         }
     }
 
@@ -467,27 +423,12 @@ abstract class ResourceController extends Controller
             $data  = $query->find($id);
 
             if (!$data) {
-                return json([
-                    'errno' => 0,
-                    'code'  => 400,
-                    'msg'   => $this->notExistMessage,
-                    'data'  => null,
-                ]);
+                return $this->fail($this->notExistMessage);
             }
 
-            return json([
-                'errno' => 0,
-                'code'  => 200,
-                'msg'   => 'success',
-                'data'  => $data,
-            ]);
+            return $this->success($data);
         } catch (Throwable $e) {
-            return json([
-                'errno' => 0,
-                'code'  => 400,
-                'msg'   => $e->getMessage(),
-                'data'  => null,
-            ]);
+            return $this->fail($e->getMessage());
         }
     }
 
@@ -520,24 +461,14 @@ abstract class ResourceController extends Controller
             $info  = $query->find($id);
 
             if (!$info) {
-                return json([
-                    'errno' => 0,
-                    'code'  => 400,
-                    'msg'   => $this->notExistMessage,
-                    'data'  => null,
-                ]);
+                return $this->fail($this->notExistMessage);
             }
 
             $fields = empty($uniqueFields) ? $this->uniqueFields : $uniqueFields;
             if (!empty($fields)) {
                 $error = $this->checkUnique($model, $postData, $id, $fields);
                 if ($error !== null) {
-                    return json([
-                        'errno' => 0,
-                        'code'  => 400,
-                        'msg'   => $error,
-                        'data'  => null,
-                    ]);
+                    return $this->fail($error);
                 }
             }
 
@@ -545,26 +476,11 @@ abstract class ResourceController extends Controller
 
             $info->save($postData);
 
-            return json([
-                'errno' => 0,
-                'code'  => 200,
-                'msg'   => 'success',
-                'data'  => $info,
-            ]);
+            return $this->success($info);
         } catch (ValidateException $e) {
-            return json([
-                'errno' => 0,
-                'code'  => 400,
-                'msg'   => $this->formatValidateError($e->getError()),
-                'data'  => null,
-            ]);
+            return $this->fail($this->formatValidateError($e->getError()));
         } catch (Throwable $e) {
-            return json([
-                'errno' => 0,
-                'code'  => 400,
-                'msg'   => $e->getMessage(),
-                'data'  => null,
-            ]);
+            return $this->fail($e->getMessage());
         }
     }
 
@@ -585,27 +501,12 @@ abstract class ResourceController extends Controller
             $data  = $query->find($id);
 
             if (!$data) {
-                return json([
-                    'errno' => 0,
-                    'code'  => 400,
-                    'msg'   => $this->notExistMessage,
-                    'data'  => null,
-                ]);
+                return $this->fail($this->notExistMessage);
             }
 
-            return json([
-                'errno' => 0,
-                'code'  => 200,
-                'msg'   => 'success',
-                'data'  => $data->delete(),
-            ]);
+            return $this->success($data->delete());
         } catch (Throwable $e) {
-            return json([
-                'errno' => 0,
-                'code'  => 400,
-                'msg'   => $e->getMessage(),
-                'data'  => null,
-            ]);
+            return $this->fail($e->getMessage());
         }
     }
 
@@ -641,34 +542,14 @@ abstract class ResourceController extends Controller
             $list  = $query->whereIn('id', $ids)->select();
 
             if ($list->isEmpty()) {
-                return json([
-                    'errno' => 0,
-                    'code'  => 400,
-                    'msg'   => $this->notExistMessage,
-                    'data'  => null,
-                ]);
+                return $this->fail($this->notExistMessage);
             }
 
-            return json([
-                'errno' => 0,
-                'code'  => 200,
-                'msg'   => 'success',
-                'data'  => $list->delete(),
-            ]);
+            return $this->success($list->delete());
         } catch (ValidateException $e) {
-            return json([
-                'errno' => 0,
-                'code'  => 400,
-                'msg'   => $this->formatValidateError($e->getError()),
-                'data'  => null,
-            ]);
+            return $this->fail($this->formatValidateError($e->getError()));
         } catch (Throwable $e) {
-            return json([
-                'errno' => 0,
-                'code'  => 400,
-                'msg'   => $e->getMessage(),
-                'data'  => null,
-            ]);
+            return $this->fail($e->getMessage());
         }
     }
 
