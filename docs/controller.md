@@ -543,6 +543,15 @@ class HomeController
 `Lychee\routing\HasDataPermission` 是一个可选 Trait，为资源控制器提供数据范围过滤。
 `use` 后会覆盖 `applyDataPermission()`，按当前登录用户的数据权限过滤查询。
 
+支持四种权限级别：
+
+| 级别 | 说明 |
+|------|------|
+| `all` | 查看所有数据（不过滤） |
+| `dept_tree` | 本部门及所有下级部门的数据 |
+| `dept` | 仅本部门的数据 |
+| `self` | 仅自己的数据（默认） |
+
 ```php
 namespace App\controller;
 
@@ -561,18 +570,74 @@ class OrderController extends ResourceController
     protected array $dataPermission = [
         'enabled'     => true,
         'userIdField' => 'user_id',
+        'deptIdField' => 'dept_id',   // dept / dept_tree 级别使用
         'module'      => 'order',
     ];
 }
 ```
+
+### 配置项
+
+| 配置 | 默认值 | 说明 |
+|------|--------|------|
+| `enabled` | `false` | 是否开启数据权限控制 |
+| `userIdField` | `'user_id'` | 数据所有者字段名（self 级别使用） |
+| `deptIdField` | `'dept_id'` | 数据所属部门字段名（dept / dept_tree 级别使用） |
+| `module` | `''` | 当前模块标识，用于匹配权限级别 |
 
 ### 工作原理
 
 - 从 `request()->loginId()` 获取当前登录用户 ID（由认证中间件挂载）
 - 调用 `isAdmin($userId)` 判断是否管理员（默认返回 `false`）
 - 调用 `getPermissionLevel($userId, $module)` 获取权限级别（默认返回 `'self'`）
-- `'self'` 级别：自动附加 `where(user_id, 当前用户ID)` 条件
-- `'all'` 级别：不附加过滤
+- 按级别应用过滤：
+  - `all`：不附加过滤
+  - `dept_tree`：附加 `whereIn(dept_id, 本部门及所有下级部门ID)`
+  - `dept`：附加 `where(dept_id, 本部门ID)`
+  - `self`：附加 `where(user_id, 当前用户ID)`
+
+> `dept` / `dept_tree` 级别下，若用户无部门归属（`getUserDeptId` 返回 `null`），自动回退到 `self` 级别。
+
+### 部门解析器 DeptResolverInterface
+
+使用 `dept` / `dept_tree` 级别时，需在容器中绑定 `DeptResolverInterface` 实现：
+
+```php
+namespace App\auth;
+
+use Lychee\routing\DeptResolverInterface;
+
+class DbDeptResolver implements DeptResolverInterface
+{
+    public function getUserDeptId(int $userId): ?int
+    {
+        return User::find($userId)?->dept_id;
+    }
+
+    public function getSubDeptIds(int $deptId): array
+    {
+        // 递归查询部门及所有子部门 ID（建议缓存结果）
+        $ids = [$deptId];
+        $children = Dept::where('parent_id', $deptId)->column('id');
+        foreach ($children as $childId) {
+            $ids = array_merge($ids, $this->getSubDeptIds($childId));
+        }
+        return $ids;
+    }
+}
+```
+
+在 ServiceProvider 或启动文件中绑定：
+
+```php
+$container->bind(
+    \Lychee\routing\DeptResolverInterface::class,
+    \App\auth\DbDeptResolver::class,
+);
+```
+
+> 未绑定实现时使用 `dept` / `dept_tree` 级别会抛出 `RuntimeException`，
+> 仅使用 `all` / `self` 级别时无需绑定。
 
 ### 覆盖管理员与权限逻辑
 
@@ -586,6 +651,7 @@ class OrderController extends ResourceController
     protected array $dataPermission = [
         'enabled'     => true,
         'userIdField' => 'user_id',
+        'deptIdField' => 'dept_id',
         'module'      => 'order',
     ];
 
@@ -605,6 +671,7 @@ class OrderController extends ResourceController
             ? $role->data_scope
             : json_decode($role->data_scope, true);
 
+        // 返回 'all' | 'dept_tree' | 'dept' | 'self'
         return $dataScope[$module] ?? 'self';
     }
 }
@@ -612,10 +679,16 @@ class OrderController extends ResourceController
 
 ### 单条数据权限检查
 
-`canAccessData($ownerId)` 用于在非查询场景（如更新、删除前）判断当前用户是否有权操作某条数据：
+`canAccessData()` 用于在非查询场景（如更新、删除前）判断当前用户是否有权操作某条数据：
 
 ```php
+// self 级别：只需传 ownerId
 if (!$this->canAccessData($order->user_id)) {
+    return json(['code' => 403, 'msg' => '无权操作'], 403);
+}
+
+// dept / dept_tree 级别：传 ownerId + deptId
+if (!$this->canAccessData($order->user_id, $order->dept_id)) {
     return json(['code' => 403, 'msg' => '无权操作'], 403);
 }
 ```
