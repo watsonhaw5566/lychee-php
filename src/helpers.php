@@ -523,6 +523,20 @@ if (!function_exists('dd')) {
     }
 }
 
+if (!function_exists('http')) {
+    /**
+     * 创建一个 HTTP 客户端请求构建器。
+     *
+     *   http()->get('https://api.example.com/users');
+     *   http()->withToken('xxx')->post('/users', ['name' => 'test']);
+     *   http()->baseUrl('https://api.example.com')->timeout(10)->get('/users');
+     */
+    function http(): \Lychee\http\client\PendingRequest
+    {
+        return new \Lychee\http\client\PendingRequest();
+    }
+}
+
 if (!function_exists('lychee_is_debug')) {
     /**
      * 判断当前是否处于调试模式。
