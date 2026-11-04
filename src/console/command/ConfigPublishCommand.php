@@ -47,7 +47,7 @@ class ConfigPublishCommand extends Command
         'satoken'    => 'SaToken 认证配置',
         'session'    => '会话 Session 配置',
         'view'       => 'Twig 模板引擎配置',
-        'websocket'  => 'WebSocket 服务配置',
+        'worker'     => 'Worker 服务配置（HTTP + WebSocket）',
     ];
 
     protected function configure(): void

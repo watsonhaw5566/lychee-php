@@ -91,4 +91,14 @@ class ConnectionManager
     {
         return (string) ($this->config['default'] ?? 'mysql');
     }
+
+    /**
+     * 获取所有已创建的连接（用于常驻进程请求间清理）。
+     *
+     * @return array<string, Connection>
+     */
+    public function getConnections(): array
+    {
+        return $this->connections;
+    }
 }

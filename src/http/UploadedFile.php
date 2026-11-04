@@ -114,7 +114,12 @@ class UploadedFile extends File
             return false;
         }
 
-        return $this->test || is_uploaded_file($this->getPathname());
+        // Workerman 环境下文件直接写入 tmp 目录，不经过 PHP 的 is_uploaded_file 检查
+        if ($this->test || PHP_SAPI === 'cli') {
+            return is_file($this->getPathname());
+        }
+
+        return is_uploaded_file($this->getPathname());
     }
 
     /**

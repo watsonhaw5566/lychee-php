@@ -14,3 +14,10 @@ parameters:
         -
             identifier: constructor.unusedParameter
             path: src/view/driver/Liquid.php
+        # Workerman 为可选依赖，未安装时静态分析无法解析其符号
+        -
+            identifier: class.notFound
+            path: src/websocket/*
+        -
+            identifier: class.notFound
+            path: src/http/Response.php

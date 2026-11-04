@@ -175,6 +175,26 @@ class Response
         return $this->cookies;
     }
 
+    /**
+     * 将 Lychee 响应写入 Workerman 连接。
+     *
+     * @param \Workerman\Connection\TcpConnection $connection
+     */
+    public function toWorkerman(object $connection): void
+    {
+        $response = new \Workerman\Protocols\Http\Response(
+            $this->status,
+            $this->headers,
+            $this->content,
+        );
+
+        foreach ($this->cookies as $cookie) {
+            $response->header('Set-Cookie', (string) $cookie);
+        }
+
+        $connection->send($response);
+    }
+
     public function send(): void
     {
         http_response_code($this->status);

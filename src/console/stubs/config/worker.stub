@@ -1,0 +1,39 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    // ── 服务监听 ──────────────────────────────────────────────────
+    'host'  => '0.0.0.0',
+    'port'  => 8080,
+    'count' => cpu_count(),
+
+    // ── WebSocket（同端口，自动协议升级） ─────────────────────────
+    'websocket' => [
+        // path 到 Handler 类的映射
+        'handlers' => [
+            // '/chat' => \App\websocket\ChatHandler::class,
+        ],
+    ],
+
+    // ── 队列消费进程（需已配置 config/queue.php） ─────────────────
+    // 取消注释以启用，启动后无需单独运行 php lee queue:work
+    // 'queue' => [
+    //     'connection' => null,  // 队列连接名，null 使用默认
+    //     'queue'      => null,  // 队列名，null 使用默认
+    //     'count'      => 1,     // 消费进程数
+    //     'sleep'      => 1,     // 轮询间隔（秒）
+    //     'tries'      => 3,     // 最大重试次数
+    // ],
+
+    // ── 定时任务调度进程（需已配置 config/cron.php） ─────────────
+    // 启用后无需配置系统 crontab，也无需单独运行 php lee cron:schedule
+    // 定时任务进程固定单实例，对齐分钟边界每分钟触发一次
+    'cron' => [
+        'enable' => true,
+    ],
+
+    // ── 进程管理 ──────────────────────────────────────────────────
+    'pid_file' => runtime_path('worker.pid'),
+    'log_file' => runtime_path('worker.log'),
+];

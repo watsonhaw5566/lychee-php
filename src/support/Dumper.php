@@ -77,6 +77,14 @@ class Dumper
     }
 
     /**
+     * 重置样式注入标记（用于常驻进程请求间清理）。
+     */
+    public static function resetStyle(): void
+    {
+        self::$styleIncluded = false;
+    }
+
+    /**
      * 按变量类型分派格式化逻辑。
      *
      * @param WeakMap<object, true> $seen

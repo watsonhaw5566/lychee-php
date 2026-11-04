@@ -42,6 +42,7 @@ use Lychee\session\driver\File as SessionFileDriver;
 use Lychee\session\Session;
 use Lychee\view\ExceptionRenderer;
 use Lychee\view\View;
+use Lychee\websocket\command\DevCommand;
 use Lychee\websocket\command\ServerCommand;
 use Lychee\websocket\WebSocketServer;
 use Lychee\validate\Validate;
@@ -140,7 +141,7 @@ class Application
             'queue'      => $this->bootQueue(...),
             'session'    => $this->bootSession(...),
             'i18n'       => $this->bootI18n(...),
-            'websocket'  => $this->bootWebSocket(...),
+            'worker'     => $this->bootWorker(...),
         ];
 
         foreach ($modules as $key => $boot) {
@@ -514,13 +515,9 @@ class Application
         });
     }
 
-    private function bootWebSocket(): void
+    private function bootWorker(): void
     {
-        /** @var Config $config */
-        $config          = $this->container->get('config');
-        $websocketConfig = $config->get('websocket', []);
-
-        $server = new WebSocketServer($this->container, $websocketConfig);
+        $server = new WebSocketServer($this->container);
 
         $this->container->instance(WebSocketServer::class, $server);
         $this->container->instance('websocket', $server);
@@ -528,6 +525,7 @@ class Application
         /** @var ConsoleApplication $console */
         $console = $this->container->get(ConsoleApplication::class);
         $console->addCommand(ServerCommand::class);
+        $console->addCommand(DevCommand::class);
     }
 
     private function bootMigration(): void
