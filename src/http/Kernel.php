@@ -46,6 +46,9 @@ class Kernel
 
         $request = $request->withRouteParams($route->params);
 
+        // 将路由目标（控制器/方法）挂载到请求，供权限中间件读取 Attribute
+        $request->setRouteTarget($route->controller, $route->action);
+
         // 将携带路由参数的请求实例注册到容器，使全局 request() 辅助函数
         // 与中间件管道、控制器拿到的是同一个实例；否则中间件在克隆体上
         // setLoginId() 后，控制器通过 request()->loginId() 仍取到 null。

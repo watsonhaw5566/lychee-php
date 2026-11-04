@@ -15,6 +15,12 @@ class Request
     /** 当前登录用户 ID（由认证中间件设置） */
     private ?int $loginId = null;
 
+    /** 路由匹配的控制器类名（由 Kernel 设置，供权限中间件使用） */
+    private string $routeController = '';
+
+    /** 路由匹配的方法名（由 Kernel 设置，供权限中间件使用） */
+    private string $routeAction = '';
+
     /** @var array<string, UploadedFile|UploadedFile[]> */
     private array $files;
 
@@ -326,6 +332,28 @@ class Request
         $clone->routeParams = $params;
 
         return $clone;
+    }
+
+    /**
+     * 设置路由匹配的控制器类名和方法名（由 Kernel 调用）。
+     *
+     * @param class-string $controller
+     */
+    public function setRouteTarget(string $controller, string $action): void
+    {
+        $this->routeController = $controller;
+        $this->routeAction     = $action;
+    }
+
+    /** @return class-string */
+    public function getRouteController(): string
+    {
+        return $this->routeController;
+    }
+
+    public function getRouteAction(): string
+    {
+        return $this->routeAction;
     }
 
     public function wantsJson(): bool

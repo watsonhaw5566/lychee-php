@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Lychee\auth;
 
+use Lychee\auth\exception\NoPermissionException;
 use Lychee\auth\exception\NotLoginException;
 use Lychee\auth\exception\TokenInvalidException;
 use Lychee\cache\CacheManager;
@@ -35,6 +36,8 @@ class SaToken implements SatokenInterface
     ];
 
     protected ?TokenReaderInterface $tokenReader = null;
+
+    protected ?PermissionResolverInterface $permissionResolver = null;
 
     public function __construct(protected Container $app)
     {
@@ -458,5 +461,65 @@ class SaToken implements SatokenInterface
     public function kickoutByToken(string $token): bool
     {
         return $this->logout($token);
+    }
+
+    // ── 权限校验 ────────────────────────────────────────────────────
+
+    /**
+     * 获取权限解析器实例。
+     *
+     * 优先从容器中解析 PermissionResolverInterface，
+     * 未绑定时使用 NullPermissionResolver（全部放行）。
+     */
+    protected function getPermissionResolver(): PermissionResolverInterface
+    {
+        if ($this->permissionResolver !== null) {
+            return $this->permissionResolver;
+        }
+
+        if ($this->app->has(PermissionResolverInterface::class)) {
+            $this->permissionResolver = $this->app->get(PermissionResolverInterface::class);
+        } else {
+            $this->permissionResolver = new NullPermissionResolver();
+        }
+
+        return $this->permissionResolver;
+    }
+
+    public function hasPermission(string $permission): bool
+    {
+        $loginId = $this->getCurrentLoginId();
+
+        return $this->getPermissionResolver()->hasPermission($loginId, $permission);
+    }
+
+    public function hasAnyPermission(string ...$permissions): bool
+    {
+        $loginId  = $this->getCurrentLoginId();
+        $resolver = $this->getPermissionResolver();
+
+        foreach ($permissions as $permission) {
+            if ($resolver->hasPermission($loginId, $permission)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function checkPermission(string $permission): void
+    {
+        if (!$this->hasPermission($permission)) {
+            throw new NoPermissionException("无权限：{$permission}");
+        }
+    }
+
+    public function checkAnyPermission(string ...$permissions): void
+    {
+        if (!$this->hasAnyPermission(...$permissions)) {
+            $list = implode(', ', $permissions);
+
+            throw new NoPermissionException("无权限：{$list}");
+        }
     }
 }
