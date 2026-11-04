@@ -14,6 +14,8 @@ use Lychee\orm\relation\HasOne;
 use Lychee\orm\relation\Relation;
 use Throwable;
 use ReflectionClass;
+use ReflectionMethod;
+use ReflectionNamedType;
 
 /**
  * ORM 模型基类（Active Record）。
@@ -227,6 +229,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
     /** 子类声明的配置属性名缓存（用于构造时合并到 $modelConfig） */
     protected static array $declaredConfigCache = [];
+
+    /** 反射扫描得到的关联方法名缓存，键为模型类名 */
+    protected static array $relationNamesCache = [];
 
     public function __construct(array $data = [])
     {
@@ -1288,8 +1293,19 @@ abstract class Model implements ArrayAccess, JsonSerializable
         $fields = $this->getActiveFields();
         $allow  = $fields === [] ? array_keys($this->data) : $fields;
 
+        // 关联字段安全网：剔除前端误提交的嵌套关联数据，避免写入主表。
+        // 关联列表由 getRelationNames() 反射自动获取（支持驼峰与蛇形）。
+        $relationKeys = [];
+        foreach ($this->getRelationNames() as $name) {
+            $relationKeys[$name]               = true;
+            $relationKeys[$this->snake($name)] = true;
+        }
+
         $data = [];
         foreach ($allow as $field) {
+            if (isset($relationKeys[$field])) {
+                continue;
+            }
             if (array_key_exists($field, $this->data)) {
                 $data[$field] = $this->data[$field];
             }
@@ -1405,6 +1421,14 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
+     * 驼峰转蛇形（adPlatform -> ad_platform）。
+     */
+    protected function snake(string $value): string
+    {
+        return strtolower((string) preg_replace('/(?<!^)[A-Z]/', '_$0', $value));
+    }
+
+    /**
      * 判断字段是否定义了访问器（getXxxAttr）。
      */
     public function isAccessor(string $name): bool
@@ -1461,6 +1485,81 @@ abstract class Model implements ArrayAccess, JsonSerializable
         } catch (Throwable) {
             return false;
         }
+    }
+
+    /**
+     * 获取模型声明的所有关联方法名。
+     *
+     * 通过反射扫描当前模型（含父类，不含 Model 基类自身）的 public 方法，
+     * 筛选返回值类型为 {@see Relation} 或其子类（HasOne / HasMany / BelongsTo）的方法。
+     *
+     * 与 {@see callReturnsRelation()} 不同，本方法不实际调用关联方法，
+     * 仅依据声明的返回类型判断，无副作用。
+     *
+     * 结果按类缓存，避免重复反射开销。
+     *
+     * @return array<int, string> 关联方法名列表（驼峰，如 orders、adPlatform）
+     */
+    public function getRelationNames(): array
+    {
+        $class = static::class;
+
+        if (!isset(self::$relationNamesCache[$class])) {
+            $relationNames = [];
+            $ref           = new ReflectionClass($class);
+
+            foreach ($ref->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+                // 跳过 Model 基类自身声明的方法（hasOne/hasMany/belongsTo 为 protected，
+                // 不会出现在 IS_PUBLIC 结果中；此处仅作保险）
+                if ($method->getDeclaringClass()->getName() === self::class) {
+                    continue;
+                }
+
+                $returnType = $method->getReturnType();
+                if (!$returnType instanceof ReflectionNamedType) {
+                    continue;
+                }
+
+                $typeName = $returnType->getName();
+                if ($typeName === Relation::class || is_subclass_of($typeName, Relation::class)) {
+                    $relationNames[] = $method->getName();
+                }
+            }
+
+            self::$relationNamesCache[$class] = $relationNames;
+        }
+
+        return self::$relationNamesCache[$class];
+    }
+
+    /**
+     * 从输入数据中剔除关联字段（支持蛇形与驼峰命名）。
+     *
+     * 关联数据不应写入主表。前端提交的嵌套关联数据需在保存前剔除，
+     * 关联列表由 {@see getRelationNames()} 反射自动获取，无需手动维护。
+     *
+     * 用法：
+     *   $data = $model->filterRelationFields($request->post());
+     *   $model->save($data);
+     *
+     * @param array<string, mixed> $data 原始输入数据
+     * @return array<string, mixed> 剔除关联字段后的数据
+     */
+    public function filterRelationFields(array $data): array
+    {
+        $relationNames = $this->getRelationNames();
+        if ($relationNames === []) {
+            return $data;
+        }
+
+        // 同时匹配驼峰（adPlatform）与蛇形（ad_platform）键名
+        $relationKeys = [];
+        foreach ($relationNames as $name) {
+            $relationKeys[$name]              = true;
+            $relationKeys[$this->snake($name)] = true;
+        }
+
+        return array_diff_key($data, $relationKeys);
     }
 
     public function getData(): array
