@@ -417,6 +417,16 @@ class Request
             $headers['Content-Length'] = $_SERVER['CONTENT_LENGTH'];
         }
 
+        // Apache + mod_rewrite 场景下，Authorization 可能被重写到 REDIRECT_HTTP_AUTHORIZATION
+        if (!isset($headers['Authorization'])) {
+            foreach (['REDIRECT_HTTP_AUTHORIZATION', 'REDIRECT_AUTHORIZATION'] as $fallback) {
+                if (isset($_SERVER[$fallback]) && is_string($_SERVER[$fallback])) {
+                    $headers['Authorization'] = $_SERVER[$fallback];
+                    break;
+                }
+            }
+        }
+
         return $headers;
     }
 
