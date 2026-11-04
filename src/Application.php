@@ -217,20 +217,6 @@ class Application
             $routePrefix = (string) config('app.route_prefix', '');
             $router      = new Router($routePrefix);
 
-            // 生产环境存在路由缓存文件时直接加载，跳过目录扫描与注解反射
-            $cacheFile = \Lychee\console\command\RouteCacheCommand::cacheFilePath($this->container->runtimePath);
-            if (is_file($cacheFile)) {
-                $data = require $cacheFile;
-                if (is_array($data) && isset($data['routes']) && is_array($data['routes'])) {
-                    $namedRoutes = isset($data['named_routes']) && is_array($data['named_routes'])
-                        ? $data['named_routes']
-                        : [];
-                    $router->loadFromCache($data['routes'], $namedRoutes);
-
-                    return $router;
-                }
-            }
-
             $router->registerDirectory(
                 $this->basePath . '/app/controller',
                 $this->controllerNamespace
@@ -247,7 +233,6 @@ class Application
             $console = new ConsoleApplication($this->container);
             $console->addCommand(\Lychee\console\command\RunCommand::class);
             $console->addCommand(\Lychee\console\command\RouteListCommand::class);
-            $console->addCommand(\Lychee\console\command\RouteCacheCommand::class);
             $console->addCommand(\Lychee\console\command\MakeRestCommand::class);
             $console->addCommand(\Lychee\console\command\MakeBaseCommand::class);
             $console->addCommand(\Lychee\console\command\ConfigPublishCommand::class);
