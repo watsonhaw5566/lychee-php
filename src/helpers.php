@@ -537,6 +537,30 @@ if (!function_exists('http')) {
     }
 }
 
+if (!function_exists('event')) {
+    /**
+     * 分发事件，或获取事件调度器实例。
+     *
+     *   event('user.login', [$user]);          // 分发事件
+     *   event()->listen('user.*', $callback);  // 获取调度器后注册监听
+     *
+     * @param  string|null $event   事件名，为 null 时返回调度器实例
+     * @param  array       $payload 传递给监听器的参数
+     * @return \Lychee\event\EventDispatcher|array
+     */
+    function event(?string $event = null, array $payload = []): mixed
+    {
+        /** @var \Lychee\event\EventDispatcher $dispatcher */
+        $dispatcher = app('event');
+
+        if ($event === null) {
+            return $dispatcher;
+        }
+
+        return $dispatcher->dispatch($event, $payload);
+    }
+}
+
 if (!function_exists('lychee_is_debug')) {
     /**
      * 判断当前是否处于调试模式。
