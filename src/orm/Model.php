@@ -101,11 +101,14 @@ use ReflectionNamedType;
  * @method static int insert(array $data)
  * @method static int|string insertGetId(array $data)
  * @method static int insertAll(array $rows)
+ * @method static int upsert(array $rows, array $uniqueBy = [], array $update = [])
  * @method static int update(array $data)
  * @method static int delete()
  * @method static int forceDelete()
  * @method static int inc(string $field, int|float $step = 1)
  * @method static int dec(string $field, int|float $step = 1)
+ * @method static static firstOrCreate(array $attributes, array $values = [])
+ * @method static static updateOrCreate(array $attributes, array $values = [])
  *
  * @phpstan-consistent-constructor
  */
