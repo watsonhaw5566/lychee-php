@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace Lychee\orm;
 
 use ArrayAccess;
+use BackedEnum;
 use Closure;
+use DateTimeImmutable;
+use DateTimeInterface;
 use JsonSerializable;
+use Lychee\orm\attribute\Column;
 use Lychee\orm\exception\DbException;
 use Lychee\orm\relation\BelongsTo;
 use Lychee\orm\relation\HasMany;
@@ -14,8 +18,10 @@ use Lychee\orm\relation\HasOne;
 use Lychee\orm\relation\Relation;
 use Throwable;
 use ReflectionClass;
+use ReflectionEnum;
 use ReflectionMethod;
 use ReflectionNamedType;
+use UnitEnum;
 
 /**
  * ORM 模型基类（Active Record）。
@@ -132,6 +138,13 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
     /** 已解析的 PHPDoc @property 注解缓存，供 ide-helper 复用 */
     protected static array $modelMetaCache = [];
+
+    /**
+     * #[Column] 属性扫描结果缓存，键为模型类名，值为 ['属性名' => Column 实例]。
+     *
+     * @var array<class-string, array<string, Column>>
+     */
+    protected static array $columnAttributeCache = [];
 
     // ── 子类覆盖项 ─────────────────────────────────────────────────────
 
@@ -398,7 +411,10 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /**
      * 获取模型声明的 JSON 字段列表。
      *
-     * 返回合并后的 $modelConfig['json']（含子类声明的 protected array $json）。
+     * 返回合并以下来源的 JSON 字段：
+     *   - 传统 $modelConfig['json']（含子类声明的 protected array $json）
+     *   - #[Column(json: true)] 或 #[Column(type: 'json')] 声明的属性
+     *
      * 供外部（如控制器的查询 DSL）判断某字段是否为 JSON 数组字段，
      * 避免使用反射直接读取 protected 属性。
      *
@@ -406,7 +422,15 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function getJsonFields(): array
     {
-        return $this->modelConfig['json'];
+        $fields = $this->modelConfig['json'];
+
+        foreach ($this->getColumnMeta() as $name => $column) {
+            if ($column->json || $column->type === 'json') {
+                $fields[] = $name;
+            }
+        }
+
+        return array_values(array_unique($fields));
     }
 
     // ── Query 入口 ───────────────────────────────────────────────────────
@@ -742,7 +766,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
             return $value;
         }
 
-        return match ($type) {
+        $info = $this->parseType($type);
+
+        return match ($info['kind']) {
             'int', 'integer'  => (int) $value,
             'float', 'double' => (float) $value,
             'bool', 'boolean' => (bool) $value,
@@ -752,6 +778,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
             'json'            => is_string($value) ? json_decode($value, $this->jsonAssoc) : $value,
             'timestamp'       => is_numeric($value) ? date($this->dateFormat, (int) $value) : $value,
             'datetime'        => $value,
+            'decimal'         => $this->readDecimal($value, (int) $info['param']),
+            'date'            => $this->readDate($value, (string) $info['param']),
+            'enum'            => $this->readEnum($value, (string) $info['class']),
             default           => $value,
         };
     }
@@ -770,7 +799,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
             return $value;
         }
 
-        return match ($type) {
+        $info = $this->parseType($type);
+
+        return match ($info['kind']) {
             'int', 'integer'          => (int) $value,
             'float', 'double'         => (float) $value,
             'bool', 'boolean'         => $value ? 1 : 0,
@@ -779,24 +810,211 @@ abstract class Model implements ArrayAccess, JsonSerializable
                 ? json_encode($value, JSON_UNESCAPED_UNICODE)
                 : $value,
             'timestamp'               => is_numeric($value) ? (int) $value : strtotime((string) $value),
+            'datetime'                => $value,
+            'decimal'                 => $this->writeDecimal($value, (int) $info['param']),
+            'date'                    => $this->writeDate($value, (string) $info['param']),
+            'enum'                    => $this->writeEnum($value),
             default                   => $value,
         };
     }
 
     protected function getFieldType(string $name): ?string
     {
-        // 1. 优先使用手动配置的 $type
+        // 1. 优先使用 #[Column] 属性声明
+        $meta = $this->getColumnMeta();
+        if (isset($meta[$name])) {
+            $column = $meta[$name];
+            if ($column->type !== null) {
+                return $column->type;
+            }
+            if ($column->json) {
+                return 'json';
+            }
+        }
+
+        // 2. 手动配置的 $type
         if (isset($this->modelConfig['type'][$name])) {
             return (string) $this->modelConfig['type'][$name];
         }
 
-        // 2. 检查 $json 列表
+        // 3. 检查 $json 列表
         if (in_array($name, $this->modelConfig['json'], true)) {
             return 'json';
         }
 
-        // 3. 从数据库元信息自动推导类型
+        // 4. 从数据库元信息自动推导类型
         return $this->inferFieldType($name);
+    }
+
+    /**
+     * 扫描模型中所有标注了 #[Column] 的属性。
+     *
+     * 仅收集子类（含继承链中非 Model 基类）声明的属性，跳过 Model 自身的属性。
+     * 结果按类缓存，避免重复反射。
+     *
+     * @return array<string, Column> 键为属性名
+     */
+    protected function getColumnMeta(): array
+    {
+        $class = static::class;
+
+        if (!isset(self::$columnAttributeCache[$class])) {
+            $meta = [];
+            $ref  = new ReflectionClass($class);
+
+            foreach ($ref->getProperties() as $prop) {
+                // 跳过 Model 基类自身声明的属性
+                if ($prop->getDeclaringClass()->getName() === self::class) {
+                    continue;
+                }
+
+                $attrs = $prop->getAttributes(Column::class);
+                if ($attrs !== []) {
+                    $meta[$prop->getName()] = $attrs[0]->newInstance();
+                }
+            }
+
+            self::$columnAttributeCache[$class] = $meta;
+        }
+
+        return self::$columnAttributeCache[$class];
+    }
+
+    /**
+     * 应用 #[Column] 声明的默认值。
+     *
+     * 仅在 INSERT 时调用，且仅对未被显式赋值（不在 $this->data 中）的字段生效。
+     * 默认值会经过 writeTransform 转换后写入 $this->data，
+     * 保证枚举取 value、数组转 JSON、decimal 格式化等行为与手动赋值一致。
+     *
+     * `default: null` 视为未声明默认值（不做处理）。
+     */
+    protected function applyColumnDefaults(): void
+    {
+        foreach ($this->getColumnMeta() as $name => $column) {
+            if ($column->default === null) {
+                continue;
+            }
+
+            if (array_key_exists($name, $this->data)) {
+                continue;
+            }
+
+            $this->data[$name] = $this->writeTransform($name, $column->default);
+        }
+    }
+
+    /**
+     * 解析类型字符串，返回统一的描述符。
+     *
+     * 返回结构：
+     *   - 基础类型：['kind' => 'int']
+     *   - 参数化：['kind' => 'decimal', 'param' => '2']
+     *   - 枚举：  ['kind' => 'enum', 'class' => 'App\\Enum\\UserStatus']
+     *
+     * @return array{kind:string, param?:string, class?:string}
+     */
+    protected function parseType(string $type): array
+    {
+        // 枚举类
+        if (enum_exists($type)) {
+            return ['kind' => 'enum', 'class' => $type];
+        }
+
+        // 参数化类型：decimal:2、date:Y-m-d、datetime:Y-m-d H:i:s
+        if (str_contains($type, ':')) {
+            [$kind, $param] = explode(':', $type, 2);
+
+            return ['kind' => $kind, 'param' => $param];
+        }
+
+        return ['kind' => $type];
+    }
+
+    /**
+     * decimal 类型读取：格式化为指定位数的字符串，避免浮点精度丢失。
+     */
+    protected function readDecimal(mixed $value, int $scale): string
+    {
+        return number_format((float) $value, $scale, '.', '');
+    }
+
+    /**
+     * decimal 类型写入：转为字符串，保留调用方传入的精度。
+     */
+    protected function writeDecimal(mixed $value, int $scale): string
+    {
+        if (is_string($value) || is_numeric($value)) {
+            return number_format((float) $value, $scale, '.', '');
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * date 类型读取：按指定格式解析为 DateTimeImmutable。
+     */
+    protected function readDate(mixed $value, string $format): ?DateTimeInterface
+    {
+        if ($value instanceof DateTimeInterface) {
+            return $value;
+        }
+
+        $date = DateTimeImmutable::createFromFormat($format, (string) $value);
+
+        return $date === false ? null : $date;
+    }
+
+    /**
+     * date 类型写入：DateTimeInterface 按格式输出字符串。
+     */
+    protected function writeDate(mixed $value, string $format): string
+    {
+        if ($value instanceof DateTimeInterface) {
+            return $value->format($format);
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * 枚举类型读取：将数据库值转为枚举实例。
+     *
+     * - 纯枚举（UnitEnum）按 name 匹配
+     * - 回退枚举（BackedEnum）按 value 匹配
+     */
+    protected function readEnum(mixed $value, string $class): UnitEnum|string
+    {
+        $ref = new ReflectionEnum($class);
+
+        if ($ref->isBacked()) {
+            /** @var class-string<BackedEnum> $class */
+            return $class::from($value);
+        }
+
+        foreach ($class::cases() as $case) {
+            if ($case->name === $value) {
+                return $case;
+            }
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * 枚举类型写入：取出枚举的 value（回退枚举）或 name（纯枚举）。
+     */
+    protected function writeEnum(mixed $value): mixed
+    {
+        if ($value instanceof BackedEnum) {
+            return $value->value;
+        }
+
+        if ($value instanceof UnitEnum) {
+            return $value->name;
+        }
+
+        return $value;
     }
 
     /**
@@ -1079,6 +1297,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
         if ($this->fireEvent('before_insert') === false) {
             return false;
         }
+
+        // 应用 #[Column] 声明的默认值（仅在字段未被显式赋值时）
+        $this->applyColumnDefaults();
 
         $data = $this->getDataForWrite();
 

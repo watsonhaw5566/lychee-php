@@ -561,6 +561,85 @@ User::active(User::where('age', '>', 18))->select();
 
 ### 字段类型转换
 
+#### 使用 `#[Column]` 属性（推荐）
+
+在模型属性上标注 `#[Column]` 声明字段类型，取代传统的 `$type` / `$json` 配置。支持参数化类型与枚举类：
+
+```php
+use Lychee\orm\attribute\Column;
+
+class User extends Model
+{
+    // 基础类型
+    #[Column(type: 'int')]
+    protected int $id;
+
+    // 精度小数：读取为字符串，避免浮点精度丢失
+    #[Column(type: 'decimal:2')]
+    protected string $balance;          // 读为 '99.50'
+
+    // 日期格式：读取为 DateTimeImmutable
+    #[Column(type: 'date:Y-m-d')]
+    protected ?\DateTimeImmutable $birthday;
+
+    // 枚举类：读取为枚举实例
+    #[Column(type: UserStatus::class)]
+    protected UserStatus $status;
+
+    // JSON 字段（快捷方式，等价 type: 'json'）
+    #[Column(json: true)]
+    protected array $extra;
+}
+```
+
+支持的 `type` 值：
+
+| type 值 | 读取行为 | 写入行为 |
+| --- | --- | --- |
+| `int` / `integer` | `(int)` | `(int)` |
+| `float` / `double` | `(float)` | `(float)` |
+| `bool` / `boolean` | `(bool)` | `1` / `0` |
+| `string` | `(string)` | `(string)` |
+| `array` / `object` / `json` | `json_decode` | `json_encode` |
+| `timestamp` | 时间戳格式化为 `dateFormat` | 转为时间戳 |
+| `datetime` | 原样 | 原样 |
+| `decimal:{scale}` | 格式化为指定位数字符串（如 `99.50`） | 格式化为指定位数字符串 |
+| `date:{format}` | 解析为 `DateTimeImmutable` | 按格式输出字符串 |
+| `EnumClass::class` | 转为枚举实例（BackedEnum 按 value，UnitEnum 按 name） | 取 `->value` 或 `->name` |
+
+> **类型解析优先级**：`#[Column]` > 模型 `$type` > 模型 `$json` > 数据库表结构自动推导。
+
+#### 默认值
+
+通过 `default` 参数声明 INSERT 时的默认值。**仅在字段未被显式赋值时生效**，显式赋值（包括赋 `null`）不会被覆盖。默认值会经过 `writeTransform` 转换，因此与手动赋值行为一致：
+
+```php
+use Lychee\orm\attribute\Column;
+
+class User extends Model
+{
+    // 枚举默认值：写入时取 ->value（'active'）
+    #[Column(type: UserStatus::class, default: UserStatus::Active)]
+    protected UserStatus $status;
+
+    // 精度小数默认值：写入 '0.00'
+    #[Column(type: 'decimal:2', default: '0.00')]
+    protected string $balance;
+
+    // JSON 默认值：写入时 json_encode 为 '[]'
+    #[Column(json: true, default: [])]
+    protected array $tags;
+
+    // 整数默认值
+    #[Column(type: 'int', default: 0)]
+    protected int $score;
+}
+```
+
+> `default: null` 视为未声明默认值，不做任何处理。默认值仅在 `INSERT`（`save()` 新增）时应用，`UPDATE` 不会填充默认值。
+
+#### 传统 `$type` / `$json` 配置
+
 ```php
 class User extends Model
 {
