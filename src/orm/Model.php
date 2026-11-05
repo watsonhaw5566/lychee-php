@@ -843,7 +843,42 @@ abstract class Model implements ArrayAccess, JsonSerializable
         }
 
         // 4. 从数据库元信息自动推导类型
-        return $this->inferFieldType($name);
+        $inferred = $this->inferFieldType($name);
+        if ($inferred !== null) {
+            return $inferred;
+        }
+
+        // 5. 约定俗成的通用字段默认类型（id / create_time / update_time / delete_time）
+        return $this->getConventionFieldType($name);
+    }
+
+    /**
+     * 约定俗成的通用字段默认类型。
+     *
+     * 避免每个模型都为 id / create_time / update_time / delete_time
+     * 重复声明 #[Column]。这些字段按框架约定自动获得类型转换：
+     *   - 主键（$pk）→ 'int'
+     *   - 创建时间（$createTime）→ 'datetime'
+     *   - 更新时间（$updateTime）→ 'datetime'
+     *   - 软删除时间（SoftDelete::$deleteTime）→ 'datetime'
+     *
+     * 返回 null 表示该字段无约定默认类型（交由调用方处理）。
+     */
+    protected function getConventionFieldType(string $name): ?string
+    {
+        if ($name === $this->pk) {
+            return 'int';
+        }
+
+        if ($name === $this->createTime || $name === $this->updateTime) {
+            return 'datetime';
+        }
+
+        if (method_exists($this, 'getDeleteTimeField') && $name === $this->getDeleteTimeField()) {
+            return 'datetime';
+        }
+
+        return null;
     }
 
     /**
@@ -932,15 +967,22 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
-     * decimal 类型读取：格式化为指定位数的字符串，避免浮点精度丢失。
+     * decimal 类型读取：按指定位数四舍五入后返回 float。
+     *
+     * 返回数字类型（而非字符串），以便 JSON 序列化后前端数字输入组件
+     * （如 Arco Design a-input-number）能直接回显。写入时 writeDecimal
+     * 仍会格式化为指定位数的字符串写入数据库，不影响存储精度。
+     *
+     * 注意：底层使用 (float) 转换，超大位数（超过 PHP_INT_MAX 精度范围）
+     * 的 decimal 如需精确运算，建议使用 type: 'string' 配合 bcmath 手动处理。
      */
-    protected function readDecimal(mixed $value, int $scale): string
+    protected function readDecimal(mixed $value, int $scale): float
     {
-        return number_format((float) $value, $scale, '.', '');
+        return round((float) $value, $scale);
     }
 
     /**
-     * decimal 类型写入：转为字符串，保留调用方传入的精度。
+     * decimal 类型写入：转为指定位数的字符串写入数据库。
      */
     protected function writeDecimal(mixed $value, int $scale): string
     {

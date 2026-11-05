@@ -15,9 +15,9 @@ use Attribute;
  *   #[Column(type: 'int')]
  *   protected int $id;
  *
- *   // 精度小数（读取为字符串，避免浮点精度丢失）
+ *   // 精度小数（读取为 float，JSON 输出数字，兼容前端数字输入组件）
  *   #[Column(type: 'decimal:2')]
- *   protected string $balance;        // 读为 '99.50'
+ *   protected float $balance;        // 读为 99.5
  *
  *   // 日期格式（读取为 DateTimeImmutable）
  *   #[Column(type: 'date:Y-m-d')]

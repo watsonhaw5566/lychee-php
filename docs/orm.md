@@ -574,9 +574,9 @@ class User extends Model
     #[Column(type: 'int')]
     protected int $id;
 
-    // 精度小数：读取为字符串，避免浮点精度丢失
+    // 精度小数：读取为 float（JSON 输出数字，兼容前端数字输入组件）
     #[Column(type: 'decimal:2')]
-    protected string $balance;          // 读为 '99.50'
+    protected float $balance;          // 读为 99.5
 
     // 日期格式：读取为 DateTimeImmutable
     #[Column(type: 'date:Y-m-d')]
@@ -603,7 +603,7 @@ class User extends Model
 | `array` / `object` / `json` | `json_decode` | `json_encode` |
 | `timestamp` | 时间戳格式化为 `dateFormat` | 转为时间戳 |
 | `datetime` | 原样 | 原样 |
-| `decimal:{scale}` | 格式化为指定位数字符串（如 `99.50`） | 格式化为指定位数字符串 |
+| `decimal:{scale}` | 四舍五入到指定位数的 `float`（如 `99.5`） | 格式化为指定位数字符串写入数据库 |
 | `date:{format}` | 解析为 `DateTimeImmutable` | 按格式输出字符串 |
 | `EnumClass::class` | 转为枚举实例（BackedEnum 按 value，UnitEnum 按 name） | 取 `->value` 或 `->name` |
 
@@ -622,9 +622,9 @@ class User extends Model
     #[Column(type: UserStatus::class, default: UserStatus::Active)]
     protected UserStatus $status;
 
-    // 精度小数默认值：写入 '0.00'
-    #[Column(type: 'decimal:2', default: '0.00')]
-    protected string $balance;
+    // 精度小数默认值：写入 0.00（经 writeDecimal 格式化为字符串入库）
+    #[Column(type: 'decimal:2', default: 0.00)]
+    protected float $balance;
 
     // JSON 默认值：写入时 json_encode 为 '[]'
     #[Column(json: true, default: [])]

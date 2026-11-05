@@ -6,17 +6,23 @@ namespace Lychee\console\command;
 
 use Lychee\console\Command;
 use Lychee\console\Input;
+use Lychee\console\ModelColumnBuilder;
 use Lychee\console\Output;
 use Lychee\console\input\Argument;
+use Lychee\console\input\Option;
 use RuntimeException;
 
 /**
  * 创建资源控制器命令（同时生成 Model 与 Validate）。
  *
- * 用法：php lee make:rest User
+ * 用法：
+ *   php lee make:rest User
+ *   php lee make:rest User --table=users   # 同时从数据库表生成 #[Column] 注解
  */
 class MakeRestCommand extends Command
 {
+    use ModelColumnBuilder;
+
     protected string $name = 'make:rest';
 
     protected string $description = 'Create a new resource controller (with Model & Validate)';
@@ -26,6 +32,7 @@ class MakeRestCommand extends Command
         $this->setName($this->name);
         $this->setDescription($this->description);
         $this->addArgument('name', Argument::REQUIRED, 'The name of the resource (e.g. User)');
+        $this->addOption('table', 't', Option::VALUE_OPTIONAL, '从指定数据表读取字段生成 #[Column] 注解');
     }
 
     protected function execute(Input $input, Output $output): int
@@ -81,7 +88,18 @@ class MakeRestCommand extends Command
         if (file_exists($modelPath)) {
             $output->writeln("<comment>Skipped model:</comment>      {$modelName}.php (already exists)");
         } else {
-            $this->writeStub($modelPath, 'model.stub', $replace);
+            $table                                    = $input->getOption('table');
+            ['use' => $useStr, 'columns' => $columns] = $this->resolveColumns($table, $output);
+
+            // 指定 --table 时，声明逻辑表名（无前缀）
+            $tableName = $table ? "    protected \$name = '{$table}';" . "\n" : '';
+
+            $modelReplace = array_merge($replace, [
+                '{{tableName}}' => $tableName,
+                '{{columnUse}}' => $useStr,
+                '{{columns}}'   => $columns,
+            ]);
+            $this->writeStub($modelPath, 'model.stub', $modelReplace);
             $output->writeln("<info>Created model:</info>      {$modelName}.php");
         }
 

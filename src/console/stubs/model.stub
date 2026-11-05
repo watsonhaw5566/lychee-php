@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace {{namespace}}\model;
 
 use Lychee\orm\Model;
+{{columnUse}}
 
 /**
  * {{model}} 模型。
  */
 class {{model}} extends Model
 {
+{{tableName}}
+{{columns}}
 }

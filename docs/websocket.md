@@ -1,6 +1,6 @@
 # WebSocket 服务
 
-Lychee PHP 通过可选的 [Workerman](https://www.workerman.net/) 集成，提供 **WebSocket 长连接** 能力。WebSocket 服务独立监听一个端口，HTTP 请求仍由 PHP-FPM 处理，队列消费和定时任务走各自的 CLI 命令。
+Lychee PHP 提供 **WebSocket 长连接** 服务，独立于 HTTP 请求生命周期运行，适合实时消息推送、在线聊天室等场景。WebSocket 服务单独监听一个端口，HTTP 请求仍由 PHP-FPM 处理，队列消费与定时任务走各自的 CLI 命令。
 
 > WebSocket 服务以**常驻进程**方式运行，与传统 PHP-FPM 的短生命周期请求模型不同。代码修改后需重启服务才能生效。
 
