@@ -240,7 +240,8 @@ class Query
                 if (is_int($k) && is_array($v) && count($v) >= 2) {
                     $this->addWhere($boolean, (string) $v[0], $v[1], $v[2] ?? null, count($v));
                 } else {
-                    $this->addWhere($boolean, (string) $k, '=', $v, 2);
+                    // 关联数组元素：field=k, op='=', value=v，共 3 个数据参数
+                    $this->addWhere($boolean, (string) $k, '=', $v, 3);
                 }
             }
 
@@ -799,6 +800,71 @@ class Query
     }
 
     /**
+     * 按条件查找；不存在则新建并返回。
+     *
+     * 已存在的记录不会被修改（第二个参数仅在新建时合并使用）。
+     *
+     * @param array<string, mixed> $attributes 查找条件
+     * @param array<string, mixed> $values     新建时合并的额外字段
+     * @return Model|array 绑定模型时返回模型实例，否则返回数组
+     */
+    public function firstOrCreate(array $attributes, array $values = []): Model|array
+    {
+        $this->where($attributes);
+        $instance = $this->find();
+
+        if ($instance !== null) {
+            return $instance;
+        }
+
+        $data = array_merge($attributes, $values);
+
+        if ($this->model !== null) {
+            return $this->model::create($data);
+        }
+
+        $this->insert($data);
+
+        return $this->find() ?? $data;
+    }
+
+    /**
+     * 按条件查找；已存在则更新，不存在则新建。
+     *
+     * @param array<string, mixed> $attributes 查找条件
+     * @param array<string, mixed> $values     已存在时更新 / 新建时合并的字段
+     * @return Model|array 绑定模型时返回模型实例，否则返回数组
+     */
+    public function updateOrCreate(array $attributes, array $values = []): Model|array
+    {
+        $this->where($attributes);
+        $instance = $this->find();
+
+        if ($instance !== null) {
+            if ($instance instanceof Model) {
+                foreach ($values as $k => $v) {
+                    $instance->setAttr((string) $k, $v);
+                }
+                $instance->save();
+            } else {
+                $this->update($values);
+            }
+
+            return $instance instanceof Model ? $instance : $this->find();
+        }
+
+        $data = array_merge($attributes, $values);
+
+        if ($this->model !== null) {
+            return $this->model::create($data);
+        }
+
+        $this->insert($data);
+
+        return $this->find() ?? $data;
+    }
+
+    /**
      * 查询多条。
      *
      * @return Collection<array-key, Model>|array<int, array<string, mixed>>
@@ -1226,6 +1292,95 @@ class Query
 
         $cols = implode(', ', array_map(fn ($c) => $this->wrap($c), $columns));
         $sql  = 'INSERT INTO ' . $this->wrap($this->table) . " ({$cols}) VALUES " . implode(', ', $values);
+
+        return $this->connection->execute($sql, $bindings);
+    }
+
+    /**
+     * 批量插入或更新（upsert）。
+     *
+     * 仅支持 MySQL 与 SQLite：
+     *   - MySQL：`INSERT ... ON DUPLICATE KEY UPDATE col = VALUES(col)`，冲突由任意唯一索引判定；
+     *   - SQLite：`INSERT ... ON CONFLICT(uniqueBy) DO UPDATE SET col = excluded.col`，
+     *     必须传入 $uniqueBy 且该列上存在唯一约束。
+     *
+     * @param array<int, array<string, mixed>>|array<string, mixed> $rows     数据行；传关联数组时视为单行
+     * @param array<int, string>                                     $uniqueBy 唯一键列（SQLite 必需；MySQL 不依赖此参数但建议传入）
+     * @param array<int, string>                                     $update   冲突时更新的列；为空则更新除 $uniqueBy 外的所有列
+     * @return int 受影响行数
+     *
+     * @throws DbException 非 mysql/sqlite 驱动，或 sqlite 下未提供 $uniqueBy
+     */
+    public function upsert(array $rows, array $uniqueBy = [], array $update = []): int
+    {
+        if ($rows === []) {
+            return 0;
+        }
+
+        // 兼容单行：传入关联数组时自动包一层
+        if (!isset($rows[0]) || !is_array($rows[0])) {
+            $rows = [$rows];
+        }
+
+        $type = strtolower((string) $this->connection->getConfig('type', 'mysql'));
+        if ($type !== 'mysql' && $type !== 'sqlite') {
+            throw new DbException('upsert() only supports mysql and sqlite, got: ' . $type);
+        }
+
+        $columns = array_keys($rows[0]);
+        $columnSql = implode(', ', array_map(fn ($c) => $this->wrap($c), $columns));
+
+        // 构建 VALUES 部分
+        $valuesSql = [];
+        $bindings  = [];
+        foreach ($rows as $row) {
+            $placeholders = [];
+            foreach ($columns as $col) {
+                $v = $row[$col] ?? null;
+                if ($v instanceof Raw) {
+                    $placeholders[] = $v->getValue();
+                    foreach ($v->getBindings() as $b) {
+                        $bindings[] = $b;
+                    }
+                } else {
+                    $placeholders[] = '?';
+                    $bindings[]     = $v;
+                }
+            }
+            $valuesSql[] = '(' . implode(', ', $placeholders) . ')';
+        }
+
+        $sql = 'INSERT INTO ' . $this->wrap($this->table)
+            . " ({$columnSql}) VALUES " . implode(', ', $valuesSql);
+
+        // 确定冲突时更新的列
+        if ($update === []) {
+            $update = array_values(array_diff($columns, $uniqueBy));
+        }
+
+        // 没有可更新的列：退化为普通插入（唯一键冲突由数据库抛出，交由调用方处理）
+        if ($update === []) {
+            return $this->connection->execute($sql, $bindings);
+        }
+
+        if ($type === 'mysql') {
+            $sets = [];
+            foreach ($update as $col) {
+                $sets[] = $this->wrap($col) . ' = VALUES(' . $this->wrap($col) . ')';
+            }
+            $sql .= ' ON DUPLICATE KEY UPDATE ' . implode(', ', $sets);
+        } else {
+            // sqlite
+            if ($uniqueBy === []) {
+                throw new DbException('upsert() requires $uniqueBy when using sqlite');
+            }
+            $conflictCols = implode(', ', array_map(fn ($c) => $this->wrap($c), $uniqueBy));
+            $sets = [];
+            foreach ($update as $col) {
+                $sets[] = $this->wrap($col) . ' = excluded.' . $this->wrap($col);
+            }
+            $sql .= ' ON CONFLICT(' . $conflictCols . ') DO UPDATE SET ' . implode(', ', $sets);
+        }
 
         return $this->connection->execute($sql, $bindings);
     }
