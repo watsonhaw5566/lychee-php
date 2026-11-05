@@ -14,23 +14,23 @@ use RecursiveIteratorIterator;
 use SplFileInfo;
 
 /**
- * Worker 开发模式命令。
+ * WebSocket 开发模式命令。
  *
- * 以子进程方式启动 `php lee worker`，并监听 app 目录（及可选目录）下的
- * PHP 文件变化。检测到文件改动后自动重启 Worker 子进程，便于本地开发。
+ * 以子进程方式启动 `php lee ws`，并监听 app 目录（及可选目录）下的
+ * PHP 文件变化。检测到文件改动后自动重启 WebSocket 子进程，便于本地开发。
  *
  * 用法：
- *   php lee worker:dev                      # 监听 app 目录，默认 1 秒轮询
- *   php lee worker:dev --interval=2         # 自定义轮询间隔（秒）
- *   php lee worker:dev --watch=config       # 追加监听目录（相对项目根，可多次）
+ *   php lee ws:dev                      # 监听 app 目录，默认 1 秒轮询
+ *   php lee ws:dev --interval=2         # 自定义轮询间隔（秒）
+ *   php lee ws:dev --watch=config       # 追加监听目录（相对项目根，可多次）
  *
  * 实现上使用轮询扫描文件 mtime，跨平台且无需任何扩展依赖。
  */
 class DevCommand extends Command
 {
-    protected string $name = 'worker:dev';
+    protected string $name = 'ws:dev';
 
-    protected string $description = 'Run the Worker server in dev mode with file watching and auto-reload';
+    protected string $description = 'Run the WebSocket server in dev mode with file watching and auto-reload';
 
     /**
      * 当前运行的 Worker 子进程句柄。
@@ -60,7 +60,7 @@ class DevCommand extends Command
         $interval = max(0.2, (float) ($input->getOption('interval') ?? 1));
         $dirs     = $this->resolveWatchDirs((string) ($input->getOption('watch') ?? ''));
 
-        $output->writeln('<info>Worker dev mode</info> started. Watching for file changes...');
+        $output->writeln('<info>WebSocket dev mode</info> started. Watching for file changes...');
         foreach ($dirs as $dir) {
             $output->writeln("  watching: <comment>{$dir}</comment>");
         }
@@ -78,7 +78,7 @@ class DevCommand extends Command
 
             // 子进程异常退出则一并退出 dev 模式
             if (!$this->isWorkerAlive()) {
-                $output->writeln('<error>Worker process exited. Stopping dev mode.</error>');
+                $output->writeln('<error>WebSocket process exited. Stopping dev mode.</error>');
 
                 return 1;
             }
@@ -87,7 +87,7 @@ class DevCommand extends Command
 
             if ($current !== $snapshot) {
                 $changed = $this->diff($snapshot, $current);
-                $output->writeln("<info>Change detected</info>: <comment>{$changed}</comment>, restarting worker...");
+                $output->writeln("<info>Change detected</info>: <comment>{$changed}</comment>, restarting WebSocket server...");
 
                 $this->stopWorker();
                 $this->startWorker($output);
@@ -197,7 +197,7 @@ class DevCommand extends Command
         $process = proc_open($command, $descriptors, $pipes, base_path());
 
         if (!is_resource($process)) {
-            $output->writeln('<error>Failed to start worker process.</error>');
+            $output->writeln('<error>Failed to start WebSocket process.</error>');
 
             return;
         }
@@ -280,6 +280,6 @@ class DevCommand extends Command
         $argv  = $_SERVER['argv'] ?? [];
         $entry = is_string($argv[0] ?? null) ? $argv[0] : 'lee';
 
-        return [PHP_BINARY, $entry, 'worker'];
+        return [PHP_BINARY, $entry, 'ws'];
     }
 }

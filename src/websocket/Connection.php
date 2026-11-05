@@ -68,11 +68,13 @@ class Connection
     /**
      * 握手请求的 query 参数。
      *
+     * 由 WebSocketServer 在握手时解析并存储在连接对象的 websocketQuery 属性上。
+     *
      * @return array<string, string>
      */
     public function getQuery(): array
     {
-        return $this->raw->getQueryString() ?? [];
+        return $this->raw->websocketQuery ?? [];
     }
 
     /**

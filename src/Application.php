@@ -43,7 +43,7 @@ use Lychee\session\Session;
 use Lychee\view\ExceptionRenderer;
 use Lychee\view\View;
 use Lychee\websocket\command\DevCommand;
-use Lychee\websocket\command\ServerCommand;
+use Lychee\websocket\command\WsCommand;
 use Lychee\websocket\WebSocketServer;
 use Lychee\validate\Validate;
 use Psr\Log\LoggerInterface;
@@ -141,7 +141,7 @@ class Application
             'queue'      => $this->bootQueue(...),
             'session'    => $this->bootSession(...),
             'i18n'       => $this->bootI18n(...),
-            'worker'     => $this->bootWorker(...),
+            'websocket'  => $this->bootWebsocket(...),
         ];
 
         foreach ($modules as $key => $boot) {
@@ -500,7 +500,7 @@ class Application
         });
     }
 
-    private function bootWorker(): void
+    private function bootWebsocket(): void
     {
         $server = new WebSocketServer($this->container);
 
@@ -509,7 +509,7 @@ class Application
 
         /** @var ConsoleApplication $console */
         $console = $this->container->get(ConsoleApplication::class);
-        $console->addCommand(ServerCommand::class);
+        $console->addCommand(WsCommand::class);
         $console->addCommand(DevCommand::class);
     }
 
