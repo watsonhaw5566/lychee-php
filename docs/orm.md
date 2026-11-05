@@ -563,7 +563,7 @@ User::active(User::where('age', '>', 18))->select();
 
 #### 使用 `#[Column]` 属性（推荐）
 
-在模型属性上标注 `#[Column]` 声明字段类型，取代传统的 `$type` / `$json` 配置。支持参数化类型与枚举类：
+在模型属性上标注 `#[Column]` 声明字段类型。支持参数化类型与枚举类：
 
 ```php
 use Lychee\orm\attribute\Column;
@@ -607,7 +607,7 @@ class User extends Model
 | `date:{format}` | 解析为 `DateTimeImmutable` | 按格式输出字符串 |
 | `EnumClass::class` | 转为枚举实例（BackedEnum 按 value，UnitEnum 按 name） | 取 `->value` 或 `->name` |
 
-> **类型解析优先级**：`#[Column]` > 模型 `$type` > 模型 `$json` > 数据库表结构自动推导。
+> **类型解析优先级**：`#[Column]` > 数据库表结构自动推导 > 约定通用字段（id / create_time 等）。
 
 #### 默认值
 
@@ -638,55 +638,25 @@ class User extends Model
 
 > `default: null` 视为未声明默认值，不做任何处理。默认值仅在 `INSERT`（`save()` 新增）时应用，`UPDATE` 不会填充默认值。
 
-#### 传统 `$type` / `$json` 配置
-
-```php
-class User extends Model
-{
-    // 类型映射：int/float/bool/string/array/object/json/datetime/timestamp
-    protected array $type = [
-        'id'      => 'int',
-        'balance' => 'float',
-        'is_vip'  => 'bool',
-        'extra'   => 'json',
-    ];
-
-    // 等价于 type 中设 'json'，可简化写法
-    protected array $json = ['extra'];
-
-    // JSON 解码时是否关联数组（默认 false）
-    protected bool $jsonAssoc = false;
-}
-```
-
 #### 类型推导优先级
 
 ORM 采用三层优先级自动推导字段类型，**无需手动配置大多数常见字段**：
 
-1. **手动配置优先** - `$type` 属性明确指定的类型最高优先
-2. **$json 列表其次** - `$json` 数组中声明的字段标记为 `json` 类型
-3. **自动推导最后** - 从数据库表结构自动推导字段类型
+1. **`#[Column]` 属性** - 显式声明的类型最高优先
+2. **数据库表结构自动推导** - 从 DB 元信息推导字段类型
+3. **约定通用字段** - `id` / `create_time` / `update_time` / `delete_time` 等常用字段有默认类型
 
 因此可以大幅简化模型配置，直接删除自动推导支持的字段声明：
 
 ```php
 class Order extends Model
 {
-    // 之前需要手动配置的字段现在可以省去
-    // protected array $type = [
-    //     'id'         => 'int',           // 数据库 int/bigint 自动推导为 int
-    //     'user_id'    => 'int',           // 外键字段自动推导
-    //     'price'      => 'float',         // 数据库 decimal/float 自动推导为 float
-    //     'amount'     => 'float',
-    //     'metadata'   => 'json',          // 数据库 json 自动推导为 json
-    // ];
+    // int/bigint 字段自动推导为 int，decimal/float 自动推导，json 字段自动推导
+    // 无需任何 $type 配置
 
     // 仅保留需要显式指定的字段（如自定义序列化需求）
-    protected array $type = [
-        'created_at' => 'datetime',        // 时间戳自定义格式需要显式指定
-    ];
-
-    protected array $json = ['extra'];     // 或保留 $json，两者等价
+    #[Column(type: 'datetime')]
+    protected ?\DateTimeImmutable $created_at;
 }
 ```
 
@@ -711,12 +681,11 @@ class Order extends Model
 
 #### 手动配置场景
 
-仍需手动配置 `$type` 的场景：
+仍需显式使用 `#[Column]` 的场景：
 
-- 时间戳字段需要自定义序列化格式（如 `timestamp` / `datetime`）
+- 时间戳字段需要自定义序列化格式（如 `date:Y-m-d` / `datetime`）
 - 某个整数字段不需要自动类型转换，保持字符串形式
 - 自定义类型转换逻辑（覆盖 `readTransform()` / `writeTransform()` 方法）
-- 为向后兼容性维持现有手动配置
 
 ### 废弃字段 `$disuse`
 
@@ -748,61 +717,510 @@ class User extends Model
 
 ### 隐藏 / 可见 / 追加字段
 
+#### 使用 `#[Append]` 属性（推荐）
+
+`#[Append]` 用于声明**虚拟追加字段**——该字段不对应数据库列，值由方法动态计算，在 `toArray()` / JSON 序列化时自动追加到输出中。
+
+**推荐写法：`#[Append]` 直接标注在方法上**，方法名即字段名，方法本身即为访问器，一次声明完成字段定义与值计算：
+
 ```php
+use Lychee\orm\attribute\Append;
+use Lychee\orm\attribute\Column;
+
 class User extends Model
 {
-    // toArray / JSON 序列化时排除
-    protected array $hidden = ['password'];
+    #[Column(type: 'string')]
+    protected string $first_name;
 
-    // 白名单（优先级高于 hidden）
-    protected array $visible = [];
+    #[Column(type: 'string')]
+    protected string $last_name;
 
-    // 虚拟字段，调用 getXxxAttr 作为输出
-    protected array $append = ['full_name'];
-
-    public function getFullNameAttr($value, array $data): string
+    // 虚拟字段：不入库，方法名 fullName 即字段名
+    #[Append]
+    public function fullName($value, array $data): string
     {
         return $data['first_name'] . ' ' . $data['last_name'];
     }
 }
-
-// 查询时临时调整
-User::where('status', 1)
-    ->hidden(['password'])
-    ->append(['full_name'])
-    ->visible(['id', 'name'])
-    ->select();
 ```
 
-> **append 也支持关联**：`append()` 中的名字如果对应模型的关联方法（`hasOne` / `hasMany` / `belongsTo`），
-> 会自动加载该关联并随序列化输出；通过查询构造器链式调用（如 `User::query()->append(['posts'])->select()`）时，
-> 关联会被**预加载**（`IN` 批量查询），避免 N+1。
->
-> 关联名支持**蛇形**与**驼峰**两种写法，输出 key 与传入的名字一致（前端友好）：
-> ```php
-> // 方法名为 adPlatform()，可这样调用：
-> User::query()->append(['ad_platform'])->find(1);   // 输出 key 为 ad_platform
-> User::query()->append(['adPlatform'])->find(1);     // 输出 key 为 adPlatform
-> ```
+序列化输出：
 
-### 获取器 / 修改器
+```json
+{
+  "id": 1,
+  "first_name": "John",
+  "last_name": "Doe",
+  "fullName": "John Doe"
+}
+```
+
+> **说明**：`#[Append]` 标注在方法上时，该方法同时承担「字段声明」和「读取访问器」两个职责，无需额外的 `#[Getter]`。
+
+**指定输出字段名**：通过 `name` 参数可自定义 `toArray()` 输出的字段名（例如输出下划线命名），方法名仍保持驼峰可读性：
+
+```php
+#[Append(name: 'full_name')]
+public function fullName($value, array $data): string
+{
+    return $data['first_name'] . ' ' . $data['last_name'];
+}
+// toArray 输出: { "full_name": "John Doe" }
+```
+
+也支持标注在属性上的显式形式（需配合 `#[Getter]` 或 `getXxxAttr` 提供值）：
+
+```php
+#[Append]
+protected string $fullName;
+
+#[Getter]
+public function fullName($value, array $data): string { ... }
+```
+
+#### 用 `#[Append]` 声明关联自动输出
+
+`#[Append]` 也可以标注在**关联方法**上，使该关联在 `toArray()` 时自动加载并输出，无需每次调用 `->append()` 或 `->with()`：
+
+```php
+use Lychee\orm\attribute\Column;
+use Lychee\orm\attribute\Append;
+use Lychee\orm\relation\HasMany;
+
+class User extends Model
+{
+    #[Column(type: 'string')]
+    protected string $username;
+
+    // posts 关联会在 toArray() 时自动加载
+    #[Append]
+    public function posts(): HasMany
+    {
+        return $this->hasMany(Post::class, 'user_id', 'id');
+    }
+}
+```
+
+`toArray()` 输出：
+
+```json
+{
+  "id": 1,
+  "username": "alice",
+  "posts": [
+    { "id": 1, "user_id": 1, "title": "Post A" },
+    { "id": 2, "user_id": 1, "title": "Post B" }
+  ]
+}
+```
+
+> **自动预加载**：`#[Append]` 标注的关联会在查询时**自动预加载**（等价于 `->with()`），无需手动指定，列表查询不会产生 N+1。
+
+`toArray()` 输出：
+
+```json
+{
+  "id": 1,
+  "username": "alice",
+  "posts": [
+    { "id": 1, "user_id": 1, "title": "Post A" },
+    { "id": 2, "user_id": 1, "title": "Post B" }
+  ]
+}
+```
+
+`User::select()` 仅执行 1 条 users 查询 + 1 条 posts 批量查询，所有模型的 `posts` 关联已预加载，`toArray()` 直接输出，无 N+1。
+
+#### 多个追加字段
+
+```php
+class Product extends Model
+{
+    #[Column(type: 'decimal:2')]
+    protected float $price;
+
+    #[Column(type: 'int')]
+    protected int $stock;
+
+    #[Append]
+    protected string $statusText;      // 状态文案
+
+    #[Append]
+    protected bool $inStock;           // 是否有货
+
+    public function getStatusTextAttr($value, $data): string
+    {
+        return $data['status'] === 1 ? '在售' : '下架';
+    }
+
+    public function getInStockAttr($value, $data): bool
+    {
+        return ($data['stock'] ?? 0) > 0;
+    }
+}
+```
+
+#### 隐藏 `#[Append]` 字段：三种策略
+
+`#[Append]` 字段（含关联）默认自动预加载并随 `toArray()` 输出。
+不同接口对字段的需求不同（列表页通常要精简、详情页要完整），框架提供三种隐藏方式，按需选择：
+
+| 方法 | 预加载 | 输出 | 适用场景 |
+|------|--------|------|----------|
+| `$query->without(['posts'])` | ❌ 跳过 | ❌ 隐藏 | 列表接口跳过重关联，省查询 |
+| `$query->hidden(['posts'])` | ✅ 仍加载 | ❌ 隐藏 | 数据在别处用，仅此处不输出 |
+| `$query->visible([...])` | ✅ 仍加载 | ✅ 仅白名单 | 严格控制输出字段 |
+
+> **核心区别**：`hidden()` 只藏输出不省查询（关联仍预加载）；`without()` 连预加载一起跳过，列表接口首选。
+
+##### 1. `without()` — 跳过预加载 + 隐藏输出（列表页推荐）
+
+```php
+// posts 关联既不预加载，也不出现在 toArray 中
+User::query()->without(['posts'])->select();
+```
+
+`toArray()` 在处理 append 字段时会先检查 `hidden` 列表，命中则直接 `continue`，
+连懒加载查询都不会触发，彻底零开销。
+
+##### 2. `hidden()` — 仅隐藏输出
+
+```php
+// posts 仍会预加载（数据可能在业务逻辑中用到），但 toArray 不输出
+User::query()->hidden(['posts'])->select();
+```
+
+##### 3. `visible()` — 白名单模式
+
+```php
+// 只输出 id 和 username，其余全部隐藏（含 append 字段和关联）
+User::query()->visible(['id', 'username'])->select();
+```
+
+##### 在 ResourceController 中按接口配置
+
+继承 `ResourceController` 时，可通过属性声明或方法参数指定每个接口要排除的 `#[Append]` 字段：
+
+```php
+class UserController extends ResourceController
+{
+    // 列表接口排除 posts 关联（不预加载、不输出）
+    protected array $indexWithout = ['posts'];
+
+    // 详情接口也排除（如需）
+    protected array $readWithout = ['posts'];
+}
+```
+
+也可在调用 `baseIndex()` / `baseRead()` 时动态传入：
+
+```php
+public function index(): JsonResponse
+{
+    // ... 构建 where
+    return $this->baseIndex($where, $current, $pageSize, append: [], without: ['posts']);
+}
+
+public function read(int $id): JsonResponse
+{
+    return $this->baseRead($id, append: [], without: ['posts']);
+}
+```
+
+> **属性 + 参数合并**：`$indexWithout`/`$readWithout` 属性与 `baseIndex()`/`baseRead()` 的 `$without` 参数会合并去重，两种方式可同时使用。
+
+##### 模型级永久隐藏
+
+如果某个 `#[Append]` 字段在所有接口都不应输出，可在模型的 `$hidden` 属性中声明：
 
 ```php
 class User extends Model
 {
-    // 获取器：读取时自动处理
+    protected array $hidden = ['internalField'];
+}
+```
+
+##### 典型场景示例
+
+下面用一个完整的 User 模型演示三种策略的效果差异。模型包含一个虚拟字段 `fullName` 和一个关联 `posts`，均标注了 `#[Append]`：
+
+```php
+use Lychee\orm\attribute\Append;
+use Lychee\orm\attribute\Column;
+use Lychee\orm\Model;
+use Lychee\orm\relation\HasMany;
+
+class User extends Model
+{
+    protected string $name = 'users';
+
+    #[Column(type: 'string')]
+    protected string $first_name;
+
+    #[Column(type: 'string')]
+    protected string $last_name;
+
+    // 虚拟字段：拼接姓名
+    #[Append]
+    public function fullName($value, array $data): string
+    {
+        return $data['first_name'] . ' ' . $data['last_name'];
+    }
+
+    // 关联：自动预加载并输出
+    #[Append]
+    public function posts(): HasMany
+    {
+        return $this->hasMany(Post::class, 'user_id', 'id');
+    }
+}
+```
+
+**默认输出**（不做任何隐藏）：
+
+```php
+$user = User::query()->find(1);
+$user->toArray();
+```
+
+```json
+{
+  "id": 1,
+  "first_name": "John",
+  "last_name": "Doe",
+  "fullName": "John Doe",
+  "posts": [
+    { "id": 10, "user_id": 1, "title": "Hello" },
+    { "id": 11, "user_id": 1, "title": "World" }
+  ]
+}
+```
+
+**列表接口**：跳过 posts 关联（省查询），保留 fullName：
+
+```php
+// 列表页：posts 不预加载也不输出，fullName 仍输出
+User::query()->without(['posts'])->select();
+```
+
+```json
+{
+  "id": 1,
+  "first_name": "John",
+  "last_name": "Doe",
+  "fullName": "John Doe"
+}
+```
+
+**详情接口**：posts 仍加载（可能在业务逻辑中用到），但不输出：
+
+```php
+// 详情页：posts 预加载但不输出
+User::query()->hidden(['posts'])->find(1);
+```
+
+```json
+{
+  "id": 1,
+  "first_name": "John",
+  "last_name": "Doe",
+  "fullName": "John Doe"
+}
+```
+
+**精简接口**：只输出必要字段：
+
+```php
+// 仅输出 id 和 fullName
+User::query()->visible(['id', 'fullName'])->find(1);
+```
+
+```json
+{
+  "id": 1,
+  "fullName": "John Doe"
+}
+```
+
+> **选择建议**：列表页用 `without()` 跳过重关联；详情页若关联数据在业务逻辑中还需使用，用 `hidden()` 仅藏输出；需要严格字段白名单时用 `visible()`。
+
+#### 运行时临时追加
+
+`#[Append]` 声明的字段始终随 `toArray()` 输出。运行时也可通过 `->append()` 临时追加字段（包括关联）：
+
+```php
+User::where('status', 1)
+    ->append(['posts'])   // posts 为关联方法，自动预加载
+    ->select();
+```
+
+> **append 也支持关联**：`append()` 中的名字如果对应模型的关联方法（`hasOne` / `hasMany` / `belongsTo`），
+> 会自动加载该关联并随序列化输出；通过查询构造器链式调用时关联会被**预加载**（`IN` 批量查询），避免 N+1。
+>
+> 关联名支持**蛇形**与**驼峰**两种写法，输出 key 与传入的名字一致：
+> ```php
+> User::query()->append(['ad_platform'])->find(1);   // 输出 key 为 ad_platform
+> User::query()->append(['adPlatform'])->find(1);     // 输出 key 为 adPlatform
+> ```
+
+#### `#[Append]` 与 `#[Column]` 的区别
+
+| 对比项 | `#[Column]` | `#[Append]` |
+|--------|-------------|-------------|
+| 语义 | 真实数据库列 | 虚拟计算字段 |
+| 是否入库 | 是，经 `writeTransform` 写入 | 否，不参与写入 |
+| 值来源 | 数据库原始值 + 类型转换 | 访问器 `getXxxAttr` 计算 |
+| 典型用途 | 声明字段类型、默认值、JSON | 拼接字段、状态文案、计算属性 |
+
+> **何时用哪个**：字段存在于数据库表中 → `#[Column]`；字段由其他列计算得出、不需要入库 → `#[Append]`。
+
+### 获取器 / 修改器
+
+访问器（getter）在读取字段时被调用，修改器（setter）在写入字段时被调用。
+
+**核心心智模型**：大多数场景下你只需要两个属性——
+
+- `#[Append]`：标在方法上，同时完成**虚拟字段声明 + 读取访问器**
+- `#[Setter]`：标在方法上，处理**字段写入时的转换**
+
+`#[Getter]` 为可选属性，仅当你需要对 `#[Column]` 真实字段做读取格式化时使用。
+
+#### `#[Append]`：虚拟字段 + 读取（推荐）
+
+`#[Append]` 标在方法上时，方法名即字段名，方法本身即为访问器，一次声明完成字段定义与值计算：
+
+```php
+use Lychee\orm\attribute\Column;
+use Lychee\orm\attribute\Append;
+use Lychee\orm\attribute\Setter;
+
+class User extends Model
+{
+    #[Column(type: 'string')]
+    protected string $first_name;
+
+    #[Column(type: 'string')]
+    protected string $last_name;
+
+    // 虚拟字段：方法名 fullName 即字段名，方法即为访问器
+    #[Append]
+    public function fullName($value, array $data): string
+    {
+        return $data['first_name'] . ' ' . $data['last_name'];
+    }
+}
+```
+
+#### `#[Setter]`：写入修改器
+
+标在方法上，处理字段写入时的转换（如密码加密、金额格式化）：
+
+```php
+use Lychee\orm\attribute\Column;
+use Lychee\orm\attribute\Setter;
+
+class User extends Model
+{
+    #[Column(type: 'string')]
+    protected string $password;
+
+    // 方法名 password 即字段名
+    #[Setter]
+    public function password($value, array $data): string
+    {
+        return password_hash((string) $value, PASSWORD_DEFAULT);
+    }
+}
+```
+
+写入时 `$user->password = 'secret'` 会自动经过 `password()` 方法加密后再入库。
+
+#### `#[Getter]`：可选的读取格式化
+
+当需要对 `#[Column]` 真实字段做读取格式化（如首字母大写、金额格式化）时，使用 `#[Getter]`：
+
+```php
+use Lychee\orm\attribute\Column;
+use Lychee\orm\attribute\Getter;
+
+class User extends Model
+{
+    #[Column(type: 'string')]
+    protected string $name;
+
+    #[Getter]
+    public function name($value, array $data): string
+    {
+        return ucfirst((string) $value);
+    }
+}
+```
+
+> **注意**：`#[Append]` 方法本身已是访问器，无需再标注 `#[Getter]`。`#[Getter]` 仅用于 `#[Column]` 字段的读取格式化。
+
+#### 字段名推导规则
+
+未指定 `field` 参数时，方法名按以下规则推导字段名：
+
+| 方法名形式 | 示例 | 推导字段 |
+|-----------|------|----------|
+| 方法名 = 字段名（推荐） | `fullName` | `fullName` |
+| `get`/`set` 前缀 | `getFullName` | `fullName` |
+| `get`/`set` 前缀 + `Attr` 后缀 | `getFullNameAttr` | `fullName` |
+
+若方法名不属于以上形式，需显式传入字段名：`#[Getter('fullName')]` / `#[Setter('password')]`。
+
+#### 方法签名约定
+
+- 第一个参数 `$value`：访问器为字段原始值（已过 `readTransform` 类型转换）；修改器为待写入的原始值
+- 第二个参数 `$data`：模型全部原始数据数组
+- 返回值：访问器返回计算结果；修改器返回处理后的值（会再经过 `writeTransform` 类型转换）
+
+#### 命名约定（向后兼容）
+
+不标注任何属性时，方法名遵循 `getXxxAttr` / `setXxxAttr` 规则也可生效，其中 `Xxx` 为字段名的 StudlyCase 形式：
+
+```php
+class User extends Model
+{
+    // 获取器：getNameAttr 对应字段 name
     public function getNameAttr($value): string
     {
         return ucfirst((string) $value);
     }
 
-    // 修改器：写入时自动处理
+    // 修改器：setPasswordAttr 对应字段 password
     public function setPasswordAttr($value): string
     {
         return password_hash((string) $value, PASSWORD_DEFAULT);
     }
 }
 ```
+
+> **优先级**：`#[Getter]` / `#[Setter]` / `#[Append]` 显式绑定的方法优先于命名约定。各种方式可共存。
+
+#### `#[Append]` 完整示例
+
+`#[Append]` 标在方法上即同时完成虚拟字段声明与读取计算，无需额外 `#[Getter]`：
+
+```php
+use Lychee\orm\attribute\Column;
+use Lychee\orm\attribute\Append;
+
+class Product extends Model
+{
+    #[Column(type: 'int')]
+    protected int $stock;
+
+    #[Append]
+    public function statusText($value, array $data): string
+    {
+        return ($data['stock'] ?? 0) > 0 ? '有货' : '缺货';
+    }
+}
+```
+
+`toArray()` 输出会自动包含 `statusText` 字段，值为 `有货` 或 `缺货`。
 
 ### 时间字段
 

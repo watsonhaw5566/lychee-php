@@ -661,6 +661,22 @@ class Query
     }
 
     /**
+     * 排除指定的追加字段/关联：既不预加载，也不在 toArray 中输出。
+     *
+     * 用于列表接口跳过 #[Append] 声明的重关联，避免不必要的查询开销。
+     * 与 hidden() 的区别：hidden() 仍会预加载（仅隐藏输出），without() 完全跳过。
+     *
+     * @param array<int, string> $fields
+     */
+    public function without(array $fields): static
+    {
+        $this->with = array_values(array_diff($this->with, $fields));
+        $this->hidden($fields);
+
+        return $this;
+    }
+
+    /**
      * @param array<int, string> $fields
      */
     public function visible(array $fields): static
