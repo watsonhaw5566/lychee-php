@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Lychee\orm\exception;
 
 use Lychee\http\HttpException;
+use Throwable;
 
 /**
  * 查询单条记录未命中时抛出，对应 HTTP 404。
@@ -13,7 +14,7 @@ use Lychee\http\HttpException;
  */
 class ModelNotFoundException extends HttpException
 {
-    public function __construct(string $model, string $message = '', int $code = 0, ?\Throwable $previous = null)
+    public function __construct(string $model, string $message = '', int $code = 0, ?Throwable $previous = null)
     {
         parent::__construct(
             404,

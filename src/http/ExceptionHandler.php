@@ -61,7 +61,7 @@ class ExceptionHandler
         // 附带请求上下文（若请求已注册到容器）
         if (app()->has('request')) {
             try {
-                $request = request();
+                $request           = request();
                 $context['url']    = $request->url();
                 $context['method'] = $request->method;
                 $context['ip']     = $request->ip;
@@ -249,9 +249,9 @@ class ExceptionHandler
             return true;
         }
 
-        $htmlQ  = $this->acceptQuality($accept, 'text/html');
-        $jsonQ  = $this->acceptQuality($accept, 'application/json');
-        $wildQ  = $this->acceptQuality($accept, '*/*');
+        $htmlQ = $this->acceptQuality($accept, 'text/html');
+        $jsonQ = $this->acceptQuality($accept, 'application/json');
+        $wildQ = $this->acceptQuality($accept, '*/*');
 
         // 两者都未声明：看是否有通配符，无通配符则不渲染 HTML（按 JSON 处理更安全）
         if ($htmlQ === 0.0 && $jsonQ === 0.0) {

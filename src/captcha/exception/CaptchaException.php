@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Lychee\captcha\exception;
 
 use Lychee\http\HttpException;
+use Throwable;
 
 /**
  * 验证码异常，对应 HTTP 400。
@@ -13,7 +14,7 @@ use Lychee\http\HttpException;
  */
 class CaptchaException extends HttpException
 {
-    public function __construct(string $message = '', int $code = 0, ?\Throwable $previous = null)
+    public function __construct(string $message = '', int $code = 0, ?Throwable $previous = null)
     {
         parent::__construct(400, $message, $code, $previous);
     }

@@ -16,6 +16,7 @@ use Lychee\validate\ValidateException;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Throwable;
+use ReflectionClass;
 
 class ExceptionHandlerTest extends TestCase
 {
@@ -124,7 +125,7 @@ class ExceptionHandlerTest extends TestCase
 
     public function test_validate_exception_preserves_field_errors(): void
     {
-        $errors = ['name' => '名称必填', 'age' => '年龄必须大于0'];
+        $errors   = ['name' => '名称必填', 'age' => '年龄必须大于0'];
         $response = $this->handler->render($this->jsonRequest(), new ValidateException($errors));
         $data     = json_decode($response->content, true);
 
@@ -215,7 +216,7 @@ class ExceptionHandlerTest extends TestCase
 
     private function invokeShouldReport(Throwable $e): bool
     {
-        $ref = new \ReflectionClass($this->handler);
+        $ref    = new ReflectionClass($this->handler);
         $method = $ref->getMethod('shouldReport');
         $method->setAccessible(true);
 
@@ -224,7 +225,7 @@ class ExceptionHandlerTest extends TestCase
 
     private function invokeWantsHtml(Request $request): bool
     {
-        $ref = new \ReflectionClass($this->handler);
+        $ref    = new ReflectionClass($this->handler);
         $method = $ref->getMethod('wantsHtml');
         $method->setAccessible(true);
 
@@ -233,7 +234,7 @@ class ExceptionHandlerTest extends TestCase
 
     private function invokeAcceptQuality(string $accept, string $mediaType): float
     {
-        $ref = new \ReflectionClass($this->handler);
+        $ref    = new ReflectionClass($this->handler);
         $method = $ref->getMethod('acceptQuality');
         $method->setAccessible(true);
 
