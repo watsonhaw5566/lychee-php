@@ -123,13 +123,18 @@ $message = $debug || $showErrorMsg
 
 #### 自定义异常处理器
 
-框架默认的 `ExceptionHandler` 已处理以下异常类型：
+框架内置完整的异常处理体系，所有具备 HTTP 语义的异常均继承自 `Lychee\http\HttpException`，由 `ExceptionHandler` 自动渲染为对应状态码的响应。完整的异常类清单、使用方法与自定义方式详见 [异常处理 Exception](./exception)。
+
+默认 `ExceptionHandler` 处理的主要异常类型：
 
 | 异常类 | HTTP 状态码 | 说明 |
 | --- | --- | --- |
 | `Lychee\validate\ValidateException` | 400 | 数据验证失败 |
+| `Lychee\auth\exception\NotLoginException` | 401 | 未登录 |
+| `Lychee\auth\exception\NoPermissionException` | 403 | 权限不足 |
 | `Lychee\routing\RouteNotFoundException` | 404 | 路由未找到 |
-| `Lychee\http\HttpException` | 自定义 | HTTP 异常 |
+| `Lychee\orm\exception\ModelNotFoundException` | 404 | 模型未找到 |
+| `Lychee\http\HttpException` | 自定义 | 通用 HTTP 异常 |
 | 其他异常 | 500 | 服务器内部错误 |
 
 如需完全自定义异常处理逻辑，可继承 `ExceptionHandler` 并覆盖 `report()` 和/或 `render()` 方法：

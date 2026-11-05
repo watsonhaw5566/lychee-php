@@ -2,12 +2,17 @@
 
 框架内置轻量校验器 `Lychee\validate\Validate`，提供常用 API（`rule / message / batch / scene / failException / extend / check / getError` 等），零外部依赖。
 
-验证失败时抛出 `Lychee\validate\ValidateException`，HTTP 内核会自动捕获并返回 **400** 状态码，`msg` 字段取自校验器的实际错误信息：
+验证失败时抛出 `Lychee\validate\ValidateException`，HTTP 内核会自动捕获并返回 **400** 状态码，并保留字段级错误信息：
 
 ```json
 {
   "code": 400,
-  "msg": "用户名必填；邮箱格式不正确"
+  "msg": "用户名必填；邮箱格式不正确",
+  "data": null,
+  "errors": {
+    "name": "用户名必填",
+    "email": "邮箱格式不正确"
+  }
 }
 ```
 
@@ -21,7 +26,7 @@ throw new \Lychee\validate\ValidateException('用户名必填');
 throw new \Lychee\validate\ValidateException(['name' => '用户名必填', 'email' => '邮箱格式不正确']);
 ```
 
-> 如需完全自定义响应结构，可在控制器中 `try/catch` 捕获 `ValidateException`，自行返回 `JsonResponse`；或通过 `app.exception_handler` 配置自定义异常处理器（详见 [应用配置 App](./app)）。
+> `ValidateException` 继承自 `Lychee\http\HttpException`，状态码固化为 400。完整的异常体系与自定义方式详见 [异常处理 Exception](./exception)。如需完全自定义响应结构，可通过 `app.exception_handler` 配置自定义异常处理器（详见 [应用配置 App](./app)）。
 
 ## 链式调用（控制器内联验证）
 

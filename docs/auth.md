@@ -143,7 +143,7 @@ $auth->kickoutByToken($token);
 
 ## 鉴权中间件
 
-通过 `#[Middleware(SatokenMiddleware::class)]` 按需挂载到控制器或方法，未登录时自动返回 401 JSON 响应：
+通过 `#[Middleware(SatokenMiddleware::class)]` 按需挂载到控制器或方法，未登录时抛出 `NotLoginException`，由全局异常处理器自动渲染为 401 响应（HTML 或 JSON 按请求自动判断）：
 
 ```php
 use Lychee\auth\SatokenMiddleware;
@@ -341,13 +341,14 @@ $auth->checkAnyPermission('order.edit', 'order.admin');
 
 ### 权限不足响应
 
-权限校验不通过时，`PermissionMiddleware` 返回 403 JSON 响应：
+权限校验不通过时，`PermissionMiddleware` 抛出 `NoPermissionException`，由全局异常处理器统一渲染为 403 响应：
 
 ```json
 {
-    "errno": 0,
     "code": 403,
     "msg": "无权限：order.delete",
     "data": null
 }
 ```
+
+> `NotLoginException`、`TokenInvalidException`、`NoPermissionException` 均继承自 `Lychee\http\HttpException`，状态码分别为 401、401、403。完整的异常体系与响应格式详见 [异常处理 Exception](./exception)。

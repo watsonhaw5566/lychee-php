@@ -40,7 +40,6 @@ use Lychee\queue\QueueManager;
 use Lychee\routing\Router;
 use Lychee\session\driver\File as SessionFileDriver;
 use Lychee\session\Session;
-use Lychee\view\ExceptionRenderer;
 use Lychee\view\View;
 use Lychee\websocket\command\DevCommand;
 use Lychee\websocket\command\WsCommand;
@@ -674,6 +673,11 @@ class Application
     /**
      * 渲染致命错误页面。
      *
+     * 委托给全局 ExceptionHandler 处理，确保：
+     *   - 用户自定义的 exception_handler 对致命错误同样生效
+     *   - exception_render 配置（auto/html/json）对致命错误同样生效
+     *   - report() 会被调用，致命错误可被日志记录
+     *
      * @param array{type:int, message:string, file:string, line:int} $error
      */
     private function renderFatalError(array $error): void
@@ -687,37 +691,21 @@ class Application
             return;
         }
 
-        $debug        = (bool) config('app.debug', env('APP_DEBUG', false));
-        $errorMessage = error_message();
-        $showErrorMsg = (bool) config('app.show_error_msg', false);
-
-        $e      = new ErrorException($error['message'], 0, $error['type'], $error['file'], $error['line']);
-        $status = 500;
+        $e = new ErrorException($error['message'], 0, $error['type'], $error['file'], $error['line']);
 
         try {
-            $renderer = new ExceptionRenderer(
-                cachePath: (string) $this->container->runtimePath . 'twig',
-            );
+            $handler = $this->container->get(ExceptionHandler::class);
+            $request = Request::capture();
 
-            if ($debug) {
-                $html = $renderer->render(
-                    status: $status,
-                    e: $e,
-                    method: $_SERVER['REQUEST_METHOD'] ?? 'GET',
-                    url: $_SERVER['REQUEST_URI']       ?? '/',
-                );
-            } else {
-                $message = $showErrorMsg ? $error['message'] : $errorMessage;
-                $html    = $renderer->renderError($status, $message);
-            }
-
-            http_response_code($status);
-            header('Content-Type: text/html; charset=utf-8');
-            echo $html;
+            $handler->report($e);
+            $response = $handler->render($request, $e);
+            $response->send();
         } catch (Throwable) {
             // 渲染失败时输出最小化错误信息
-            http_response_code(500);
-            header('Content-Type: text/plain; charset=utf-8');
+            if (!headers_sent()) {
+                http_response_code(500);
+                header('Content-Type: text/plain; charset=utf-8');
+            }
             echo 'Server Error';
         }
     }
