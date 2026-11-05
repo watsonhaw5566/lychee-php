@@ -61,7 +61,7 @@ class ConfigPublishCommandTest extends TestCase
         // 所有模块的配置文件都应已生成
         $modules = [
             'app', 'cache', 'command', 'captcha', 'cron', 'database', 'filesystem',
-            'i18n', 'log', 'plugin', 'queue', 'satoken', 'session', 'view', 'worker',
+            'i18n', 'log', 'plugin', 'queue', 'satoken', 'session', 'view', 'websocket',
         ];
 
         foreach ($modules as $module) {
