@@ -7,6 +7,7 @@ namespace Lychee\websocket;
 use Closure;
 use Lychee\container\Container;
 use RuntimeException;
+use Throwable;
 
 /**
  * WebSocket 服务管理器。
@@ -35,6 +36,12 @@ class WebSocketServer
     private readonly int $port;
     private readonly int $count;
 
+    /** @var string 内置鉴权驱动：'satoken' | 'none' */
+    private readonly string $authDriver;
+
+    /** @var string 握手 query 中 token 的字段名 */
+    private readonly string $tokenName;
+
     public function __construct(
         private readonly Container $app,
     ) {
@@ -43,6 +50,11 @@ class WebSocketServer
         $this->host  = (string) ($config['host'] ?? '0.0.0.0');
         $this->port  = (int) ($config['port'] ?? 8080);
         $this->count = (int) ($config['count'] ?? 1);
+
+        $auth = is_array($config['auth'] ?? null) ? $config['auth'] : [];
+
+        $this->authDriver = strtolower((string) ($auth['driver'] ?? 'none'));
+        $this->tokenName  = (string) ($auth['token_name'] ?? 'token');
     }
 
     /**
@@ -103,8 +115,21 @@ class WebSocketServer
         $connection->websocketPath  = $path;
         $connection->websocketQuery = $query;
 
-        $conn = new Connection($connection);
+        // 解析握手 token（来自 query，字段名可配置）
+        $connection->websocketToken = isset($query[$this->tokenName])
+            ? (string) $query[$this->tokenName]
+            : null;
 
+        $conn = new Connection($connection, $this->app);
+
+        // 内置鉴权：satoken 驱动
+        if ($this->authDriver === 'satoken' && !$this->authBySaToken($conn)) {
+            $connection->close();
+
+            return;
+        }
+
+        // 自定义鉴权回调
         if ($this->authCallback !== null) {
             $auth = $this->authCallback;
             if (!$auth($conn)) {
@@ -121,6 +146,24 @@ class WebSocketServer
     }
 
     /**
+     * 使用 SaToken 校验握手 token 是否有效。
+     */
+    private function authBySaToken(Connection $conn): bool
+    {
+        $token = $conn->getToken();
+
+        if (empty($token)) {
+            return false;
+        }
+
+        try {
+            return $this->app->get('satoken')->isLogin($token);
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * WebSocket 消息回调。
      */
     public function onMessage(mixed $connection, mixed $data): void
@@ -132,7 +175,7 @@ class WebSocketServer
             return;
         }
 
-        $handler->onMessage(new Connection($connection), (string) $data);
+        $handler->onMessage(new Connection($connection, $this->app), (string) $data);
     }
 
     /**
@@ -149,7 +192,7 @@ class WebSocketServer
         unset($this->connections[$path][$connection->id]);
 
         $handler = $this->resolveHandler($path);
-        $handler?->onClose(new Connection($connection));
+        $handler?->onClose(new Connection($connection, $this->app));
     }
 
     /**

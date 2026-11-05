@@ -189,16 +189,86 @@ $online = ws()->count('/chat');
 
 ### 连接鉴权
 
-通过 `auth()` 方法设置鉴权回调，在握手阶段校验连接合法性。返回 `false` 时拒绝连接：
+WebSocket 进程常驻运行，无法读取 PHP-FPM 的 `$_SESSION`，认证必须基于 token。框架支持两种鉴权方式。
+
+#### 方式一：内置 SaToken 鉴权（推荐）
+
+在 `config/websocket.php` 中开启 `auth.driver = 'satoken'`，框架会在握手阶段自动从 query 读取 token 并调用 SaToken 校验，无效则直接拒绝连接：
+
+```php
+'auth' => [
+    'driver'     => 'satoken',   // 复用 SaToken 校验握手 token
+    'token_name' => 'token',     // query 中的 token 字段名
+],
+```
+
+客户端连接时携带 token：
+
+```javascript
+const ws = new WebSocket('ws://localhost:8080/chat?token=' + token);
+```
+
+#### 方式二：自定义鉴权回调
+
+通过 `ws()->auth()` 注册回调，返回 `false` 时拒绝连接：
 
 ```php
 ws()->auth(function (Connection $conn): bool {
-    $token = $conn->getQuery()['token'] ?? '';
-    return satoken()->check($token);
+    $token = $conn->getToken();
+    if (empty($token)) {
+        return false;
+    }
+    return satoken()->isLogin($token);
 });
 ```
 
-> WebSocket 进程中无法使用 PHP-FPM 的 `$_SESSION`，认证必须基于 token。
+> 两种方式可同时使用：内置鉴权先执行，通过后再执行自定义回调，两者都放行才建立连接。
+
+### 在 Handler 中获取登录用户
+
+握手通过后，`Connection` 提供以下方法复用 SaToken 身份信息（无需手动传 token）：
+
+| 方法 | 返回 | 说明 |
+|------|------|------|
+| `$conn->getToken()` | `?string` | 握手携带的 token |
+| `$conn->getLoginId()` | `?int` | 登录用户 ID（首次调用时校验并缓存） |
+| `$conn->getLoginExtra()` | `array` | token 中存储的 extra 数据 |
+
+```php
+public function onMessage(Connection $conn, string $data): void
+{
+    $loginId = $conn->getLoginId();
+    if ($loginId === null) {
+        $conn->close();
+        return;
+    }
+
+    ws()->broadcast('/chat', json_encode([
+        'type' => 'message',
+        'from' => $loginId,
+        'msg'  => $data,
+    ]));
+}
+```
+
+### 在闭包内复用 SaToken 无参方法
+
+`hasPermission()`、`getCurrentLoginId()` 等无参方法默认从 HTTP 请求读取 token，在 WebSocket 进程中不可用。可使用 `withToken()` 在闭包内注入 token 上下文：
+
+```php
+satoken()->withToken($conn->getToken(), function () use ($conn, $data) {
+    // 闭包内所有无参调用自动使用该 token
+    if (!satoken()->hasPermission('chat.send')) {
+        $conn->send(json_encode(['type' => 'error', 'msg' => '无权限']));
+        return;
+    }
+
+    $loginId = satoken()->getCurrentLoginId();
+    // ...
+});
+```
+
+> `withToken()` 执行结束后自动恢复原上下文，不影响其他连接。Workerman 单进程事件循环内不会并发执行回调，因此是安全的。
 
 ### 客户端示例
 
