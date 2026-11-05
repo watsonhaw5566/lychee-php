@@ -15,6 +15,19 @@ interface SatokenInterface
 
     public function login(int $loginId, array $extra = []): string;
 
+    /**
+     * 在闭包内设置当前 token 上下文。
+     *
+     * 适用于非 HTTP 请求场景（如 WebSocket、CLI 队列），此时无 Request 对象可供
+     * TokenReader 读取。闭包内所有未显式传 token 的方法（getCurrentLoginId、
+     * hasPermission 等）都会自动使用该 token；闭包执行结束后恢复原状态。
+     *
+     * @param  string|null  $token
+     * @param  callable     $callback
+     * @return mixed        闭包的返回值
+     */
+    public function withToken(?string $token, callable $callback): mixed;
+
     public function logout(?string $token = null): bool;
 
     public function kickout(int $id): bool;

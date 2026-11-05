@@ -9,26 +9,27 @@ use Lychee\console\input\Argument;
 use Lychee\console\input\Option;
 use Lychee\console\Input;
 use Lychee\console\Output;
-use Lychee\websocket\CronWorker;
-use Lychee\websocket\HttpWorker;
-use Lychee\websocket\QueueWorker;
+use Lychee\websocket\WebSocketServer;
 
 /**
- * Worker 服务管理命令。
+ * WebSocket 服务管理命令。
  *
  * 用法：
- *   php lee worker              # 启动服务（前台）
- *   php lee worker start -d     # 守护进程模式启动
- *   php lee worker stop         # 停止服务
- *   php lee worker reload       # 平滑重启（重载业务代码）
- *   php lee worker restart      # 完全重启
- *   php lee worker status       # 查看运行状态
+ *   php lee ws              # 启动服务（前台）
+ *   php lee ws start -d     # 守护进程模式启动
+ *   php lee ws stop         # 停止服务
+ *   php lee ws reload       # 平滑重启（重载业务代码，连接基本不中断）
+ *   php lee ws restart      # 完全重启
+ *   php lee ws status       # 查看运行状态
+ *
+ * 注意：本命令仅负责 WebSocket 服务。HTTP 请求走 php-fpm，
+ * 队列消费使用 php lee queue:work，定时任务使用 php lee cron:schedule。
  */
-class ServerCommand extends Command
+class WsCommand extends Command
 {
-    protected string $name = 'worker';
+    protected string $name = 'ws';
 
-    protected string $description = 'Manage the Worker server';
+    protected string $description = 'Manage the WebSocket server';
 
     protected function configure(): void
     {
@@ -49,65 +50,43 @@ class ServerCommand extends Command
         }
 
         $action  = (string) ($input->getArgument('action') ?? 'start');
-        $config  = $this->app->get('config')->get('worker', []);
-        $pidFile = $config['pid_file'] ?? runtime_path('worker.pid');
+        $config  = $this->app->get('config')->get('websocket', []);
+        $pidFile = $config['pid_file'] ?? runtime_path('ws.pid');
 
         return match ($action) {
             'stop'    => $this->stop($output, $pidFile),
             'reload'  => $this->reload($output, $pidFile),
             'restart' => $this->restart($input, $output, $config, $pidFile),
             'status'  => $this->status($output, $pidFile),
-            default   => $this->start($input, $output, $config),
+            default   => $this->start($input, $output, $config, $pidFile),
         };
     }
 
     /**
-     * 启动服务。
+     * 启动 WebSocket 服务。
      *
      * @param array<string, mixed> $config
      */
-    private function start(Input $input, Output $output, array $config): int
+    private function start(Input $input, Output $output, array $config, string $pidFile): int
     {
-        $httpWorker = new HttpWorker($this->app, $config);
-        $httpWorker->createWorker();
+        /** @var WebSocketServer $server */
+        $server = $this->app->get(WebSocketServer::class);
+        $server->createWorker();
 
-        if (isset($config['pid_file'])) {
-            \Workerman\Worker::$pidFile = $config['pid_file'];
-        }
+        \Workerman\Worker::$pidFile = $pidFile;
+
         if (isset($config['log_file'])) {
             \Workerman\Worker::$logFile = $config['log_file'];
         }
 
         $host = $config['host'] ?? '0.0.0.0';
         $port = $config['port'] ?? 8080;
-        $output->writeln("<info>Worker</info> listening on <comment>http://{$host}:{$port}</comment>");
+        $output->writeln("<info>WebSocket</info> listening on <comment>ws://{$host}:{$port}</comment>");
 
-        $handlers = $config['websocket']['handlers'] ?? [];
+        $handlers = $config['handlers'] ?? [];
         if (!empty($handlers)) {
             $paths = implode(', ', array_keys($handlers));
             $output->writeln("<info>WebSocket</info> paths: <comment>{$paths}</comment>");
-        }
-
-        $queueConfig = $config['queue'] ?? null;
-        if (is_array($queueConfig) && $this->app->bound(\Lychee\queue\QueueManager::class)) {
-            $queueWorker = new QueueWorker($this->app, $queueConfig);
-            $queueWorker->createWorker();
-
-            $queueConn  = $queueConfig['connection'] ?? 'default';
-            $queueCount = $queueConfig['count']      ?? 1;
-            $output->writeln("<info>Queue</info>     consumer x{$queueCount} (connection: <comment>{$queueConn}</comment>)");
-        }
-
-        $cronConfig  = $config['cron'] ?? null;
-        $cronEnabled = is_array($cronConfig) ? ($cronConfig['enable'] ?? true) : (bool) $cronConfig;
-        if ($cronEnabled && $this->app->bound(\Lychee\cron\Scheduler::class)) {
-            $cronWorker = new CronWorker($this->app, is_array($cronConfig) ? $cronConfig : []);
-            $cronWorker->createWorker();
-
-            /** @var \Lychee\cron\Scheduler $scheduler */
-            $scheduler = $this->app->get(\Lychee\cron\Scheduler::class);
-            $taskCount = count($scheduler->getTasks());
-            $output->writeln("<info>Cron</info>      scheduler ({$taskCount} task(s))");
         }
 
         if ((bool) $input->getOption('daemon')) {
@@ -127,12 +106,12 @@ class ServerCommand extends Command
         $pid = $this->getMasterPid($pidFile);
 
         if ($pid === null) {
-            $output->writeln('<comment>Worker is not running.</comment>');
+            $output->writeln('<comment>WebSocket server is not running.</comment>');
 
             return 0;
         }
 
-        $output->writeln('<info>Stopping worker...</info>');
+        $output->writeln('<info>Stopping WebSocket server...</info>');
         posix_kill($pid, SIGTERM);
 
         $timeout = 10;
@@ -148,7 +127,7 @@ class ServerCommand extends Command
             usleep(100_000);
         }
 
-        $output->writeln('<info>Worker stopped.</info>');
+        $output->writeln('<info>WebSocket server stopped.</info>');
 
         return 0;
     }
@@ -157,20 +136,20 @@ class ServerCommand extends Command
      * 平滑重载（SIGUSR1）。
      *
      * 向主进程发送 SIGUSR1，Workerman 会逐个重启子进程，
-     * 子进程重启后重新加载业务代码。主进程不会重启。
+     * 子进程重启后重新加载业务代码。主进程不会重启，在线连接基本不中断。
      */
     private function reload(Output $output, string $pidFile): int
     {
         $pid = $this->getMasterPid($pidFile);
 
         if ($pid === null) {
-            $output->writeln('<error>Worker is not running.</error>');
+            $output->writeln('<error>WebSocket server is not running.</error>');
 
             return 1;
         }
 
         posix_kill($pid, SIGUSR1);
-        $output->writeln('<info>Worker reloading...</info>');
+        $output->writeln('<info>WebSocket server reloading...</info>');
 
         return 0;
     }
@@ -184,7 +163,7 @@ class ServerCommand extends Command
     {
         $this->stop($output, $pidFile);
 
-        return $this->start($input, $output, $config);
+        return $this->start($input, $output, $config, $pidFile);
     }
 
     /**
@@ -195,12 +174,12 @@ class ServerCommand extends Command
         $pid = $this->getMasterPid($pidFile);
 
         if ($pid === null) {
-            $output->writeln('<comment>Worker is not running.</comment>');
+            $output->writeln('<comment>WebSocket server is not running.</comment>');
 
             return 0;
         }
 
-        $output->writeln("<info>Worker is running</info> (master pid: <comment>{$pid}</comment>)");
+        $output->writeln("<info>WebSocket server is running</info> (master pid: <comment>{$pid}</comment>)");
 
         return 0;
     }

@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    // ── 服务监听 ──────────────────────────────────────────────────
+    'host'  => '0.0.0.0',
+    'port'  => 8080,
+    'count' => 1,
+
+    // ── WebSocket Handler 路由 ────────────────────────────────────
+    // path 到 Handler 类的映射，Handler 需实现 Lychee\websocket\Handler 接口
+    'handlers' => [
+        // '/chat' => \App\websocket\ChatHandler::class,
+    ],
+
+    // ── 连接鉴权 ──────────────────────────────────────────────────
+    // driver: 'none'（默认，不鉴权）| 'satoken'（复用 SaToken 校验握手 token）
+    // token_name: 握手 query 中携带 token 的字段名，客户端需 ws://host:port/path?token=xxx
+    'auth' => [
+        'driver'     => 'none',
+        'token_name' => 'token',
+    ],
+
+    // ── 进程管理 ──────────────────────────────────────────────────
+    'pid_file' => runtime_path('ws.pid'),
+    'log_file' => runtime_path('ws.log'),
+];

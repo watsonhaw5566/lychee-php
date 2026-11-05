@@ -6,12 +6,17 @@ namespace Lychee\websocket;
 
 use Closure;
 use Lychee\container\Container;
+use RuntimeException;
+use Throwable;
 
 /**
  * WebSocket 服务管理器。
  *
- * 不再独立创建 Worker，而是由 HttpWorker 在同端口下委托调用。
- * 负责：
+ * 基于 Workerman 的 websocket:// 协议提供纯 WebSocket 服务，
+ * 不再承载 HTTP 请求、队列消费或定时任务（这些由 php-fpm / CLI 负责）。
+ *
+ * 职责：
+ * - 创建并启动 Workerman WebSocket Worker
  * - 按握手请求 path 路由到对应的 Handler
  * - 维护连接注册表，支持按 path 广播
  * - 可选的连接鉴权回调
@@ -27,9 +32,29 @@ class WebSocketServer
     /** @var Closure|null 鉴权回调 (Connection): bool */
     private ?Closure $authCallback = null;
 
+    private readonly string $host;
+    private readonly int $port;
+    private readonly int $count;
+
+    /** @var string 内置鉴权驱动：'satoken' | 'none' */
+    private readonly string $authDriver;
+
+    /** @var string 握手 query 中 token 的字段名 */
+    private readonly string $tokenName;
+
     public function __construct(
         private readonly Container $app,
     ) {
+        $config = $app->get('config')->get('websocket', []);
+
+        $this->host  = (string) ($config['host'] ?? '0.0.0.0');
+        $this->port  = (int) ($config['port'] ?? 8080);
+        $this->count = (int) ($config['count'] ?? 1);
+
+        $auth = is_array($config['auth'] ?? null) ? $config['auth'] : [];
+
+        $this->authDriver = strtolower((string) ($auth['driver'] ?? 'none'));
+        $this->tokenName  = (string) ($auth['token_name'] ?? 'token');
     }
 
     /**
@@ -45,15 +70,66 @@ class WebSocketServer
     }
 
     /**
-     * WebSocket 握手完成回调（由 HttpWorker 委托调用）。
+     * 创建 Workerman WebSocket Worker（不启动，由命令统一 runAll）。
+     *
+     * @return object Workerman\Worker
+     * @throws RuntimeException 当 Workerman 未安装时
      */
-    public function onWebSocketConnect(mixed $connection, mixed $request): void
+    public function createWorker(): object
     {
-        $path                      = parse_url($request->uri ?? '/', PHP_URL_PATH) ?: '/';
-        $connection->websocketPath = $path;
+        $workerClass = '\\Workerman\\Worker';
 
-        $conn = new Connection($connection);
+        if (!class_exists($workerClass)) {
+            throw new RuntimeException(
+                'Workerman is not installed. Run: composer require workerman/workerman:^5.0'
+            );
+        }
 
+        /** @var object $worker */
+        $worker        = new $workerClass('websocket://' . $this->host . ':' . $this->port);
+        $worker->name  = 'WebSocket';
+        $worker->count = $this->count;
+
+        // 握手完成回调：解析 path/query、鉴权、注册连接、触发 onOpen
+        $worker->onWebSocketConnect = $this->onWebSocketConnect(...);
+
+        // 消息回调：文本帧 payload
+        $worker->onMessage = $this->onMessage(...);
+
+        // 连接关闭回调
+        $worker->onClose = $this->onClose(...);
+
+        return $worker;
+    }
+
+    /**
+     * WebSocket 握手回调。
+     *
+     * Workerman websocket:// 协议在收到 HTTP 升级请求时触发，
+     * $buffer 为原始 HTTP 请求报文，可从中解析 path 与 query。
+     */
+    public function onWebSocketConnect(mixed $connection, mixed $buffer): void
+    {
+        [$path, $query] = $this->parseHandshake((string) $buffer);
+
+        $connection->websocketPath  = $path;
+        $connection->websocketQuery = $query;
+
+        // 解析握手 token（来自 query，字段名可配置）
+        $connection->websocketToken = isset($query[$this->tokenName])
+            ? (string) $query[$this->tokenName]
+            : null;
+
+        $conn = new Connection($connection, $this->app);
+
+        // 内置鉴权：satoken 驱动
+        if ($this->authDriver === 'satoken' && !$this->authBySaToken($conn)) {
+            $connection->close();
+
+            return;
+        }
+
+        // 自定义鉴权回调
         if ($this->authCallback !== null) {
             $auth = $this->authCallback;
             if (!$auth($conn)) {
@@ -70,9 +146,27 @@ class WebSocketServer
     }
 
     /**
-     * WebSocket 消息回调（由 HttpWorker 委托调用）。
+     * 使用 SaToken 校验握手 token 是否有效。
      */
-    public function onWebSocketMessage(mixed $connection, mixed $data): void
+    private function authBySaToken(Connection $conn): bool
+    {
+        $token = $conn->getToken();
+
+        if (empty($token)) {
+            return false;
+        }
+
+        try {
+            return $this->app->get('satoken')->isLogin($token);
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * WebSocket 消息回调。
+     */
+    public function onMessage(mixed $connection, mixed $data): void
     {
         $path    = $connection->websocketPath ?? '/';
         $handler = $this->resolveHandler($path);
@@ -81,15 +175,13 @@ class WebSocketServer
             return;
         }
 
-        $handler->onMessage(new Connection($connection), (string) $data);
+        $handler->onMessage(new Connection($connection, $this->app), (string) $data);
     }
 
     /**
-     * 连接关闭回调（由 HttpWorker 委托调用）。
-     *
-     * 仅处理 WebSocket 连接的关闭，普通 HTTP 连接忽略。
+     * 连接关闭回调。
      */
-    public function onConnectionClose(mixed $connection): void
+    public function onClose(mixed $connection): void
     {
         $path = $connection->websocketPath ?? null;
 
@@ -100,7 +192,29 @@ class WebSocketServer
         unset($this->connections[$path][$connection->id]);
 
         $handler = $this->resolveHandler($path);
-        $handler?->onClose(new Connection($connection));
+        $handler?->onClose(new Connection($connection, $this->app));
+    }
+
+    /**
+     * 从握手 HTTP 报文中解析 path 与 query 参数。
+     *
+     * @return array{0: string, 1: array<string, string>}
+     */
+    private function parseHandshake(string $buffer): array
+    {
+        $firstLine = strstr($buffer, "\r\n", true) ?: $buffer;
+        $parts     = explode(' ', $firstLine);
+        $uri       = $parts[1] ?? '/';
+
+        $path        = parse_url($uri, PHP_URL_PATH) ?: '/';
+        $queryString = parse_url($uri, PHP_URL_QUERY);
+
+        $query = [];
+        if ($queryString !== null && $queryString !== '') {
+            parse_str($queryString, $query);
+        }
+
+        return [$path, $query];
     }
 
     /**
@@ -112,7 +226,7 @@ class WebSocketServer
             return $this->handlers[$path];
         }
 
-        $handlers = (array) $this->app->get('config')->get('worker.websocket.handlers', []);
+        $handlers = (array) $this->app->get('config')->get('websocket.handlers', []);
         $class    = $handlers[$path] ?? null;
 
         if ($class === null || !class_exists($class)) {

@@ -52,4 +52,39 @@ class SaTokenTest extends TestCase
     {
         $this->assertFalse($this->saToken->isLogin('invalid-token'));
     }
+
+    public function test_with_token_sets_context_for_parameterless_calls(): void
+    {
+        $token = $this->saToken->login(2002);
+
+        // 闭包内未显式传 token，应自动使用 withToken 设置的上下文 token
+        $loginId = $this->saToken->withToken($token, function () {
+            return $this->saToken->getCurrentLoginId();
+        });
+
+        $this->assertSame(2002, $loginId);
+    }
+
+    public function test_with_token_restores_context_after_callback(): void
+    {
+        $token = $this->saToken->login(3003);
+
+        $this->saToken->withToken($token, function (): void {
+            $this->assertSame(3003, $this->saToken->getCurrentLoginId());
+        });
+
+        // 闭包结束后上下文恢复，无 token 时应抛 NotLoginException
+        $this->expectException(\Lychee\auth\exception\NotLoginException::class);
+        $this->saToken->getCurrentLoginId();
+    }
+
+    public function test_with_null_token_prevents_fallback_to_request(): void
+    {
+        // withToken(null) 表示"无 token"，不应回退到 TokenReader 读取请求
+        $result = $this->saToken->withToken(null, function () {
+            return $this->saToken->isLogin();
+        });
+
+        $this->assertFalse($result);
+    }
 }

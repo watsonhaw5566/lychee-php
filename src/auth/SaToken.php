@@ -39,6 +39,16 @@ class SaToken implements SatokenInterface
 
     protected ?PermissionResolverInterface $permissionResolver = null;
 
+    /**
+     * 显式设置的 token 上下文（用于 WebSocket / CLI 等无 Request 场景）。
+     *
+     * 当 $hasContextToken 为 true 时，getToken() 直接返回 $contextToken，
+     * 不再通过 TokenReader 读取 HTTP 请求。
+     */
+    protected bool $hasContextToken = false;
+
+    protected ?string $contextToken = null;
+
     public function __construct(protected Container $app)
     {
     }
@@ -223,7 +233,32 @@ class SaToken implements SatokenInterface
 
     private function getToken(): ?string
     {
+        if ($this->hasContextToken) {
+            return $this->contextToken;
+        }
+
         return $this->getTokenReader()->read();
+    }
+
+    /**
+     * 在闭包内设置 token 上下文，闭包内所有未显式传 token 的方法自动使用该 token。
+     *
+     * 执行结束后恢复原上下文，避免污染单例状态。
+     */
+    public function withToken(?string $token, callable $callback): mixed
+    {
+        $prevHasContext = $this->hasContextToken;
+        $prevToken      = $this->contextToken;
+
+        $this->hasContextToken = true;
+        $this->contextToken    = $token;
+
+        try {
+            return $callback();
+        } finally {
+            $this->hasContextToken = $prevHasContext;
+            $this->contextToken    = $prevToken;
+        }
     }
 
     /**
