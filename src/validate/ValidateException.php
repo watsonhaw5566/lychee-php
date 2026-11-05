@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace Lychee\validate;
 
-use RuntimeException;
+use Lychee\http\HttpException;
 
 /**
- * 校验失败异常。
+ * 校验失败异常，对应 HTTP 400。
  *
  * 由 Validate::check() 在 failException(true) 时抛出；
- * HTTP Kernel 的 ExceptionHandler 捕获后统一返回 400 响应。
+ * HTTP 内核的 ExceptionHandler 捕获后统一返回 400 响应，并保留字段级错误。
  *
  * 构造参数：
  *   - $error 可为字符串或 field => message 关联数组
  *   - $key   发生错误的字段名（可选，批量错误时留空）
  */
-class ValidateException extends RuntimeException
+class ValidateException extends HttpException
 {
     /**
      * @var string|array<string, string>
@@ -35,7 +35,7 @@ class ValidateException extends RuntimeException
 
         $message = is_array($error) ? implode('；', $error) : $error;
 
-        parent::__construct($message, $code);
+        parent::__construct(400, $message, $code);
     }
 
     /**

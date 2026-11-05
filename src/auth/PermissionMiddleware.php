@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Lychee\auth;
 
 use Closure;
-use Lychee\auth\exception\NoPermissionException;
-use Lychee\http\JsonResponse;
 use Lychee\http\MiddlewareInterface;
 use Lychee\http\Request;
 use Lychee\http\Response;
@@ -19,6 +17,7 @@ use ReflectionMethod;
  *
  * 读取控制器方法和类上的 #[Permission] 注解，
  * 通过 SaToken::checkAnyPermission() 校验当前用户是否拥有所需权限。
+ * 无权限时抛出 NoPermissionException（HTTP 403），由全局异常处理器统一渲染。
  *
  * 优先级：方法级 > 类级。方法上声明了 #[Permission] 则忽略类级声明。
  * 未标注 #[Permission] 的方法默认放行（渐进式迁移）。
@@ -57,16 +56,8 @@ class PermissionMiddleware implements MiddlewareInterface
             return $next($request);
         }
 
-        try {
-            $this->saToken->checkAnyPermission(...$permissions);
-        } catch (NoPermissionException $e) {
-            return new JsonResponse([
-                'errno' => 0,
-                'code'  => 403,
-                'msg'   => $e->getMessage(),
-                'data'  => null,
-            ], 403);
-        }
+        // 无权限时抛出 NoPermissionException（HTTP 403），由全局 ExceptionHandler 统一渲染
+        $this->saToken->checkAnyPermission(...$permissions);
 
         return $next($request);
     }
