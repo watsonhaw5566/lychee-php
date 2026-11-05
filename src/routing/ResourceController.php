@@ -61,16 +61,19 @@ abstract class ResourceController extends Controller
     protected array $pageFields = ['current', 'pageSize'];
 
     /**
-     * index / read 时需要追加的属性与关联（混合列表，统一走 append）。
-     *
-     * append() 会自动区分：
-     *   - 访问器字段（getXxxAttr）→ 调用访问器输出
-     *   - 关联方法（hasOne / hasMany / belongsTo）→ 自动预加载后输出
-     * 关联名支持蛇形（ad_platform）与驼峰（adPlatform），输出 key 与传入名一致。
-     *
+     * 列表接口排除的追加字段/关联（#[Append] 声明的字段）。
+     * 等价于 $query->without($indexWithout)：既不预加载，也不输出。
+     * 用于列表页跳过重关联，避免不必要的查询开销。
      * @var array<int, string>
      */
-    protected array $append = [];
+    protected array $indexWithout = [];
+
+    /**
+     * 详情接口排除的追加字段/关联（#[Append] 声明的字段）。
+     * 等价于 $query->without($readWithout)。
+     * @var array<int, string>
+     */
+    protected array $readWithout = [];
 
     // ── 验证快捷方式 ────────────────────────────────────────────────
 
@@ -305,7 +308,7 @@ abstract class ResourceController extends Controller
             $where = $all;
         }
 
-        return $this->baseIndex($where, $current, $pageSize, $this->append);
+        return $this->baseIndex($where, $current, $pageSize);
     }
 
     /**
@@ -318,12 +321,14 @@ abstract class ResourceController extends Controller
      * @param int $current 当前页码
      * @param int $pageSize 每页条数
      * @param array $append 追加属性与关联的混合列表（统一走 append，关联自动预加载）
+     * @param array $without 排除的 #[Append] 字段/关联：既不预加载也不输出（列表页跳过重关联）
      */
     protected function baseIndex(
         array $where = [],
         int   $current = 1,
         int   $pageSize = 20,
         array $append = [],
+        array $without = [],
     ): JsonResponse {
         try {
             $order = $this->request->param('order', $this->order);
@@ -341,6 +346,12 @@ abstract class ResourceController extends Controller
 
             if ($append) {
                 $query->append($append);
+            }
+
+            // 合并属性声明 + 调用方传入的排除字段
+            $without = array_values(array_unique(array_merge($this->indexWithout, $without)));
+            if ($without) {
+                $query->without($without);
             }
 
             if (is_string($order)) {
@@ -400,7 +411,7 @@ abstract class ResourceController extends Controller
 
     public function read(int $id): JsonResponse
     {
-        return $this->baseRead($id, $this->append);
+        return $this->baseRead($id);
     }
 
     /**
@@ -408,14 +419,21 @@ abstract class ResourceController extends Controller
      *
      * @param int $id 主键 ID
      * @param array $append 追加属性与关联的混合列表（统一走 append，关联自动预加载）
+     * @param array $without 排除的 #[Append] 字段/关联：既不预加载也不输出
      */
-    protected function baseRead(int $id, array $append = []): JsonResponse
+    protected function baseRead(int $id, array $append = [], array $without = []): JsonResponse
     {
         try {
             $query = $this->getModelClass()->db();
 
             if ($append) {
                 $query->append($append);
+            }
+
+            // 合并属性声明 + 调用方传入的排除字段
+            $without = array_values(array_unique(array_merge($this->readWithout, $without)));
+            if ($without) {
+                $query->without($without);
             }
 
             $query = $this->applyDataPermission($query);

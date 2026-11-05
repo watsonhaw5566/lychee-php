@@ -10,9 +10,13 @@ use Closure;
 use DateTimeImmutable;
 use DateTimeInterface;
 use JsonSerializable;
+use Lychee\orm\attribute\Append;
 use Lychee\orm\attribute\Column;
+use Lychee\orm\attribute\Getter;
+use Lychee\orm\attribute\Setter;
 use Lychee\orm\exception\DbException;
 use Lychee\orm\relation\BelongsTo;
+use Lychee\orm\relation\BelongsToMany;
 use Lychee\orm\relation\HasMany;
 use Lychee\orm\relation\HasOne;
 use Lychee\orm\relation\Relation;
@@ -30,9 +34,10 @@ use UnitEnum;
  *
  *   class User extends Model {
  *       protected string $table = 'user';
- *       protected array $type   = ['balance' => 'float'];
- *       protected array $json   = ['extra'];
  *       protected array $disuse = ['legacy_col'];
+ *
+ *       #[Column(type: 'decimal:2')]
+ *       protected float $balance;
  *
  *       public function orders(): HasMany {
  *           return $this->hasMany(Order::class, 'user_id', 'id');
@@ -74,7 +79,6 @@ use UnitEnum;
  * @method static Query join(string $table, string $condition, string $type = 'INNER')
  * @method static Query leftJoin(string $table, string $condition)
  * @method static Query rightJoin(string $table, string $condition)
- * @method static Query with(string|array $relations)
  * @method static Query withCount(string|array $relations)
  * @method static Query append(string|array $attrs)
  * @method static Query hidden(array $fields)
@@ -146,6 +150,34 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     protected static array $columnAttributeCache = [];
 
+    /**
+     * #[Append] 属性扫描结果缓存，键为模型类名，值为属性名列表。
+     *
+     * @var array<class-string, array<int, string>>
+     */
+    protected static array $appendAttributeCache = [];
+
+    /**
+     * 模型类 → #[Append(with: true)] 关联方法名列表缓存。
+     *
+     * @var array<class-string, array<int, string>>
+     */
+    protected static array $appendWithCache = [];
+
+    /**
+     * #[Getter] 方法扫描结果缓存，键为模型类名，值为 ['字段名' => '方法名']。
+     *
+     * @var array<class-string, array<string, string>>
+     */
+    protected static array $getterMethodCache = [];
+
+    /**
+     * #[Setter] 方法扫描结果缓存，键为模型类名，值为 ['字段名' => '方法名']。
+     *
+     * @var array<class-string, array<string, string>>
+     */
+    protected static array $setterMethodCache = [];
+
     // ── 子类覆盖项 ─────────────────────────────────────────────────────
 
     /** 连接名；为空则使用默认连接 */
@@ -164,7 +196,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
     protected string $pk = 'id';
 
     /**
-     * 模型配置集中存放，避免与数据库字段同名冲突（如 hidden / type / json 等）。
+     * 模型配置集中存放，避免与数据库字段同名冲突（如 hidden 等）。
      *
      * 子类可通过声明同名属性（如 protected array $hidden = [...]）进行配置，
      * 构造时会自动合并到本数组；也可直接覆盖 $modelConfig。
@@ -175,9 +207,6 @@ abstract class Model implements ArrayAccess, JsonSerializable
      *     readonly:array<int,string>,
      *     hidden:array<int,string>,
      *     visible:array<int,string>,
-     *     append:array<int,string>,
-     *     type:array<string,string>,
-     *     json:array<int,string>,
      * }
      */
     protected array $modelConfig = [
@@ -186,9 +215,6 @@ abstract class Model implements ArrayAccess, JsonSerializable
         'readonly' => [],
         'hidden'   => [],
         'visible'  => [],
-        'append'   => [],
-        'type'     => [],
-        'json'     => [],
     ];
 
     /** JSON 解码时是否关联数组 */
@@ -411,9 +437,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /**
      * 获取模型声明的 JSON 字段列表。
      *
-     * 返回合并以下来源的 JSON 字段：
-     *   - 传统 $modelConfig['json']（含子类声明的 protected array $json）
-     *   - #[Column(json: true)] 或 #[Column(type: 'json')] 声明的属性
+     * 返回通过 #[Column(json: true)] 或 #[Column(type: 'json')] 声明的 JSON 字段。
      *
      * 供外部（如控制器的查询 DSL）判断某字段是否为 JSON 数组字段，
      * 避免使用反射直接读取 protected 属性。
@@ -422,7 +446,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function getJsonFields(): array
     {
-        $fields = $this->modelConfig['json'];
+        $fields = [];
 
         foreach ($this->getColumnMeta() as $name => $column) {
             if ($column->json || $column->type === 'json') {
@@ -430,7 +454,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
             }
         }
 
-        return array_values(array_unique($fields));
+        return $fields;
     }
 
     // ── Query 入口 ───────────────────────────────────────────────────────
@@ -455,6 +479,12 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
         if (method_exists($this, 'applySoftDeleteScope')) {
             $this->{'applySoftDeleteScope'}($query);
+        }
+
+        // 自动预加载 #[Append] 声明的关联，避免列表 N+1
+        $withRelations = $this->getAppendWithRelations();
+        if ($withRelations !== []) {
+            $query->with($withRelations);
         }
 
         return $query;
@@ -726,10 +756,16 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
     public function getAttr(string $name): mixed
     {
-        // accessor：getXxxAttr($value, $data)
-        $method = 'get' . $this->studly($name) . 'Attr';
-        $value  = $this->data[$name] ?? null;
+        $value = $this->data[$name] ?? null;
 
+        // 优先使用 #[Getter] 显式绑定的访问器方法
+        $getters = $this->getGetterMethods();
+        if (isset($getters[$name])) {
+            return $this->{$getters[$name]}($this->readTransform($name, $value), $this->data);
+        }
+
+        // 回退：getXxxAttr 命名约定
+        $method = 'get' . $this->studly($name) . 'Attr';
         if (method_exists($this, $method)) {
             return $this->{$method}($this->readTransform($name, $value), $this->data);
         }
@@ -743,10 +779,16 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
     public function setAttr(string $name, mixed $value): void
     {
-        // mutator：setXxxAttr($value, $data)
-        $method = 'set' . $this->studly($name) . 'Attr';
-        if (method_exists($this, $method)) {
-            $value = $this->{$method}($value, $this->data);
+        // 优先使用 #[Setter] 显式绑定的修改器方法
+        $setters = $this->getSetterMethods();
+        if (isset($setters[$name])) {
+            $value = $this->{$setters[$name]}($value, $this->data);
+        } else {
+            // 回退：setXxxAttr 命名约定
+            $method = 'set' . $this->studly($name) . 'Attr';
+            if (method_exists($this, $method)) {
+                $value = $this->{$method}($value, $this->data);
+            }
         }
 
         $this->data[$name] = $this->writeTransform($name, $value);
@@ -832,18 +874,43 @@ abstract class Model implements ArrayAccess, JsonSerializable
             }
         }
 
-        // 2. 手动配置的 $type
-        if (isset($this->modelConfig['type'][$name])) {
-            return (string) $this->modelConfig['type'][$name];
+        // 2. 从数据库元信息自动推导类型
+        $inferred = $this->inferFieldType($name);
+        if ($inferred !== null) {
+            return $inferred;
         }
 
-        // 3. 检查 $json 列表
-        if (in_array($name, $this->modelConfig['json'], true)) {
-            return 'json';
+        // 3. 约定俗成的通用字段默认类型（id / create_time / update_time / delete_time）
+        return $this->getConventionFieldType($name);
+    }
+
+    /**
+     * 约定俗成的通用字段默认类型。
+     *
+     * 避免每个模型都为 id / create_time / update_time / delete_time
+     * 重复声明 #[Column]。这些字段按框架约定自动获得类型转换：
+     *   - 主键（$pk）→ 'int'
+     *   - 创建时间（$createTime）→ 'datetime'
+     *   - 更新时间（$updateTime）→ 'datetime'
+     *   - 软删除时间（SoftDelete::$deleteTime）→ 'datetime'
+     *
+     * 返回 null 表示该字段无约定默认类型（交由调用方处理）。
+     */
+    protected function getConventionFieldType(string $name): ?string
+    {
+        if ($name === $this->pk) {
+            return 'int';
         }
 
-        // 4. 从数据库元信息自动推导类型
-        return $this->inferFieldType($name);
+        if ($name === $this->createTime || $name === $this->updateTime) {
+            return 'datetime';
+        }
+
+        if (method_exists($this, 'getDeleteTimeField') && $name === $this->getDeleteTimeField()) {
+            return 'datetime';
+        }
+
+        return null;
     }
 
     /**
@@ -878,6 +945,246 @@ abstract class Model implements ArrayAccess, JsonSerializable
         }
 
         return self::$columnAttributeCache[$class];
+    }
+
+    /**
+     * 扫描模型中所有标注了 #[Append] 的属性，返回属性名列表。
+     *
+     * 这些属性/方法为虚拟追加字段（不对应数据库列），值由访问器计算，
+     * 在 `toArray()` 时自动追加到输出。
+     *
+     * 支持两种声明形式：
+     *   1. 属性上标注 #[Append]（需配合 #[Getter] 或 getXxxAttr 提供值）
+     *   2. 方法上标注 #[Append]（方法名即字段名，方法本身即为访问器，无需 #[Getter]）
+     *
+     * 仅收集子类（含继承链中非 Model 基类）声明的属性/方法，跳过 Model 自身。
+     * 结果按类缓存，避免重复反射。
+     *
+     * @return array<int, string> 追加字段名列表
+     */
+    protected function getAppendMeta(): array
+    {
+        $class = static::class;
+
+        if (!isset(self::$appendAttributeCache[$class])) {
+            $names = [];
+            $ref   = new ReflectionClass($class);
+
+            // 形式一：属性上的 #[Append]
+            foreach ($ref->getProperties() as $prop) {
+                if ($prop->getDeclaringClass()->getName() === self::class) {
+                    continue;
+                }
+                $attrs = $prop->getAttributes(Append::class);
+                if ($attrs === []) {
+                    continue;
+                }
+                /** @var Append $instance */
+                $instance = $attrs[0]->newInstance();
+                $names[]  = $instance->name ?? $prop->getName();
+            }
+
+            // 形式二：方法上的 #[Append]（方法名即字段名，方法本身为访问器）
+            foreach ($ref->getMethods(ReflectionMethod::IS_PUBLIC | ReflectionMethod::IS_PROTECTED) as $method) {
+                if ($method->getDeclaringClass()->getName() === self::class) {
+                    continue;
+                }
+                $attrs = $method->getAttributes(Append::class);
+                if ($attrs === []) {
+                    continue;
+                }
+                /** @var Append $instance */
+                $instance = $attrs[0]->newInstance();
+                $names[]  = $instance->name ?? $method->getName();
+            }
+
+            self::$appendAttributeCache[$class] = array_values(array_unique($names));
+        }
+
+        return self::$appendAttributeCache[$class];
+    }
+
+    /**
+     * 返回标注了 #[Append] 的关联方法名，用于查询时自动预加载，
+     * 避免列表场景的 N+1 查询。
+     *
+     * 所有 #[Append] 关联均自动预加载，无需手动指定。
+     *
+     * @return array<int, string>
+     */
+    protected function getAppendWithRelations(): array
+    {
+        $class = static::class;
+
+        if (!isset(self::$appendWithCache[$class])) {
+            $relations = [];
+            $ref       = new ReflectionClass($class);
+
+            foreach ($ref->getMethods(ReflectionMethod::IS_PUBLIC | ReflectionMethod::IS_PROTECTED) as $method) {
+                if ($method->getDeclaringClass()->getName() === self::class) {
+                    continue;
+                }
+                $attrs = $method->getAttributes(Append::class);
+                if ($attrs === []) {
+                    continue;
+                }
+                /** @var Append $instance */
+                $instance = $attrs[0]->newInstance();
+                // 仅关联方法（返回 Relation 或其子类）参与预加载
+                $returnType = $method->getReturnType();
+                if ($returnType instanceof ReflectionNamedType) {
+                    $typeName = $returnType->getName();
+                    if ($typeName === Relation::class || is_subclass_of($typeName, Relation::class)) {
+                        $relations[] = $instance->name ?? $method->getName();
+                    }
+                }
+            }
+
+            self::$appendWithCache[$class] = array_values(array_unique($relations));
+        }
+
+        return self::$appendWithCache[$class];
+    }
+
+    /**
+     * 扫描模型中所有标注了 #[Getter] 的方法，返回字段名 => 方法名映射。
+     *
+     * 此外，标注了 #[Append] 的方法也自动注册为该字段的访问器
+     * （方法名即字段名，方法本身即为 getter，无需再标注 #[Getter]）。
+     *
+     * 若 #[Getter] 未指定 field 参数，则从方法名推导：
+     *   去除 get/set 前缀与 Attr 后缀后首字母小写，或方法名直接等于字段名。
+     *   例如 fullName → fullName，getFullNameAttr → fullName。
+     *
+     * 仅收集子类（含继承链中非 Model 基类）声明的方法，跳过 Model 自身。
+     * 结果按类缓存。
+     *
+     * @return array<string, string> 字段名 => 方法名
+     */
+    protected function getGetterMethods(): array
+    {
+        $class = static::class;
+
+        if (!isset(self::$getterMethodCache[$class])) {
+            $map = $this->scanAttributeMethods(Getter::class);
+
+            // #[Append] 方法自动作为 getter 注册：输出名(name或方法名) => 方法名
+            // 注意：返回 Relation 的关联方法不注册为 getter，由 toArray() 通过
+            // resolveRelationMethod() 加载关联数据。
+            $ref = new ReflectionClass(static::class);
+            foreach ($ref->getMethods(ReflectionMethod::IS_PUBLIC | ReflectionMethod::IS_PROTECTED) as $method) {
+                if ($method->getDeclaringClass()->getName() === self::class) {
+                    continue;
+                }
+                $attrs = $method->getAttributes(Append::class);
+                if ($attrs === []) {
+                    continue;
+                }
+
+                // 跳过关联方法（返回 Relation 或其子类）
+                $returnType = $method->getReturnType();
+                if ($returnType instanceof ReflectionNamedType) {
+                    $typeName = $returnType->getName();
+                    if ($typeName === Relation::class || is_subclass_of($typeName, Relation::class)) {
+                        continue;
+                    }
+                }
+
+                /** @var Append $instance */
+                $instance = $attrs[0]->newInstance();
+                $field    = $instance->name ?? $method->getName();
+                // #[Getter] 显式绑定优先级更高
+                if (!isset($map[$field])) {
+                    $map[$field] = $method->getName();
+                }
+            }
+
+            self::$getterMethodCache[$class] = $map;
+        }
+
+        return self::$getterMethodCache[$class];
+    }
+
+    /**
+     * 扫描模型中所有标注了 #[Setter] 的方法，返回字段名 => 方法名映射。
+     *
+     * @return array<string, string> 字段名 => 方法名
+     */
+    protected function getSetterMethods(): array
+    {
+        $class = static::class;
+
+        if (!isset(self::$setterMethodCache[$class])) {
+            self::$setterMethodCache[$class] = $this->scanAttributeMethods(Setter::class);
+        }
+
+        return self::$setterMethodCache[$class];
+    }
+
+    /**
+     * 扫描标注了指定 Attribute 的方法，推导字段名并返回映射。
+     *
+     * @param class-string $attributeClass Getter::class 或 Setter::class
+     * @return array<string, string> 字段名 => 方法名
+     */
+    protected function scanAttributeMethods(string $attributeClass): array
+    {
+        $map = [];
+        $ref = new ReflectionClass(static::class);
+
+        foreach ($ref->getMethods(ReflectionMethod::IS_PUBLIC | ReflectionMethod::IS_PROTECTED) as $method) {
+            // 跳过 Model 基类自身声明的方法
+            if ($method->getDeclaringClass()->getName() === self::class) {
+                continue;
+            }
+
+            $attrs = $method->getAttributes($attributeClass);
+            if ($attrs === []) {
+                continue;
+            }
+
+            /** @var Getter|Setter $instance */
+            $instance = $attrs[0]->newInstance();
+            $field    = $instance->field ?? $this->fieldNameFromMethod($method->getName());
+
+            if ($field !== null) {
+                $map[$field] = $method->getName();
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * 从访问器/修改器方法名推导字段名。
+     *
+     * 支持三种命名形式（推荐第一种，最简洁）：
+     *   1. 方法名直接等于字段名：fullName → fullName
+     *   2. get/set 前缀：getFullName → FullName → fullName
+     *   3. get/set 前缀 + Attr 后缀：getFullNameAttr → FullName → fullName
+     *
+     * 若方法名不属于以上形式，返回 null（需用 #[Getter('field')] 显式指定）。
+     */
+    protected function fieldNameFromMethod(string $method): ?string
+    {
+        $name = $method;
+
+        if (str_starts_with($name, 'get') || str_starts_with($name, 'set')) {
+            $name = substr($name, 3);
+
+            if (str_ends_with($name, 'Attr')) {
+                $name = substr($name, 0, -4);
+            }
+
+            if ($name === '') {
+                return null;
+            }
+
+            return lcfirst($name);
+        }
+
+        // 无前缀：方法名即为字段名
+        return $name === '' ? null : $name;
     }
 
     /**
@@ -932,15 +1239,22 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
-     * decimal 类型读取：格式化为指定位数的字符串，避免浮点精度丢失。
+     * decimal 类型读取：按指定位数四舍五入后返回 float。
+     *
+     * 返回数字类型（而非字符串），以便 JSON 序列化后前端数字输入组件
+     * （如 Arco Design a-input-number）能直接回显。写入时 writeDecimal
+     * 仍会格式化为指定位数的字符串写入数据库，不影响存储精度。
+     *
+     * 注意：底层使用 (float) 转换，超大位数（超过 PHP_INT_MAX 精度范围）
+     * 的 decimal 如需精确运算，建议使用 type: 'string' 配合 bcmath 手动处理。
      */
-    protected function readDecimal(mixed $value, int $scale): string
+    protected function readDecimal(mixed $value, int $scale): float
     {
-        return number_format((float) $value, $scale, '.', '');
+        return round((float) $value, $scale);
     }
 
     /**
-     * decimal 类型写入：转为字符串，保留调用方传入的精度。
+     * decimal 类型写入：转为指定位数的字符串写入数据库。
      */
     protected function writeDecimal(mixed $value, int $scale): string
     {
@@ -1182,7 +1496,10 @@ abstract class Model implements ArrayAccess, JsonSerializable
     public function append(array|string $attrs): static
     {
         $attrs                       = is_array($attrs) ? $attrs : [$attrs];
-        $this->modelConfig['append'] = array_values(array_unique(array_merge($this->modelConfig['append'], $attrs)));
+        $this->modelConfig['append'] = array_values(array_unique(array_merge(
+            $this->modelConfig['append'] ?? [],
+            $attrs,
+        )));
 
         return $this;
     }
@@ -1220,8 +1537,18 @@ abstract class Model implements ArrayAccess, JsonSerializable
             }
         }
 
-        // append 虚拟字段 / 关联
-        foreach ($this->modelConfig['append'] as $key) {
+        // append 虚拟字段 / 关联（#[Append] 属性声明 + 运行时 append() 调用）
+        $hidden       = $this->modelConfig['hidden'];
+        $appendFields = array_values(array_unique(array_merge(
+            $this->getAppendMeta(),
+            $this->modelConfig['append'] ?? [],
+        )));
+
+        foreach ($appendFields as $key) {
+            // 跳过 hidden 字段，避免不必要的懒加载查询
+            if (in_array($key, $hidden, true)) {
+                continue;
+            }
             if ($this->resolveRelationMethod($key) !== null) {
                 // 关联：触发 lazy 加载（已预加载则直接取缓存）
                 $data[$key] = $this->{$key};
@@ -1603,6 +1930,57 @@ abstract class Model implements ArrayAccess, JsonSerializable
         return new BelongsTo($this, $related, $foreignKey, $ownerKey);
     }
 
+    /**
+     * 多对多关联。
+     *
+     *   $this->belongsToMany(Role::class, 'role_user', 'user_id', 'role_id');
+     *
+     * @template TRelated of Model
+     * @param  class-string<TRelated> $related
+     * @param  string $table           中间表名（逻辑名，不含前缀），默认按双方表名字母序拼接
+     * @param  string $foreignPivotKey 中间表中指向当前模型的外键字段，默认 {model}_id
+     * @param  string $relatedPivotKey 中间表中指向目标模型的外键字段，默认 {related}_id
+     * @param  string $parentKey       当前模型的本地键，默认主键
+     * @param  string $relatedKey      目标模型的本地键，默认主键
+     * @return BelongsToMany<TRelated>
+     */
+    protected function belongsToMany(
+        string $related,
+        string $table = '',
+        string $foreignPivotKey = '',
+        string $relatedPivotKey = '',
+        string $parentKey = '',
+        string $relatedKey = '',
+    ): BelongsToMany {
+        $parentKey  = $parentKey  !== '' ? $parentKey : $this->pk;
+        $relatedKey = $relatedKey !== '' ? $relatedKey : (new $related())->getPk();
+
+        $foreignPivotKey = $foreignPivotKey !== '' ? $foreignPivotKey : $this->defaultForeignKey();
+        $relatedPivotKey = $relatedPivotKey !== '' ? $relatedPivotKey : $this->defaultForeignKey($related);
+
+        if ($table === '') {
+            $tables = [$this->getLogicalTableName(), (new $related())->getLogicalTableName()];
+            sort($tables);
+            $table = implode('_', $tables);
+        }
+
+        return new BelongsToMany($this, $related, $table, $foreignPivotKey, $relatedPivotKey, $parentKey, $relatedKey);
+    }
+
+    /**
+     * 获取模型的逻辑表名（不含表前缀、不含后缀）。
+     *
+     * 用于多对多中间表的默认命名推导等场景。
+     */
+    public function getLogicalTableName(): string
+    {
+        if ($this->table !== '') {
+            return $this->table;
+        }
+
+        return $this->name !== '' ? $this->name : $this->inferTableName();
+    }
+
     protected function defaultForeignKey(?string $relatedClass = null): string
     {
         $target = $relatedClass ?? static::class;
@@ -1671,6 +2049,11 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function isAccessor(string $name): bool
     {
+        // 优先检查 #[Getter] 显式绑定
+        if (isset($this->getGetterMethods()[$name])) {
+            return true;
+        }
+
         return method_exists($this, 'get' . $this->studly($name) . 'Attr');
     }
 
@@ -1729,7 +2112,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * 获取模型声明的所有关联方法名。
      *
      * 通过反射扫描当前模型（含父类，不含 Model 基类自身）的 public 方法，
-     * 筛选返回值类型为 {@see Relation} 或其子类（HasOne / HasMany / BelongsTo）的方法。
+     * 筛选返回值类型为 {@see Relation} 或其子类（HasOne / HasMany / BelongsTo / BelongsToMany）的方法。
      *
      * 与 {@see callReturnsRelation()} 不同，本方法不实际调用关联方法，
      * 仅依据声明的返回类型判断，无副作用。
