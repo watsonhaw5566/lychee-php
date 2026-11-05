@@ -16,6 +16,7 @@ use Lychee\orm\attribute\Getter;
 use Lychee\orm\attribute\Setter;
 use Lychee\orm\exception\DbException;
 use Lychee\orm\relation\BelongsTo;
+use Lychee\orm\relation\BelongsToMany;
 use Lychee\orm\relation\HasMany;
 use Lychee\orm\relation\HasOne;
 use Lychee\orm\relation\Relation;
@@ -1929,6 +1930,57 @@ abstract class Model implements ArrayAccess, JsonSerializable
         return new BelongsTo($this, $related, $foreignKey, $ownerKey);
     }
 
+    /**
+     * 多对多关联。
+     *
+     *   $this->belongsToMany(Role::class, 'role_user', 'user_id', 'role_id');
+     *
+     * @template TRelated of Model
+     * @param  class-string<TRelated> $related
+     * @param  string $table           中间表名（逻辑名，不含前缀），默认按双方表名字母序拼接
+     * @param  string $foreignPivotKey 中间表中指向当前模型的外键字段，默认 {model}_id
+     * @param  string $relatedPivotKey 中间表中指向目标模型的外键字段，默认 {related}_id
+     * @param  string $parentKey       当前模型的本地键，默认主键
+     * @param  string $relatedKey      目标模型的本地键，默认主键
+     * @return BelongsToMany<TRelated>
+     */
+    protected function belongsToMany(
+        string $related,
+        string $table = '',
+        string $foreignPivotKey = '',
+        string $relatedPivotKey = '',
+        string $parentKey = '',
+        string $relatedKey = '',
+    ): BelongsToMany {
+        $parentKey  = $parentKey  !== '' ? $parentKey : $this->pk;
+        $relatedKey = $relatedKey !== '' ? $relatedKey : (new $related())->getPk();
+
+        $foreignPivotKey = $foreignPivotKey !== '' ? $foreignPivotKey : $this->defaultForeignKey();
+        $relatedPivotKey = $relatedPivotKey !== '' ? $relatedPivotKey : $this->defaultForeignKey($related);
+
+        if ($table === '') {
+            $tables = [$this->getLogicalTableName(), (new $related())->getLogicalTableName()];
+            sort($tables);
+            $table = implode('_', $tables);
+        }
+
+        return new BelongsToMany($this, $related, $table, $foreignPivotKey, $relatedPivotKey, $parentKey, $relatedKey);
+    }
+
+    /**
+     * 获取模型的逻辑表名（不含表前缀、不含后缀）。
+     *
+     * 用于多对多中间表的默认命名推导等场景。
+     */
+    public function getLogicalTableName(): string
+    {
+        if ($this->table !== '') {
+            return $this->table;
+        }
+
+        return $this->name !== '' ? $this->name : $this->inferTableName();
+    }
+
     protected function defaultForeignKey(?string $relatedClass = null): string
     {
         $target = $relatedClass ?? static::class;
@@ -2060,7 +2112,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * 获取模型声明的所有关联方法名。
      *
      * 通过反射扫描当前模型（含父类，不含 Model 基类自身）的 public 方法，
-     * 筛选返回值类型为 {@see Relation} 或其子类（HasOne / HasMany / BelongsTo）的方法。
+     * 筛选返回值类型为 {@see Relation} 或其子类（HasOne / HasMany / BelongsTo / BelongsToMany）的方法。
      *
      * 与 {@see callReturnsRelation()} 不同，本方法不实际调用关联方法，
      * 仅依据声明的返回类型判断，无副作用。

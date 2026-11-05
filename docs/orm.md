@@ -1054,7 +1054,7 @@ User::where('status', 1)
     ->select();
 ```
 
-> **append 也支持关联**：`append()` 中的名字如果对应模型的关联方法（`hasOne` / `hasMany` / `belongsTo`），
+> **append 也支持关联**：`append()` 中的名字如果对应模型的关联方法（`hasOne` / `hasMany` / `belongsTo` / `belongsToMany`），
 > 会自动加载该关联并随序列化输出；通过查询构造器链式调用时关联会被**预加载**（`IN` 批量查询），避免 N+1。
 >
 > 关联名支持**蛇形**与**驼峰**两种写法，输出 key 与传入的名字一致：
@@ -1240,7 +1240,7 @@ class User extends Model
 
 ### 关联
 
-支持 `hasOne` / `hasMany` / `belongsTo` 三种关联。
+支持 `hasOne` / `hasMany` / `belongsTo` / `belongsToMany` 四种关联。
 
 ```php
 class User extends Model
@@ -1256,6 +1256,12 @@ class User extends Model
     {
         return $this->hasMany(Post::class, 'user_id');
     }
+
+    // 多对多（用户-角色）
+    public function roles(): \Lychee\orm\relation\BelongsToMany
+    {
+        return $this->belongsToMany(Role::class, 'role_user', 'user_id', 'role_id');
+    }
 }
 
 class Post extends Model
@@ -1268,12 +1274,139 @@ class Post extends Model
 }
 
 // 预加载（避免 N+1）
-$users = User::with(['profile', 'posts'])->select();
+$users = User::with(['profile', 'posts', 'roles'])->select();
 
 // 懒加载：首次访问时查询
 $user = User::find(1);
 $user->profile; // 自动触发查询
 $user->posts;
+$user->roles;
+```
+
+#### 多对多 belongsToMany
+
+参数说明（均支持默认推导）：
+
+```php
+$this->belongsToMany(
+    Role::class,        // 目标模型
+    'role_user',        // 中间表名（默认按双方表名字母序拼接，如 role_user）
+    'user_id',          // 中间表中指向当前模型的外键（默认 {model}_id）
+    'role_id',          // 中间表中指向目标模型的外键（默认 {related}_id）
+    'id',               // 当前模型的本地键（默认主键）
+    'id',               // 目标模型的本地键（默认主键）
+);
+```
+
+**读取中间表额外字段**：用 `withPivot()` 指定需要读取的中间表字段，结果以数组形式挂在关联模型的 `pivot` 属性上：
+
+```php
+public function products(): \Lychee\orm\relation\BelongsToMany
+{
+    // 读取中间表的 quantity、price 字段
+    return $this->belongsToMany(Product::class, 'order_product')
+        ->withPivot(['quantity', 'price']);
+}
+
+$order = Order::find(1);
+foreach ($order->products as $product) {
+    echo $product->name;
+    echo $product->pivot['quantity']; // 中间表字段（数组）
+    echo $product->pivot['price'];
+}
+```
+
+> **pivot 是数组而非模型**：与 Laravel 不同，Lychee 的 `pivot` 直接以关联数组形式挂载，
+> 通过 `$model->pivot['field']` 访问，无需额外的 Pivot 模型。`toArray()` 序列化时会自动包含。
+
+**写入中间表**：
+
+```php
+$user = User::find(1);
+
+// 附加单个 / 多个
+$user->roles()->attach($roleId);
+$user->roles()->attach([1, 2, 3]);
+
+// 附加并写入中间表额外字段
+$user->roles()->attach(1, ['expired_at' => '2026-12-31']);
+$user->roles()->attach([1 => ['expired_at' => '2026-12-31'], 2 => []]);
+
+// 解除单个 / 多个 / 全部，返回删除的行数
+$deleted = $user->roles()->detach($roleId);
+$user->roles()->detach([1, 2]);
+$user->roles()->detach();
+
+// 同步（以给定列表为准，删除多余的、插入缺失的，已存在的会更新 pivot 字段）
+// 返回 ['attached' => [新增的ID], 'detached' => [删除的ID]]
+$result = $user->roles()->sync([1, 2, 3]);
+$result = $user->roles()->sync([1 => ['expired_at' => '2026-12-31'], 2 => []]);
+
+// 切换（已存在则删除，不存在则插入）
+// 返回 ['attached' => [新增的ID], 'detached' => [删除的ID]]
+$result = $user->roles()->toggle([1, 2, 3]);
+```
+
+> **输入格式约定**：`attach` / `sync` 接受两种数组形式——
+> - `[1, 2, 3]`：值为关联 ID，无额外 pivot 字段
+> - `[1 => ['expired_at' => '...'], 2 => []]`：键为关联 ID，值为该记录的 pivot 字段
+
+**完整示例：用户-角色 RBAC**
+
+```php
+// 模型定义
+class User extends Model
+{
+    public function roles(): \Lychee\orm\relation\BelongsToMany
+    {
+        return $this->belongsToMany(Role::class, 'role_user', 'user_id', 'role_id');
+    }
+}
+
+class Role extends Model
+{
+    public function users(): \Lychee\orm\relation\BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'role_user', 'role_id', 'user_id');
+    }
+}
+
+// 查询：预加载用户及其角色（2 条 SQL，无 N+1）
+$users = User::with('roles')->select();
+foreach ($users as $user) {
+    echo $user->name . ': ' . implode(',', array_column($user->roles->toArray(), 'name'));
+}
+
+// 写入：给用户分配角色
+$user = User::find(1);
+$user->roles()->sync([1, 2]);           // 覆盖式同步
+$user->roles()->attach(3);              // 追加单个
+$user->roles()->detach(2);              // 移除单个
+$user->roles()->toggle([1, 3]);         // 切换状态
+```
+
+**与其他特性配合**：
+
+| 特性 | 用法 | 说明 |
+|------|------|------|
+| `#[Append]` | 标注在 `roles()` 方法上 | 自动预加载并随 `toArray()` 输出，列表无 N+1 |
+| `withCount` | `User::withCount('roles')->select()` | 统计每个用户的角色数，结果为 `roles_count` |
+| `without` | `User::without(['roles'])->select()` | 跳过 roles 的预加载与输出（列表页省查询） |
+| `hidden` | `User::hidden(['roles'])->select()` | 仅隐藏输出，仍预加载（详情页逻辑中需用时） |
+
+```php
+// #[Append] 自动输出角色列表
+class User extends Model
+{
+    #[\Lychee\orm\attribute\Append]
+    public function roles(): \Lychee\orm\relation\BelongsToMany
+    {
+        return $this->belongsToMany(Role::class, 'role_user', 'user_id', 'role_id');
+    }
+}
+
+// 列表接口排除 roles（不预加载、不输出）
+$list = User::without(['roles'])->select();
 ```
 
 > **关联名支持蛇形 / 驼峰**：`with()`、懒加载属性访问、`append()` 中的关联名既可用方法原名（驼峰，如 `adPlatform`），
