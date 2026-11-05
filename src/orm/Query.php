@@ -1327,7 +1327,7 @@ class Query
             throw new DbException('upsert() only supports mysql and sqlite, got: ' . $type);
         }
 
-        $columns = array_keys($rows[0]);
+        $columns   = array_keys($rows[0]);
         $columnSql = implode(', ', array_map(fn ($c) => $this->wrap($c), $columns));
 
         // 构建 VALUES 部分
@@ -1375,7 +1375,7 @@ class Query
                 throw new DbException('upsert() requires $uniqueBy when using sqlite');
             }
             $conflictCols = implode(', ', array_map(fn ($c) => $this->wrap($c), $uniqueBy));
-            $sets = [];
+            $sets         = [];
             foreach ($update as $col) {
                 $sets[] = $this->wrap($col) . ' = excluded.' . $this->wrap($col);
             }
