@@ -58,12 +58,6 @@ export default defineConfig({
                     {text: '测试', link: '/testing'},
                 ],
             },
-            {
-                text: '生态',
-                items: [
-                    {text: 'lychee-admin', link: 'https://github.com/watsonhaw5566/lychee-admin'},
-                ],
-            },
             {text: '宝塔部署', link: '/deploy'},
         ],
 
@@ -112,12 +106,6 @@ export default defineConfig({
                     {text: '命令行 Console', link: '/console'},
                     {text: '插件 Plugin', link: '/plugin'},
                     {text: '测试 Testing', link: '/testing'},
-                ],
-            },
-            {
-                text: '生态',
-                items: [
-                    {text: 'lychee-admin', link: '/lychee-admin'},
                 ],
             },
         ],
