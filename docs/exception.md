@@ -1,6 +1,6 @@
 # 异常处理 Exception
 
-Lychee PHP 提供了统一的异常处理体系：所有具备 HTTP 语义的异常均继承自 [Lychee\http\HttpException](file:///Users/wangjue/PhpstormProjects/ant/lychee-php/src/http/HttpException.php)，由全局异常处理器 [Lychee\http\ExceptionHandler](file:///Users/wangjue/PhpstormProjects/ant/lychee-php/src/http/ExceptionHandler.php) 自动捕获并渲染为对应状态码的响应，无需在控制器或中间件中逐个 `try/catch`。
+Lychee PHP 提供了统一的异常处理体系：所有具备 HTTP 语义的异常均继承自 `Lychee\http\HttpException`，由全局异常处理器 `Lychee\http\ExceptionHandler` 自动捕获并渲染为对应状态码的响应，无需在控制器或中间件中逐个 `try/catch`。
 
 ## 处理流程
 
@@ -13,8 +13,8 @@ Lychee PHP 提供了统一的异常处理体系：所有具备 HTTP 语义的异
         HTML 异常页 或 JSON 错误响应
 ```
 
-- **路由匹配阶段**、**中间件管道**、**控制器调用**中抛出的未捕获异常，均由 [Kernel](file:///Users/wangjue/PhpstormProjects/ant/lychee-php/src/http/Kernel.php) 的 `exceptionResponse()` 统一交给 `ExceptionHandler` 处理。
-- **致命错误**（`E_ERROR`、`E_PARSE` 等）由 [Application::registerErrorHandling()](file:///Users/wangjue/PhpstormProjects/ant/lychee-php/src/Application.php) 注册的 shutdown 函数兜底，同样委托给 `ExceptionHandler` 渲染——因此自定义处理器、`exception_render` 配置（JSON 模式）与日志记录对致命错误同样生效。
+- **路由匹配阶段**、**中间件管道**、**控制器调用**中抛出的未捕获异常，均由 `Kernel` 的 `exceptionResponse()` 统一交给 `ExceptionHandler` 处理。
+- **致命错误**（`E_ERROR`、`E_PARSE` 等）由 `Application::registerErrorHandling()` 注册的 shutdown 函数兜底，同样委托给 `ExceptionHandler` 渲染——因此自定义处理器、`exception_render` 配置（JSON 模式）与日志记录对致命错误同样生效。
 - **PHP Warning/Notice** 被转换为 `ErrorException`，同样进入统一处理流程。
 
 ## 异常继承体系
@@ -55,7 +55,7 @@ RuntimeException（其他）
 
 ## HttpException 基类
 
-[Lychee\http\HttpException](file:///Users/wangjue/PhpstormProjects/ant/lychee-php/src/http/HttpException.php) 是所有 HTTP 语义异常的基类，构造函数签名：
+`Lychee\http\HttpException` 是所有 HTTP 语义异常的基类，构造函数签名：
 
 ```php
 public function __construct(
@@ -262,7 +262,7 @@ throw new OrderException('订单已支付，无法取消', 10001);
 
 ## 自定义异常处理器
 
-默认的 [ExceptionHandler](file:///Users/wangjue/PhpstormProjects/ant/lychee-php/src/http/ExceptionHandler.php) 已能处理绝大多数场景。如需自定义日志上报、响应格式或特定异常的渲染逻辑，可继承它并覆盖对应方法。
+默认的 `ExceptionHandler` 已能处理绝大多数场景。如需自定义日志上报、响应格式或特定异常的渲染逻辑，可继承它并覆盖对应方法。
 
 ### 配置自定义处理器
 
