@@ -695,6 +695,71 @@ class Order extends Model
 - 某个整数字段不需要自动类型转换，保持字符串形式
 - 自定义类型转换逻辑（覆盖 `readTransform()` / `writeTransform()` 方法）
 
+### JSON 字段
+
+JSON 字段的读写会自动进行 `json_encode` / `json_decode` 转换，无需手动处理。
+
+#### 声明方式
+
+`#[Column]` 是属性级别的 Attribute，多个 JSON 字段各自声明即可，没有数量限制：
+
+```php
+use Lychee\orm\attribute\Column;
+
+class User extends Model
+{
+    // 写法一：json 快捷参数（等价 type: 'json'）
+    #[Column(json: true)]
+    protected array $tags;
+
+    // 写法二：显式 type
+    #[Column(type: 'json')]
+    protected ?array $permissions;
+
+    // 带默认值：INSERT 时若未赋值，自动 json_encode 为 '[]'
+    #[Column(json: true, default: [])]
+    protected array $settings;
+}
+```
+
+两种写法完全等价，`getJsonFields()` 都会识别。
+
+#### 自动识别（无需声明）
+
+`getJsonFields()` 复用 `getFieldType()` 的类型推导链路，因此 **MySQL 的 `json` 类型列无需声明 `#[Column]` 即可被自动识别**：
+
+```php
+class Order extends Model
+{
+    // extra 是 MySQL json 列，无需 #[Column(json: true)]
+    // getJsonFields() 会通过表结构自动推导返回 ['extra']
+}
+```
+
+推导结果缓存于 `$typeInferenceCache`，不会重复查询表结构。
+
+#### 需要显式声明的场景
+
+| 场景 | 原因 |
+| --- | --- |
+| SQLite `TEXT` 列存储 JSON | SQLite 无原生 `json` 类型，`mapDatabaseType` 只认类型名含 `json` 的列 |
+| 需要设置 `default` 默认值 | 自动推导不提供默认值 |
+| 字段是 `array` / `object` 类型而非 `json` | 区分 `json_decode($v, true)`（关联数组）与 `json_decode($v)`（对象） |
+
+#### `getJsonFields()` 与查询 DSL
+
+`ResourceController` 的查询 DSL 中，`_in` 后缀会通过 `$model->getJsonFields()` 判断字段是否为 JSON 数组：
+
+- **JSON 字段**：使用 `JSON_CONTAINS` 匹配（适合存储数组的 JSON 列，如 `tags` 字段存 `[1,2,3]`）
+- **普通字段**：使用 `IN (...)`
+
+```
+?tags_in=1,2     → JSON_CONTAINS(`tags`, '1') OR JSON_CONTAINS(`tags`, '2')
+?status_in=1,2   → status IN (1, 2)
+```
+
+由于 `getJsonFields()` 已支持表结构自动推导，MySQL 的 `json` 列即使未声明 `#[Column]`，`_in` 查询也会正确走 `JSON_CONTAINS`。
+
 ### 废弃字段 `$disuse`
 
 当数据表存在历史遗留的废弃字段，可在模型里声明让 ORM 在查询与写入时自动忽略：

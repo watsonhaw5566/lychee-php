@@ -446,9 +446,10 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
-     * 获取模型声明的 JSON 字段列表。
+     * 获取模型的 JSON 字段列表。
      *
-     * 返回通过 #[Column(json: true)] 或 #[Column(type: 'json')] 声明的 JSON 字段。
+     * 复用 {@see getFieldType()} 的类型推导结果（含 #[Column] 声明与数据库表结构自动推导），
+     * 无需重复查询表结构，且自动继承推导链路的缓存（typeInferenceCache / tableFieldsCache）。
      *
      * 供外部（如控制器的查询 DSL）判断某字段是否为 JSON 数组字段，
      * 避免使用反射直接读取 protected 属性。
@@ -459,8 +460,8 @@ abstract class Model implements ArrayAccess, JsonSerializable
     {
         $fields = [];
 
-        foreach ($this->getColumnMeta() as $name => $column) {
-            if ($column->json || $column->type === 'json') {
+        foreach ($this->getActiveFields() as $name) {
+            if ($this->getFieldType($name) === 'json') {
                 $fields[] = $name;
             }
         }
