@@ -8,3 +8,5 @@ vendor/
 
 tests/stub/runtime/**/*
 /lychee-admin/
+
+.trae
