@@ -6,14 +6,15 @@ namespace Lychee\routing;
 
 use Lychee\orm\Model;
 use Lychee\orm\Query;
+use ReflectionClass;
 use RuntimeException;
 
 /**
  * 数据权限 Trait：按需 use，不强制。
  *
  * 仅依赖 request()->loginId()，不依赖具体用户模型。
- * 管理员判断与权限级别读取通过可覆盖的方法实现，
- * 默认采用最保守策略（非管理员、self 级别）。
+ * 管理员判断与权限级别读取默认从容器解析 {@see UserDataScopeResolverInterface}，
+ * 未绑定时采用最保守策略（非管理员、self 级别）。
  *
  * 支持四种权限级别：
  *   - all:       查看所有数据（不过滤）
@@ -23,6 +24,12 @@ use RuntimeException;
  *
  * 使用 dept / dept_tree 级别时，需在容器中绑定 DeptResolverInterface 实现。
  *
+ * 控制器接入方式（最简）：
+ *   use HasDataPermission;
+ *
+ * 模块标识默认从控制器类名推导（OrderController → order），
+ * 推导结果不符合预期时覆盖 getDataPermissionModule() 即可。
+ *
  * 覆盖 ResourceController::applyDataPermission，按用户角色的数据范围过滤查询。
  */
 trait HasDataPermission
@@ -30,20 +37,48 @@ trait HasDataPermission
     /**
      * 数据权限配置。
      *
-     * - enabled:     是否开启数据权限控制
+     * - enabled:     是否开启数据权限控制（use trait 后默认开启）
      * - userIdField: 数据所有者字段名
      * - deptIdField: 数据所属部门字段名（dept / dept_tree 级别使用）
-     * - module:      当前模块标识，用于从 data_scope 匹配权限级别
+     *
+     * 模块标识请通过 getDataPermissionModule() 方法返回。
      */
     protected array $dataPermission = [
-        'enabled'     => false,
+        'enabled'     => true,
         'userIdField' => 'user_id',
         'deptIdField' => 'dept_id',
-        'module'      => '',
     ];
 
     /** @var DeptResolverInterface|null 缓存的部门解析器实例 */
     private ?DeptResolverInterface $deptResolver = null;
+
+    /** @var UserDataScopeResolverInterface|null 缓存的数据范围解析器实例 */
+    private ?UserDataScopeResolverInterface $dataScopeResolver = null;
+
+    /** @var string|null 缓存的模块标识（首次推导后复用） */
+    private ?string $dataPermissionModule = null;
+
+    /**
+     * 获取当前控制器的数据权限模块标识。
+     *
+     * 用于从用户角色的 data_scope 中匹配对应模块的权限级别。
+     *
+     * 默认从控制器类名推导：去除 Controller 后缀后首字母小写，
+     * 例如 OrderController → order、CustomerController → customer。
+     * 推导结果不符合预期时（如 AdminCustomerController 需映射为 customer），
+     * 子类可覆盖此方法返回指定模块名。
+     */
+    protected function getDataPermissionModule(): string
+    {
+        if ($this->dataPermissionModule !== null) {
+            return $this->dataPermissionModule;
+        }
+
+        $short = (new ReflectionClass($this))->getShortName();
+        $name  = preg_replace('/Controller$/', '', $short);
+
+        return $this->dataPermissionModule = lcfirst($name);
+    }
 
     /**
      * 应用数据权限过滤到查询。
@@ -66,7 +101,7 @@ trait HasDataPermission
             return $query;
         }
 
-        $level = $this->getPermissionLevel($userId, $module ?: $this->dataPermission['module']);
+        $level = $this->getPermissionLevel($userId, $module ?: $this->getDataPermissionModule());
 
         return match ($level) {
             'all'       => $query,
@@ -146,26 +181,54 @@ trait HasDataPermission
     }
 
     /**
-     * 获取当前模块的数据权限级别。
+     * 获取数据范围解析器。
      *
-     * 默认返回 'self'（最保守策略）。子类可覆盖此方法，
-     * 根据用户角色的 data_scope 返回对应级别。
-     *
-     * @return string 'all' | 'dept_tree' | 'dept' | 'self'
+     * 从容器中解析 UserDataScopeResolverInterface，未绑定时返回 null，
+     * 调用方需自行处理 null 情况（采用最保守策略）。
      */
-    protected function getPermissionLevel(int $userId, string $module): string
+    private function getDataScopeResolver(): ?UserDataScopeResolverInterface
     {
-        return 'self';
+        if ($this->dataScopeResolver !== null) {
+            return $this->dataScopeResolver;
+        }
+
+        $container = app();
+
+        if (!$container->has(UserDataScopeResolverInterface::class)) {
+            return null;
+        }
+
+        return $this->dataScopeResolver = $container->get(UserDataScopeResolverInterface::class);
     }
 
     /**
      * 判断用户是否为管理员。
      *
-     * 默认返回 false。子类可覆盖此方法接入实际的管理员判断逻辑。
+     * 默认从容器解析 UserDataScopeResolverInterface 并委托判断；
+     * 未绑定或解析失败时返回 false（最保守策略）。
+     * 子类可覆盖此方法接入自定义逻辑。
      */
     protected function isAdmin(int $userId): bool
     {
-        return false;
+        $resolver = $this->getDataScopeResolver();
+
+        return $resolver?->isAdmin($userId) ?? false;
+    }
+
+    /**
+     * 获取当前模块的数据权限级别。
+     *
+     * 默认从容器解析 UserDataScopeResolverInterface 并委托获取；
+     * 未绑定或解析失败时返回 'self'（最保守策略）。
+     * 子类可覆盖此方法接入自定义逻辑。
+     *
+     * @return string 'all' | 'dept_tree' | 'dept' | 'self'
+     */
+    protected function getPermissionLevel(int $userId, string $module): string
+    {
+        $resolver = $this->getDataScopeResolver();
+
+        return $resolver?->getPermissionLevel($userId, $module) ?? 'self';
     }
 
     /**
@@ -189,7 +252,7 @@ trait HasDataPermission
             return true;
         }
 
-        $level = $this->getPermissionLevel($userId, $module ?: $this->dataPermission['module']);
+        $level = $this->getPermissionLevel($userId, $module ?: $this->getDataPermissionModule());
 
         return match ($level) {
             'all'       => true,
