@@ -110,6 +110,23 @@ class Scheduler
     }
 
     /**
+     * 是否存在秒级（6 段）任务。
+     *
+     * 只要有任意一个任务使用了 6 段表达式，调度器就需要以秒级
+     * 频率 tick；否则回退到分钟级 tick，减少不必要的子进程开销。
+     */
+    public function requiresSecondTick(): bool
+    {
+        foreach ($this->tasks as $task) {
+            if ($task->hasSeconds()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * 获取指定时间到期的任务。
      *
      * @return array<string, Task>

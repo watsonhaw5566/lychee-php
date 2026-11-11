@@ -42,7 +42,8 @@ class CronTest extends TestCase
     public function test_run_executes_due_tasks(): void
     {
         $executed = false;
-        $this->scheduler->call('due-task', '* * * * *', function () use (&$executed) {
+        // 6 段表达式：秒为 *，任意秒都到期，测试不受当前秒数影响
+        $this->scheduler->call('due-task', '* * * * * *', function () use (&$executed) {
             $executed = true;
 
             return 'result';
@@ -70,7 +71,7 @@ class CronTest extends TestCase
 
     public function test_get_due_tasks_filters_correctly(): void
     {
-        $this->scheduler->call('due', '* * * * *', fn () => null);
+        $this->scheduler->call('due', '* * * * * *', fn () => null);
         // 2 月 31 日不存在，永不到期
         $this->scheduler->call('not-due', '0 0 31 2 *', fn () => null);
 
@@ -91,7 +92,7 @@ class CronTest extends TestCase
             }
         };
 
-        $this->scheduler->command('cmd-task', '* * * * *', $command);
+        $this->scheduler->command('cmd-task', '* * * * * *', $command);
         $this->scheduler->run();
 
         $this->assertTrue($command->handled);
@@ -114,7 +115,7 @@ class CronTest extends TestCase
         $this->scheduler->load([
             [
                 'name'        => 'loaded-task',
-                'cron'        => '* * * * *',
+                'cron'        => '* * * * * *',
                 'command'     => 'test.cron.command',
                 'description' => 'Loaded from config',
             ],
@@ -132,5 +133,28 @@ class CronTest extends TestCase
         $console = $this->app->container->get(\Lychee\console\Application::class);
 
         $this->assertTrue($console->has('cron:run'));
+    }
+
+    public function test_requires_second_tick_false_when_all_minute_level(): void
+    {
+        $this->scheduler->call('m1', '* * * * *', fn () => null);
+        $this->scheduler->call('m2', '0 0 * * *', fn () => null);
+
+        $this->assertFalse($this->scheduler->requiresSecondTick());
+    }
+
+    public function test_requires_second_tick_true_when_any_second_level(): void
+    {
+        $this->scheduler->call('m1', '* * * * *', fn () => null);
+        $this->scheduler->call('s1', '* * * * * *', fn () => null);
+
+        $this->assertTrue($this->scheduler->requiresSecondTick());
+    }
+
+    public function test_requires_second_tick_true_for_specific_second(): void
+    {
+        $this->scheduler->call('s1', '*/30 * * * * *', fn () => null);
+
+        $this->assertTrue($this->scheduler->requiresSecondTick());
     }
 }

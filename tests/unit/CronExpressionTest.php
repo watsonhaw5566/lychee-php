@@ -203,4 +203,102 @@ class CronExpressionTest extends TestCase
         $this->assertTrue($expr->isDue(new DateTimeImmutable('2026-01-15 00:00:00')));
         $this->assertFalse($expr->isDue(new DateTimeImmutable('2026-01-16 00:00:00')));
     }
+
+    // ===== 6 段（秒级）表达式 =====
+
+    public function test_six_field_expression_has_seconds(): void
+    {
+        $expr = new CronExpression('* * * * * *');
+
+        $this->assertTrue($expr->hasSeconds());
+    }
+
+    public function test_five_field_expression_has_no_seconds(): void
+    {
+        $expr = new CronExpression('* * * * *');
+
+        $this->assertFalse($expr->hasSeconds());
+    }
+
+    public function test_five_field_matches_only_at_second_zero(): void
+    {
+        // 5 段表达式秒字段固定为 0，仅在每分钟第 0 秒命中
+        $expr = new CronExpression('* * * * *');
+
+        $this->assertTrue($expr->isDue(new DateTimeImmutable('2026-09-16 10:30:00')));
+        $this->assertFalse($expr->isDue(new DateTimeImmutable('2026-09-16 10:30:01')));
+        $this->assertFalse($expr->isDue(new DateTimeImmutable('2026-09-16 10:30:30')));
+        $this->assertFalse($expr->isDue(new DateTimeImmutable('2026-09-16 10:30:59')));
+    }
+
+    public function test_six_field_wildcard_second_matches_any_second(): void
+    {
+        $expr = new CronExpression('* * * * * *');
+
+        $this->assertTrue($expr->isDue(new DateTimeImmutable('2026-09-16 10:30:00')));
+        $this->assertTrue($expr->isDue(new DateTimeImmutable('2026-09-16 10:30:01')));
+        $this->assertTrue($expr->isDue(new DateTimeImmutable('2026-09-16 10:30:30')));
+    }
+
+    public function test_six_field_specific_second(): void
+    {
+        // 每分钟第 30 秒
+        $expr = new CronExpression('30 * * * * *');
+
+        $this->assertTrue($expr->isDue(new DateTimeImmutable('2026-09-16 10:30:30')));
+        $this->assertFalse($expr->isDue(new DateTimeImmutable('2026-09-16 10:30:00')));
+        $this->assertFalse($expr->isDue(new DateTimeImmutable('2026-09-16 10:30:31')));
+    }
+
+    public function test_six_field_stepped_second(): void
+    {
+        // 每 5 秒
+        $expr = new CronExpression('*/5 * * * * *');
+
+        $this->assertTrue($expr->isDue(new DateTimeImmutable('2026-09-16 10:30:00')));
+        $this->assertTrue($expr->isDue(new DateTimeImmutable('2026-09-16 10:30:05')));
+        $this->assertTrue($expr->isDue(new DateTimeImmutable('2026-09-16 10:30:30')));
+        $this->assertFalse($expr->isDue(new DateTimeImmutable('2026-09-16 10:30:01')));
+        $this->assertFalse($expr->isDue(new DateTimeImmutable('2026-09-16 10:30:07')));
+    }
+
+    public function test_six_field_combination(): void
+    {
+        // 每天 9 点的第 0、15、30、45 秒
+        $expr = new CronExpression('0,15,30,45 0 9 * * *');
+
+        $this->assertTrue($expr->isDue(new DateTimeImmutable('2026-09-16 09:00:00')));
+        $this->assertTrue($expr->isDue(new DateTimeImmutable('2026-09-16 09:00:15')));
+        $this->assertTrue($expr->isDue(new DateTimeImmutable('2026-09-16 09:00:30')));
+        $this->assertTrue($expr->isDue(new DateTimeImmutable('2026-09-16 09:00:45')));
+        $this->assertFalse($expr->isDue(new DateTimeImmutable('2026-09-16 09:00:01')));
+        $this->assertFalse($expr->isDue(new DateTimeImmutable('2026-09-16 09:01:00')));
+        $this->assertFalse($expr->isDue(new DateTimeImmutable('2026-09-16 10:00:00')));
+    }
+
+    public function test_six_field_with_vixie_or_semantics(): void
+    {
+        // 6 段表达式同样遵循 Vixie 日/星期 OR 语义
+        // 每月 1 号、15 号，或每周五的 00:00:00
+        $expr = new CronExpression('0 0 0 1,15 * 5');
+
+        // 2026-01-01 Thursday: day=1 matches → OR true
+        $this->assertTrue($expr->isDue(new DateTimeImmutable('2026-01-01 00:00:00')));
+        // 2026-01-02 Friday: weekday=5 matches → OR true
+        $this->assertTrue($expr->isDue(new DateTimeImmutable('2026-01-02 00:00:00')));
+        // 2026-01-05 Monday: neither matches → false
+        $this->assertFalse($expr->isDue(new DateTimeImmutable('2026-01-05 00:00:00')));
+    }
+
+    public function test_invalid_field_count_throws(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        new CronExpression('* * * *');
+    }
+
+    public function test_six_field_invalid_second_throws(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        new CronExpression('60 * * * * *');
+    }
 }

@@ -50,6 +50,14 @@ class Task
     }
 
     /**
+     * 是否为秒级（6 段）表达式。
+     */
+    public function hasSeconds(): bool
+    {
+        return $this->expression->hasSeconds();
+    }
+
+    /**
      * 判断任务在给定时间是否应该执行。
      */
     public function isDue(DateTimeInterface $time): bool

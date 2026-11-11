@@ -10,7 +10,10 @@ use InvalidArgumentException;
 /**
  * Cron 表达式解析器。
  *
- * 支持标准 5 段格式：分 时 日 月 周
+ * 支持 5 段或 6 段格式：
+ *   5 段：分 时 日 月 周（分钟级，秒固定为 0）
+ *   6 段：秒 分 时 日 月 周（秒级）
+ *
  *   * * * * *
  *   | | | | |
  *   | | | | +--- 星期 (0-7, 0 和 7 都是周日)
@@ -19,8 +22,20 @@ use InvalidArgumentException;
  *   | +--------- 小时 (0-23)
  *   +----------- 分钟 (0-59)
  *
+ *   * * * * * *
+ *   | | | | | |
+ *   | | | | | +--- 星期 (0-7)
+ *   | | | | +----- 月份 (1-12)
+ *   | | | +------- 日期 (1-31)
+ *   | | +--------- 小时 (0-23)
+ *   | +----------- 分钟 (0-59)
+ *   +------------- 秒 (0-59)
+ *
  * 支持语法：* 任意值 , 列表 - 范围 / 步长
  * 支持月份和星期的英文缩写（jan-dec / sun-sat）。
+ *
+ * 5 段表达式的秒字段固定为 0，即每分钟 :00 触发一次，
+ * 与传统 crontab 行为一致。
  *
  * 日期与星期的匹配遵循标准 cron（Vixie）语义：
  *   - 任一字段为通配（星号 或 星号/n 步长）时，两者按「与」匹配
@@ -29,13 +44,14 @@ use InvalidArgumentException;
  */
 class CronExpression
 {
-    /** 各字段的取值范围 [min, max] */
+    /** 各字段的取值范围 [min, max]，索引 5 为秒 */
     private const RANGES = [
         0 => [0, 59],   // minute
         1 => [0, 23],   // hour
         2 => [1, 31],   // day of month
         3 => [1, 12],   // month
         4 => [0, 7],    // day of week（7 在解析后归一为 0，均表示周日）
+        5 => [0, 59],   // second
     ];
 
     /** 月份英文缩写到数字的映射 */
@@ -51,11 +67,14 @@ class CronExpression
         'thu' => 4, 'fri' => 5, 'sat' => 6,
     ];
 
-    /** @var array<int, list<int>> 各字段允许的取值集合 */
+    /** @var array<int, list<int>> 各字段允许的取值集合，索引 5 为秒 */
     private array $values = [];
 
     /** @var array<int, bool> 各字段原始值是否为通配，用于日/星期 OR 判定 */
     private array $wildcards = [];
+
+    /** 是否为 6 段表达式（含秒），5 段时为 false 且秒固定为 0 */
+    private readonly bool $hasSeconds;
 
     public function __construct(private readonly string $expression)
     {
@@ -64,21 +83,40 @@ class CronExpression
 
     /**
      * 解析 cron 表达式，生成各字段的取值集合。
+     *
+     * 内部统一按 6 段处理：秒 分 时 日 月 周。
+     * 5 段表达式会在最前面补一个 '0' 作为秒字段，
+     * 保证每分钟 :00 触发，与传统 crontab 行为一致。
      */
     private function parse(): void
     {
         $parts = preg_split('/\s+/', trim($this->expression));
 
-        if ($parts === false || count($parts) !== 5) {
+        if ($parts === false || (count($parts) !== 5 && count($parts) !== 6)) {
             throw new InvalidArgumentException(
-                "Invalid cron expression '{$this->expression}': expected 5 fields"
+                "Invalid cron expression '{$this->expression}': expected 5 or 6 fields"
             );
         }
 
-        foreach ($parts as $index => $part) {
-            $this->wildcards[$index] = $this->isWildcard($part);
-            $this->values[$index]    = $this->parseField($part, $index);
+        // 归一化为 6 段：[秒, 分, 时, 日, 月, 周]
+        if (count($parts) === 5) {
+            array_unshift($parts, '0');
+            $this->hasSeconds = false;
+        } else {
+            $this->hasSeconds = true;
         }
+
+        // 字段索引：0=分 1=时 2=日 3=月 4=周 5=秒
+        $this->values[5] = $this->parseField($parts[0], 5); // second
+        $this->values[0] = $this->parseField($parts[1], 0); // minute
+        $this->values[1] = $this->parseField($parts[2], 1); // hour
+        $this->values[2] = $this->parseField($parts[3], 2); // day of month
+        $this->values[3] = $this->parseField($parts[4], 3); // month
+        $this->values[4] = $this->parseField($parts[5], 4); // day of week
+
+        // 仅日（2）与周（4）的通配状态用于 OR 判定
+        $this->wildcards[2] = $this->isWildcard($parts[3]);
+        $this->wildcards[4] = $this->isWildcard($parts[5]);
     }
 
     /**
@@ -179,7 +217,8 @@ class CronExpression
      */
     public function isDue(DateTimeInterface $time): bool
     {
-        if (!in_array((int) $time->format('i'), $this->values[0], true)
+        if (!in_array((int) $time->format('s'), $this->values[5], true)
+            || !in_array((int) $time->format('i'), $this->values[0], true)
             || !in_array((int) $time->format('G'), $this->values[1], true)
             || !in_array((int) $time->format('n'), $this->values[3], true)
         ) {
@@ -195,6 +234,14 @@ class CronExpression
             : $dayOfMonth || $dayOfWeek;
 
         return $dayMatches;
+    }
+
+    /**
+     * 是否为 6 段（含秒）表达式。
+     */
+    public function hasSeconds(): bool
+    {
+        return $this->hasSeconds;
     }
 
     /**
