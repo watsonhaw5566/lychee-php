@@ -4,7 +4,7 @@
 
 ## 环境要求
 
-- PHP >= 8.2
+- PHP >= 8.3
 - Nginx
 - MySQL / PostgreSQL / SQLite（按需）
 - Composer
@@ -18,7 +18,7 @@
 在宝塔面板的 **软件商店** 中安装：
 
 - **Nginx**（任意稳定版本）
-- **PHP 8.2+**（推荐 8.3），安装时勾选以下扩展：
+- **PHP 8.3+**（推荐 8.4），安装时勾选以下扩展：
   - `fileinfo`
   - `openssl`
   - `pdo`
@@ -59,7 +59,7 @@ composer install --no-dev --optimize-autoloader
 
 1. 宝塔面板 → **网站** → **添加站点**
 2. 填写域名，根目录选择项目的 `public` 目录，例如 `/www/wwwroot/example.com/public`
-3. PHP 版本选择 8.2+
+3. PHP 版本选择 8.3+
 4. 点击提交
 
 ## 五、配置站点

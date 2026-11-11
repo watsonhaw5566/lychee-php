@@ -1,6 +1,6 @@
 # Lychee PHP
 
-轻量级、IDE 友好的 PHP Web 框架，PHP ^8.2。
+轻量级、IDE 友好的 PHP Web 框架，PHP ^8.3。
 
 ## 特性
 
@@ -13,7 +13,7 @@
 
 ## 环境要求
 
-- PHP >= 8.2
+- PHP >= 8.3
 - Composer
 
 ## 安装
