@@ -160,7 +160,7 @@ class BelongsToMany extends Relation
         $relatedKeys = array_values(array_unique($relatedKeys, SORT_REGULAR));
 
         // 2. 查目标模型
-        /** @var Collection<array-key, Model> $results */
+        /** @var Collection<array-key, TRelated> $results */
         $results = $this->query->whereIn($this->localKey, $relatedKeys)->select();
 
         // 3. 附加 pivot 字段

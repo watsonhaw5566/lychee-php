@@ -7,13 +7,14 @@ namespace Tests\unit;
 use Lychee\queue\connector\Redis as RedisConnector;
 use Lychee\queue\job\Redis as RedisJob;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Redis;
 
 #[AllowMockObjectsWithoutExpectations]
 class RedisQueueTest extends TestCase
 {
-    private Redis $redis;
+    private Redis&MockObject $redis;
     private RedisConnector $connector;
     private \Lychee\container\Container $app;
 

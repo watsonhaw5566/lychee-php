@@ -18,7 +18,13 @@ use Lychee\orm\Query;
  * - getResults()：lazy 加载时取结果
  * - eagerLoad()：预加载批量匹配
  *
+ * 链式调用（where/order 等）通过 __call 转发到内部 Query 并返回自身，
+ * 终端方法（select/find 等）返回查询结果。
+ *
  * @template TRelated of Model
+ *
+ * @method static where(string|array|\Closure|\Lychee\orm\Raw $field, mixed $op = null, mixed $value = null)
+ * @method \Lychee\orm\Collection|array select()
  */
 abstract class Relation
 {
@@ -26,6 +32,9 @@ abstract class Relation
 
     protected Model $relatedInstance;
 
+    /**
+     * @param class-string<TRelated> $related
+     */
     public function __construct(
         protected Model $parent,
         protected string $related,

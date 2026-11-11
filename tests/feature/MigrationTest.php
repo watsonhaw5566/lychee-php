@@ -47,8 +47,13 @@ class MigrationTest extends TestCase
         $this->assertCount(2, $migrations);
         $this->assertArrayHasKey('20240101000000', $migrations);
         $this->assertArrayHasKey('20240102000000', $migrations);
-        $this->assertSame('CreateUsersTableMigration', $migrations['20240101000000']['class']);
-        $this->assertSame('CreatePostsTableMigration', $migrations['20240102000000']['class']);
+
+        $m1 = $migrations['20240101000000'] ?? null;
+        $m2 = $migrations['20240102000000'] ?? null;
+        $this->assertNotNull($m1);
+        $this->assertNotNull($m2);
+        $this->assertSame('CreateUsersTableMigration', $m1['class']);
+        $this->assertSame('CreatePostsTableMigration', $m2['class']);
     }
 
     public function test_get_migrations_ignores_non_standard_files(): void

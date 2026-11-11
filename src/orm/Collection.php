@@ -182,9 +182,9 @@ class Collection implements ArrayAccess, IteratorAggregate, Countable, JsonSeria
 
     /**
      * @param callable(TModel, array-key): mixed $callback
-     * @return static<array-key, mixed>
+     * @return Collection
      */
-    public function map(callable $callback): static
+    public function map(callable $callback): Collection
     {
         $result = [];
         foreach ($this->items as $key => $item) {
@@ -226,7 +226,7 @@ class Collection implements ArrayAccess, IteratorAggregate, Countable, JsonSeria
     }
 
     /**
-     * @param callable(TModel, array-key): void $callback
+     * @param callable(TModel, array-key): mixed $callback
      */
     public function each(callable $callback): static
     {
@@ -410,9 +410,9 @@ class Collection implements ArrayAccess, IteratorAggregate, Countable, JsonSeria
     /**
      * 将集合（项为数组）扁平化一层。
      *
-     * @return static<array-key, mixed>
+     * @return Collection
      */
-    public function flatten(): static
+    public function flatten(): Collection
     {
         $result = [];
         foreach ($this->items as $item) {
@@ -432,9 +432,9 @@ class Collection implements ArrayAccess, IteratorAggregate, Countable, JsonSeria
     /**
      * {@see flatten} 的别名，用于项为集合的场景。
      *
-     * @return static<array-key, mixed>
+     * @return Collection
      */
-    public function collapse(): static
+    public function collapse(): Collection
     {
         return $this->flatten();
     }

@@ -238,9 +238,11 @@ class FakeMnsQueue extends Queue
         return $this->receiveReturn ?? new FakeReceiveMessageResponse('', '');
     }
 
-    public function deleteMessage($receiptHandle): void
+    public function deleteMessage($receiptHandle): ReceiveMessageResponse
     {
         $this->deleted[] = (string) $receiptHandle;
+
+        return new FakeReceiveMessageResponse('', '');
     }
 
     public function getAttribute(): GetQueueAttributeResponse

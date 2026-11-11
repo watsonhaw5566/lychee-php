@@ -120,6 +120,17 @@ use UnitEnum;
  * @method static static firstOrCreate(array $attributes, array $values = [])
  * @method static static updateOrCreate(array $attributes, array $values = [])
  *
+ * 以下方法来自 SoftDelete trait，仅在模型使用该 trait 时可用。
+ * 显式声明以让 phpstan 识别 Query 中的调用。
+ *
+ * @method string getDeleteTimeField()
+ * @method mixed getSoftDeleteValue()
+ * @method mixed getDefaultSoftDelete()
+ * @method bool runSoftDelete()
+ * @method void applySoftDeleteScope(Query $query)
+ * @method bool trashed()
+ * @method bool restore()
+ *
  * @phpstan-consistent-constructor
  */
 abstract class Model implements ArrayAccess, JsonSerializable
@@ -461,6 +472,8 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
     /**
      * 返回一个绑定了当前模型的新查询构造器。
+     *
+     * @return Query<static>
      */
     public static function query(): Query
     {
@@ -471,9 +484,12 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
     /**
      * 返回绑定当前实例的新查询构造器（含软删除全局过滤）。
+     *
+     * @return Query<static>
      */
     public function newQuery(): Query
     {
+        /** @var Query<static> $query */
         $query = new Query($this->getConnection());
         $query->setModel($this);
 
@@ -538,7 +554,10 @@ abstract class Model implements ArrayAccess, JsonSerializable
             return null;
         }
 
-        return static::query()->find($pk);
+        /** @var static|null $result */
+        $result = static::query()->find($pk);
+
+        return $result;
     }
 
     /**
@@ -559,6 +578,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
     /**
      * @param array<int, string>|string $relations
+     * @return Query<static>
      */
     public static function with(array|string $relations): Query
     {
