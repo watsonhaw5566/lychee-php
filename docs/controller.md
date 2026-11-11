@@ -645,17 +645,78 @@ class UserDataScopeResolver implements UserDataScopeResolverInterface
 }
 ```
 
-在 ServiceProvider 或启动文件中绑定：
+实现类可放在项目任意命名空间下，例如 `app/auth/UserDataScopeResolver.php`。
+
+### 绑定到容器
+
+`HasDataPermission` 通过 `app()->get(UserDataScopeResolverInterface::class)` 自动解析实现，
+绑定一次全局生效。框架提供两种标准绑定方式。
+
+#### 方式一：项目 ServiceProvider（推荐）
+
+框架从 `config/plugin.php` 的 `providers` 数组自动加载插件（需实现 `PluginInterface`）。
+在 `register()` 阶段绑定容器服务：
 
 ```php
-$container->bind(
+// app/provider/AuthServiceProvider.php
+namespace App\provider;
+
+use App\auth\DbDeptResolver;
+use App\auth\UserDataScopeResolver;
+use Lychee\container\Container;
+use Lychee\plugin\PluginInterface;
+use Lychee\routing\DeptResolverInterface;
+use Lychee\routing\UserDataScopeResolverInterface;
+
+class AuthServiceProvider implements PluginInterface
+{
+    public function register(Container $container): void
+    {
+        $container->bind(
+            UserDataScopeResolverInterface::class,
+            UserDataScopeResolver::class,
+        );
+
+        // 用到 dept / dept_tree 级别时，顺便绑定部门解析器
+        $container->bind(
+            DeptResolverInterface::class,
+            DbDeptResolver::class,
+        );
+    }
+
+    public function boot(Container $container): void
+    {
+    }
+}
+```
+
+然后在 `config/plugin.php` 中注册：
+
+```php
+return [
+    'providers' => [
+        \App\provider\AuthServiceProvider::class,
+    ],
+];
+```
+
+#### 方式二：入口文件直接绑定
+
+在 `public/index.php` 中，`new Application` 之后、`run()` 之前绑定：
+
+```php
+$app = new Application(basePath: __DIR__ . '/..');
+
+app()->bind(
     \Lychee\routing\UserDataScopeResolverInterface::class,
     \App\auth\UserDataScopeResolver::class,
 );
+
+$app->run();
 ```
 
 > 未绑定 `UserDataScopeResolverInterface` 时，`isAdmin()` 返回 `false`、`getPermissionLevel()` 返回 `'self'`，
-> 即所有用户只能看到自己的数据，是最保守的安全策略。
+> 即所有用户只能看到自己的数据，是最保守的安全策略，不会报错。
 > 若个别控制器需要自定义逻辑，仍可直接覆盖 `isAdmin()` / `getPermissionLevel()` 方法（类方法优先于 trait）。
 
 ### 部门解析器 DeptResolverInterface
@@ -687,7 +748,7 @@ class DbDeptResolver implements DeptResolverInterface
 }
 ```
 
-在 ServiceProvider 或启动文件中绑定：
+在 ServiceProvider 或启动文件中绑定（绑定方式同上文 `UserDataScopeResolverInterface`）：
 
 ```php
 $container->bind(
