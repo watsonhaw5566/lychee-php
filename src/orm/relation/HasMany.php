@@ -34,7 +34,7 @@ class HasMany extends Relation
             return new Collection();
         }
 
-        /** @var Collection<array-key, Model> $result */
+        /** @var Collection<array-key, TRelated> $result */
         $result = $this->query->where($this->foreignKey, $value)->select();
         if (is_array($result)) {
             $result = new Collection($result);

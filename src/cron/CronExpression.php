@@ -78,6 +78,15 @@ class CronExpression
 
     public function __construct(private readonly string $expression)
     {
+        $parts = preg_split('/\s+/', trim($this->expression));
+
+        if ($parts === false || (count($parts) !== 5 && count($parts) !== 6)) {
+            throw new InvalidArgumentException(
+                "Invalid cron expression '{$this->expression}': expected 5 or 6 fields"
+            );
+        }
+
+        $this->hasSeconds = count($parts) === 6;
         $this->parse();
     }
 
@@ -101,9 +110,6 @@ class CronExpression
         // 归一化为 6 段：[秒, 分, 时, 日, 月, 周]
         if (count($parts) === 5) {
             array_unshift($parts, '0');
-            $this->hasSeconds = false;
-        } else {
-            $this->hasSeconds = true;
         }
 
         // 字段索引：0=分 1=时 2=日 3=月 4=周 5=秒

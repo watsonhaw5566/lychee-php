@@ -41,6 +41,7 @@ class Query
 
     protected string $pk = 'id';
 
+    /** @var TModel */
     protected ?Model $model = null;
 
     /** @var string[] 查询字段列表；空数组表示 *（会在 build 时被 Model 的字段白名单替换） */
@@ -110,11 +111,13 @@ class Query
         return $this->connection;
     }
 
-    public function setModel(Model $model): static
+    public function setModel(?Model $model): static
     {
         $this->model = $model;
-        $this->table = $model->getTable();
-        $this->pk    = $model->getPk();
+        if ($model !== null) {
+            $this->table = $model->getTable();
+            $this->pk    = $model->getPk();
+        }
 
         return $this;
     }
@@ -124,8 +127,12 @@ class Query
         return $this->model;
     }
 
+    /**
+     * @return static<TModel>
+     */
     public function newInstance(): static
     {
+        /** @var static<TModel> $clone */
         $clone = new static($this->connection);
         if ($this->model !== null) {
             $clone->setModel($this->model);
@@ -769,11 +776,12 @@ class Query
     // ── Fetchers ────────────────────────────────────────────────────
 
     /**
-     * 查询单条。
+     * 查询单条记录。
      *
-     * $id 不为 null 时按主键查询。
+     * 设置了模型时返回模型实例，否则返回原始数组。
      *
-     * @return Model|array<string, mixed>|null
+     * @param mixed $id 主键值；为 null 时取当前查询条件的第一条
+     * @return TModel|array|null
      */
     public function find(mixed $id = null): mixed
     {
@@ -891,7 +899,7 @@ class Query
     /**
      * 查询多条。
      *
-     * @return Collection<array-key, Model>|array<int, array<string, mixed>>
+     * @return Collection|array<int, array<string, mixed>>
      */
     public function select(): Collection|array
     {
@@ -1106,7 +1114,7 @@ class Query
      * 分批处理结果集，避免一次性加载大量数据到内存。
      *
      * @param int                                        $size     每批条数
-     * @param callable(Collection|array, int): bool|null $callback 回调返回 false 可终止后续批次
+     * @param callable(Collection|array, int): (bool|null) $callback 回调返回 false 可终止后续批次
      * @return bool 全部处理完返回 true，被回调中止返回 false
      */
     public function chunk(int $size, callable $callback): bool
@@ -1139,7 +1147,7 @@ class Query
      * 按主键游标分批处理，比 {@see chunk()} 更高效（避免深分页 offset）。
      *
      * @param int                                        $size  每批条数
-     * @param callable(Collection|array, int): bool|null $callback
+     * @param callable(Collection|array, int): (bool|null) $callback
      * @param string|null                                $column 游标列名，默认主键
      * @return bool
      */

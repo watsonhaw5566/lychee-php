@@ -1,5 +1,5 @@
 parameters:
-    level: 1
+    level: 3
     paths:
         - src
         - tests
@@ -21,3 +21,6 @@ parameters:
         -
             identifier: class.notFound
             path: src/http/Response.php
+        -
+            identifier: class.notFound
+            path: src/http/Request.php

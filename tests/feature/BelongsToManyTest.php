@@ -84,6 +84,7 @@ class BelongsToManyTest extends TestCase
 
     public function test_eager_load_prevents_n_plus_one(): void
     {
+        /** @var \Lychee\orm\Collection<int, BtmUser> $users */
         $users = BtmUser::with('roles')->select();
 
         $this->assertCount(2, $users);
@@ -97,6 +98,7 @@ class BelongsToManyTest extends TestCase
 
     public function test_eager_load_groups_correctly(): void
     {
+        /** @var \Lychee\orm\Collection<int, BtmUser> $users */
         $users = BtmUser::with('roles')->select();
 
         $byId = [];
@@ -129,6 +131,7 @@ class BelongsToManyTest extends TestCase
 
     public function test_with_count(): void
     {
+        /** @var \Lychee\orm\Collection<int, BtmUser> $users */
         $users = BtmUser::withCount('roles')->select();
 
         $byId = [];
@@ -144,6 +147,7 @@ class BelongsToManyTest extends TestCase
     {
         // 通过关联查询构造器添加条件
         $user  = BtmUser::find(1);
+        /** @var \Lychee\orm\Collection<int, BtmRole> $roles */
         $roles = $user->roles()->where('name', 'Admin')->select();
 
         $this->assertCount(1, $roles);
@@ -299,10 +303,16 @@ class BelongsToManyTest extends TestCase
 
 /**
  * 测试模型：User 多对多 Role。
+ *
+ * @property int $id
+ * @property string $name
+ * @property-read \Lychee\orm\Collection<int, BtmRole> $roles
+ * @property-read \Lychee\orm\Collection<int, BtmRole> $rolesWithPivot
+ * @property-read int $roles_count
  */
 class BtmUser extends Model
 {
-    protected string $name = 'btm_users';
+    protected string $table = 'btm_users';
 
     public function roles(): BelongsToMany
     {
@@ -322,7 +332,10 @@ class BtmUser extends Model
     }
 }
 
+/**
+ * @property string $name
+ */
 class BtmRole extends Model
 {
-    protected string $name = 'btm_roles';
+    protected string $table = 'btm_roles';
 }
