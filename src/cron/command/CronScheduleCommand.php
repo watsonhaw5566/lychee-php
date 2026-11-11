@@ -7,11 +7,17 @@ namespace Lychee\cron\command;
 use Lychee\console\Command;
 use Lychee\console\Input;
 use Lychee\console\Output;
+use Lychee\cron\Scheduler;
 
 /**
  * 定时任务常驻调度进程。
  *
- * 每分钟启动一个子进程执行 `cron:run`，无需依赖系统 crontab。
+ * 根据已注册任务的粒度自动选择 tick 频率：
+ * - 全部为 5 段（分钟级）表达式时，每分钟 tick 一次
+ * - 存在任意 6 段（秒级）表达式时，每秒 tick 一次
+ *
+ * 每次 tick 只做轻量的到期检查，有到期任务时才启动子进程执行
+ * `cron:run`，无到期任务时直接休眠，避免不必要的子进程开销。
  * 建议配合 supervisor / systemd 守护运行。
  *
  * 用法：php lee cron:schedule
@@ -20,7 +26,7 @@ class CronScheduleCommand extends Command
 {
     protected string $name = 'cron:schedule';
 
-    protected string $description = 'Start the cron schedule daemon (runs cron:run every minute)';
+    protected string $description = 'Start the cron schedule daemon (auto minute/second tick)';
 
     protected function configure(): void
     {
@@ -30,6 +36,13 @@ class CronScheduleCommand extends Command
 
     protected function execute(Input $input, Output $output): int
     {
+        /** @var Scheduler $scheduler */
+        $scheduler = $this->app->get(Scheduler::class);
+
+        // 自动检测粒度：存在秒级任务则 1 秒 tick，否则 60 秒 tick
+        $useSecondTick = $scheduler->requiresSecondTick();
+        $interval      = $useSecondTick ? 1.0 : 60.0;
+
         $entryScript = $this->resolveEntryScript();
         $command     = sprintf(
             '%s %s cron:run',
@@ -37,19 +50,25 @@ class CronScheduleCommand extends Command
             escapeshellarg($entryScript)
         );
 
-        $output->writeln('<info>Cron schedule started.</info> Press Ctrl+C to stop.');
+        $granularity = $useSecondTick ? '1-second' : '1-minute';
+        $output->writeln("<info>Cron schedule started.</info> ({$granularity} tick) Press Ctrl+C to stop.");
 
         while (true) {
-            $exitCode = $this->runSubprocess($command, $output);
+            // 轻量检查到期任务，有到期才 fork 子进程执行
+            if (!empty($scheduler->getDueTasks())) {
+                $exitCode = $this->runSubprocess($command, $output);
 
-            if ($exitCode !== 0) {
-                $output->writeln('<error>cron:run exited with code ' . $exitCode . '</error>');
+                if ($exitCode !== 0) {
+                    $output->writeln('<error>cron:run exited with code ' . $exitCode . '</error>');
+                }
             }
 
-            // 对齐到下一分钟边界休眠，避免子进程耗时累积导致触发时刻漂移，
-            // 进而漏过 * * * * * 等整分钟任务
-            $sleepSeconds = 60 - (time() % 60);
-            sleep($sleepSeconds);
+            // 对齐到下一个 tick 边界休眠，避免子进程耗时累积导致触发时刻漂移，
+            // 进而漏过整分钟 / 整秒任务
+            $sleep = $interval - fmod(microtime(true), $interval);
+            if ($sleep > 0) {
+                usleep((int) ($sleep * 1_000_000));
+            }
         }
     }
 
