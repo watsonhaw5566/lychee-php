@@ -543,14 +543,9 @@ class HomeController
 `Lychee\routing\HasDataPermission` 是一个可选 Trait，为资源控制器提供数据范围过滤。
 `use` 后会覆盖 `applyDataPermission()`，按当前登录用户的数据权限过滤查询。
 
-支持四种权限级别：
+### 快速接入
 
-| 级别 | 说明 |
-|------|------|
-| `all` | 查看所有数据（不过滤） |
-| `dept_tree` | 本部门及所有下级部门的数据 |
-| `dept` | 仅本部门的数据 |
-| `self` | 仅自己的数据（默认） |
+控制器只需 `use HasDataPermission`，模块标识默认从类名自动推导（`OrderController` → `order`）：
 
 ```php
 namespace App\controller;
@@ -566,30 +561,53 @@ class OrderController extends ResourceController
     use HasDataPermission;
 
     protected string $modelClass = Order::class;
-
-    protected array $dataPermission = [
-        'enabled'     => true,
-        'userIdField' => 'user_id',
-        'deptIdField' => 'dept_id',   // dept / dept_tree 级别使用
-        'module'      => 'order',
-    ];
 }
 ```
+
+当推导结果不符合预期时（例如 `AdminCustomerController` 希望模块名为 `customer` 而非 `adminCustomer`），覆盖 `getDataPermissionModule()` 即可：
+
+```php
+class AdminCustomerController extends ResourceController
+{
+    use HasDataPermission;
+
+    protected function getDataPermissionModule(): string
+    {
+        return 'customer';
+    }
+}
+```
+
+管理员判断与权限级别读取由项目统一实现的 `UserDataScopeResolverInterface` 提供（见下文），
+无需在每个控制器中重复覆盖 `isAdmin()` / `getPermissionLevel()`。
+
+### 权限级别
+
+支持四种权限级别：
+
+| 级别 | 说明 |
+|------|------|
+| `all` | 查看所有数据（不过滤） |
+| `dept_tree` | 本部门及所有下级部门的数据 |
+| `dept` | 仅本部门的数据 |
+| `self` | 仅自己的数据（默认） |
 
 ### 配置项
 
 | 配置 | 默认值 | 说明 |
 |------|--------|------|
-| `enabled` | `false` | 是否开启数据权限控制 |
+| `enabled` | `true` | 是否开启数据权限控制 |
 | `userIdField` | `'user_id'` | 数据所有者字段名（self 级别使用） |
 | `deptIdField` | `'dept_id'` | 数据所属部门字段名（dept / dept_tree 级别使用） |
-| `module` | `''` | 当前模块标识，用于匹配权限级别 |
+
+> 模块标识默认从控制器类名推导（去 `Controller` 后缀后 `lcfirst`），
+> 推导不符时覆盖 `getDataPermissionModule()`，不通过配置项设置。
 
 ### 工作原理
 
 - 从 `request()->loginId()` 获取当前登录用户 ID（由认证中间件挂载）
-- 调用 `isAdmin($userId)` 判断是否管理员（默认返回 `false`）
-- 调用 `getPermissionLevel($userId, $module)` 获取权限级别（默认返回 `'self'`）
+- 调用 `isAdmin($userId)` 判断是否管理员（默认委托 `UserDataScopeResolverInterface`，未绑定时返回 `false`）
+- 调用 `getPermissionLevel($userId, $module)` 获取权限级别（默认委托 `UserDataScopeResolverInterface`，未绑定时返回 `'self'`）
 - 按级别应用过滤：
   - `all`：不附加过滤
   - `dept_tree`：附加 `whereIn(dept_id, 本部门及所有下级部门ID)`
@@ -597,6 +615,48 @@ class OrderController extends ResourceController
   - `self`：附加 `where(user_id, 当前用户ID)`
 
 > `dept` / `dept_tree` 级别下，若用户无部门归属（`getUserDeptId` 返回 `null`），自动回退到 `self` 级别。
+
+### 数据范围解析器 UserDataScopeResolverInterface
+
+`isAdmin()` 与 `getPermissionLevel()` 默认从容器解析 `UserDataScopeResolverInterface`。
+项目只需实现一次并绑定到容器，所有使用 `HasDataPermission` 的控制器自动复用：
+
+```php
+namespace App\auth;
+
+use App\model\User;
+use Lychee\routing\UserDataScopeResolverInterface;
+
+class UserDataScopeResolver implements UserDataScopeResolverInterface
+{
+    public function isAdmin(int $userId): bool
+    {
+        return User::find($userId)?->role === 'admin';
+    }
+
+    public function getPermissionLevel(int $userId, string $module): string
+    {
+        // 假设 User 模型上有 dataScope() 方法返回各模块的权限级别映射
+        $dataScope = User::find($userId)?->dataScope() ?? [];
+
+        // 返回 'all' | 'dept_tree' | 'dept' | 'self'
+        return $dataScope[$module] ?? 'self';
+    }
+}
+```
+
+在 ServiceProvider 或启动文件中绑定：
+
+```php
+$container->bind(
+    \Lychee\routing\UserDataScopeResolverInterface::class,
+    \App\auth\UserDataScopeResolver::class,
+);
+```
+
+> 未绑定 `UserDataScopeResolverInterface` 时，`isAdmin()` 返回 `false`、`getPermissionLevel()` 返回 `'self'`，
+> 即所有用户只能看到自己的数据，是最保守的安全策略。
+> 若个别控制器需要自定义逻辑，仍可直接覆盖 `isAdmin()` / `getPermissionLevel()` 方法（类方法优先于 trait）。
 
 ### 部门解析器 DeptResolverInterface
 
@@ -638,44 +698,6 @@ $container->bind(
 
 > 未绑定实现时使用 `dept` / `dept_tree` 级别会抛出 `RuntimeException`，
 > 仅使用 `all` / `self` 级别时无需绑定。
-
-### 覆盖管理员与权限逻辑
-
-Trait 默认采用最保守策略。实际项目中需覆盖 `isAdmin()` 和 `getPermissionLevel()`：
-
-```php
-class OrderController extends ResourceController
-{
-    use HasDataPermission;
-
-    protected array $dataPermission = [
-        'enabled'     => true,
-        'userIdField' => 'user_id',
-        'deptIdField' => 'dept_id',
-        'module'      => 'order',
-    ];
-
-    protected function isAdmin(int $userId): bool
-    {
-        return User::find($userId)?->is_admin ?? false;
-    }
-
-    protected function getPermissionLevel(int $userId, string $module): string
-    {
-        $role = User::find($userId)?->role;
-        if (!$role || empty($role->data_scope)) {
-            return 'self';
-        }
-
-        $dataScope = is_array($role->data_scope)
-            ? $role->data_scope
-            : json_decode($role->data_scope, true);
-
-        // 返回 'all' | 'dept_tree' | 'dept' | 'self'
-        return $dataScope[$module] ?? 'self';
-    }
-}
-```
 
 ### 单条数据权限检查
 
