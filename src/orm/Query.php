@@ -520,6 +520,14 @@ class Query
         return $this;
     }
 
+    /**
+     * 设置查询条数（及可选偏移量）。
+     *
+     * 注意：参数顺序与 ThinkPHP 相反——Lychee 为「条数在前」，ThinkPHP 为「偏移量在前」。
+     *
+     * @param int      $limit  条数
+     * @param int|null $offset 偏移量（可选）
+     */
     public function limit(int $limit, ?int $offset = null): static
     {
         $this->limit = $limit;

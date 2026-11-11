@@ -170,6 +170,14 @@ Db::table('users')->where('status', 1)->exists();       // true / false
 Db::table('users')->field('id,name')->select();
 Db::table('users')->field(['id', 'name'])->select();
 
+// 条数与偏移量
+Db::table('users')->limit(10)->select();                              // 取前 10 条
+Db::table('users')->limit(10, 5)->select();                           // 跳过 5 条、取 10 条（条数在前）
+
+// 注意：limit() 参数顺序与 ThinkPHP 相反
+//   Lychee:   limit($limit, $offset)  条数在前，偏移量在后
+//   ThinkPHP: limit($offset, $length) 偏移量在前，条数在后
+
 // 分页（offset + limit）
 Db::table('users')->page(2, 20)->select();
 
