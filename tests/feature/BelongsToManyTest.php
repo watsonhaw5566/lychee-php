@@ -146,7 +146,7 @@ class BelongsToManyTest extends TestCase
     public function test_relation_methods_where_clause(): void
     {
         // 通过关联查询构造器添加条件
-        $user  = BtmUser::find(1);
+        $user = BtmUser::find(1);
         /** @var \Lychee\orm\Collection<int, BtmRole> $roles */
         $roles = $user->roles()->where('name', 'Admin')->select();
 
