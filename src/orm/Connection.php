@@ -378,7 +378,7 @@ class Connection
         $statement->execute();
         $elapsed = (microtime(true) - $start) * 1000;
 
-        if ($this->logger instanceof Closure) {
+        if ($this->logger instanceof Closure && ($this->config['trigger_sql'] ?? true)) {
             ($this->logger)('sql', sprintf(
                 '[%s] %s | bindings: %s | %.2fms',
                 $this->name,
