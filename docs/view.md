@@ -50,9 +50,7 @@ return [
 
 ## 渲染模板
 
-### `view()` —— 返回 HTML 字符串
-
-`view()` 辅助函数渲染模板并返回 HTML 字符串：
+在控制器中使用 `view()` 辅助函数，直接 `return` 即可输出 HTML 页面：
 
 ```php
 public function index()
@@ -64,35 +62,29 @@ public function index()
 }
 ```
 
-### `render()` —— 返回 HTML 响应
+`view()` 返回一个 `ViewResponse` 对象（继承自 `Response`），自动设置 `Content-Type: text/html; charset=utf-8`，HTTP 内核会原样输出。控制器可声明 `: ViewResponse` 返回类型以获得精确的静态分析与 IDE 提示。
 
-`render()` 辅助函数在 `view()` 的基础上进一步封装，直接返回一个带 `Content-Type: text/html; charset=utf-8` 的 `Response` 对象，控制器中可直接 `return`：
+### 指定状态码
 
-```php
-public function index()
-{
-    return render('user/profile', [
-        'name' => 'Lychee',
-        'user' => ['id' => 1, 'email' => 'a@b.com'],
-    ]);
-}
-```
-
-支持传入第三个参数指定 HTTP 状态码（默认 200），常用于错误页面：
+`view()` 支持第三个参数指定 HTTP 状态码（默认 200），常用于错误页面：
 
 ```php
 public function notFound()
 {
-    return render('errors/404', [], 404);
+    return view('errors/404', [], 404);
 }
 ```
 
-> `render($template, $data, $status)` 等价于 `response(view($template, $data), $status, ['Content-Type' => 'text/html; charset=utf-8'])`。
+### 获取原始 HTML 字符串
 
-也可通过容器获取 View 实例：
+`view()` 返回的是 `ViewResponse` 对象，如需原始 HTML 字符串（如渲染邮件模板、将片段嵌入变量），可通过 `->content` 属性获取，或直接调用容器中的 View 实例：
 
 ```php
-$html = app('view')->render('index', ['title' => 'Home']);
+// 通过 content 属性获取渲染后的字符串
+$html = view('email/welcome', ['name' => 'Lychee'])->content;
+
+// 或直接使用 View 实例的 render() 方法
+$html = app('view')->render('email/welcome', ['name' => 'Lychee']);
 
 // 判断模板是否存在
 if (app('view')->exists('user/profile')) {

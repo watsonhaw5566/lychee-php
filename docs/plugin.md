@@ -221,7 +221,7 @@ use Lychee\routing\Route;
 class HelloController extends Controller
 {
     #[Route('GET', '/hello')]
-    public function index(): string
+    public function index()
     {
         return view('@myplugin/hello', ['name' => 'Lychee']);
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Lychee\http\JsonResponse;
 use Lychee\http\Request;
 use Lychee\http\Response;
+use Lychee\http\ViewResponse;
 
 if (!function_exists('env')) {
     /**
@@ -392,34 +393,25 @@ if (!function_exists('error_message')) {
 
 if (!function_exists('view')) {
     /**
-     * 渲染 Twig 模板。
-     *
-     * @param  string               $template 模板路径（相对 app/view，如 'user/index'、'user/index.twig' 或 'user/index.html'）
-     * @param  array<string, mixed> $data     传递给模板的数据
-     */
-    function view(string $template, array $data = []): string
-    {
-        /** @var \Lychee\view\View $view */
-        $view = app('view');
-
-        return $view->render($template, $data);
-    }
-}
-
-if (!function_exists('render')) {
-    /**
      * 渲染模板并返回 HTML 响应。
      *
-     * 等价于 response(view($template, $data), $status, ['Content-Type' => 'text/html; charset=utf-8'])，
-     * 方便在控制器中直接 return render('user/index', ['list' => $list]);
+     * 返回的 ViewResponse 已设置 Content-Type: text/html; charset=utf-8，
+     * 控制器中可直接 return view('user/index', ['list' => $list]);
+     *
+     * 如需原始 HTML 字符串（如邮件模板），可通过 view(...)->content 获取。
      *
      * @param  string               $template 模板路径（相对 app/view，如 'user/index'、'user/index.twig' 或 'user/index.html'）
      * @param  array<string, mixed> $data     传递给模板的数据
      * @param  int                  $status   HTTP 状态码
      */
-    function render(string $template, array $data = [], int $status = 200): Response
+    function view(string $template, array $data = [], int $status = 200): ViewResponse
     {
-        return response(view($template, $data), $status, ['Content-Type' => 'text/html; charset=utf-8']);
+        /** @var \Lychee\view\View $view */
+        $view = app('view');
+
+        $html = $view->render($template, $data);
+
+        return new ViewResponse($html, $status);
     }
 }
 

@@ -154,11 +154,8 @@ return $this->paginate($query, $current, $pageSize);
 直接返回对应的响应对象，内核会原样输出：
 
 ```php
-// HTML 视图（返回字符串，内核自动输出）
+// HTML 视图（view() 返回 ViewResponse，自动设置 Content-Type: text/html）
 return view('user/index', ['list' => $list]);
-
-// HTML 视图（返回 Response，自动设置 Content-Type: text/html）
-return render('user/index', ['list' => $list]);
 
 // 文件下载
 return download('report.pdf');
@@ -166,6 +163,40 @@ return download('report.pdf');
 // 重定向
 return redirect('/login');
 ```
+
+#### 返回类型声明
+
+控制器方法可根据返回内容声明精确的返回类型，以获得更好的静态分析与 IDE 提示：
+
+```php
+use Lychee\http\JsonResponse;
+use Lychee\http\Response;
+use Lychee\http\ViewResponse;
+
+// 仅渲染 HTML 页面 → 声明 ViewResponse
+public function index(): ViewResponse
+{
+    return view('user/index', ['list' => $list]);
+}
+
+// 仅返回 JSON → 声明 JsonResponse
+public function store(): JsonResponse
+{
+    return $this->success(['id' => 1]);
+}
+
+// 可能返回多种响应类型（HTML/JSON/重定向）→ 声明 Response
+public function show(): Response
+{
+    if (!request()->isAjax()) {
+        return view('user/show', ['user' => $user]);
+    }
+    return $this->success($user);
+}
+```
+
+> `JsonResponse` 与 `ViewResponse` 均继承自 `Response`，因此声明 `: Response` 可兼容所有响应类型。
+> 内核通过 `instanceof Response` 判断是否直接输出，只要返回 `Response` 及其子类就不会被包成 JSON。
 
 #### 全局助手函数
 
