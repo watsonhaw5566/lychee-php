@@ -406,6 +406,23 @@ if (!function_exists('view')) {
     }
 }
 
+if (!function_exists('render')) {
+    /**
+     * 渲染模板并返回 HTML 响应。
+     *
+     * 等价于 response(view($template, $data), $status, ['Content-Type' => 'text/html; charset=utf-8'])，
+     * 方便在控制器中直接 return render('user/index', ['list' => $list]);
+     *
+     * @param  string               $template 模板路径（相对 app/view，如 'user/index'、'user/index.twig' 或 'user/index.html'）
+     * @param  array<string, mixed> $data     传递给模板的数据
+     * @param  int                  $status   HTTP 状态码
+     */
+    function render(string $template, array $data = [], int $status = 200): Response
+    {
+        return response(view($template, $data), $status, ['Content-Type' => 'text/html; charset=utf-8']);
+    }
+}
+
 if (!function_exists('asset')) {
     /**
      * 生成 public 目录下静态资源的 URL。

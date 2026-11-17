@@ -50,7 +50,9 @@ return [
 
 ## 渲染模板
 
-在控制器中使用 `view()` 辅助函数：
+### `view()` —— 返回 HTML 字符串
+
+`view()` 辅助函数渲染模板并返回 HTML 字符串：
 
 ```php
 public function index()
@@ -61,6 +63,31 @@ public function index()
     ]);
 }
 ```
+
+### `render()` —— 返回 HTML 响应
+
+`render()` 辅助函数在 `view()` 的基础上进一步封装，直接返回一个带 `Content-Type: text/html; charset=utf-8` 的 `Response` 对象，控制器中可直接 `return`：
+
+```php
+public function index()
+{
+    return render('user/profile', [
+        'name' => 'Lychee',
+        'user' => ['id' => 1, 'email' => 'a@b.com'],
+    ]);
+}
+```
+
+支持传入第三个参数指定 HTTP 状态码（默认 200），常用于错误页面：
+
+```php
+public function notFound()
+{
+    return render('errors/404', [], 404);
+}
+```
+
+> `render($template, $data, $status)` 等价于 `response(view($template, $data), $status, ['Content-Type' => 'text/html; charset=utf-8'])`。
 
 也可通过容器获取 View 实例：
 

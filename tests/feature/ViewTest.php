@@ -51,6 +51,24 @@ class ViewTest extends TestCase
         $this->assertStringContainsString('Hello, World!', $html);
     }
 
+    public function test_render_helper_function_returns_response_with_html_content_type(): void
+    {
+        $response = render('hello.html', ['name' => 'Lychee']);
+
+        $this->assertInstanceOf(\Lychee\http\Response::class, $response);
+        $this->assertSame(200, $response->status);
+        $this->assertSame('text/html; charset=utf-8', $response->headers['Content-Type'] ?? '');
+        $this->assertStringContainsString('Hello, Lychee!', $response->content);
+    }
+
+    public function test_render_helper_function_accepts_custom_status(): void
+    {
+        $response = render('hello.html', ['name' => 'Test'], 404);
+
+        $this->assertSame(404, $response->status);
+        $this->assertStringContainsString('Hello, Test!', $response->content);
+    }
+
     public function test_render_twig_template(): void
     {
         $html = $this->view->render('welcome.twig', ['name' => 'Lychee']);
