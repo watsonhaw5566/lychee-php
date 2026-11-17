@@ -117,10 +117,31 @@ class ExceptionHandlerTest extends TestCase
         $response = $this->handler->render($this->jsonRequest(), new HttpException(404, 'not found'));
         $data     = json_decode($response->content, true);
 
+        $this->assertSame(0, $data['errno']);
         $this->assertSame(404, $data['code']);
         $this->assertIsString($data['msg']);
         $this->assertArrayHasKey('data', $data);
         $this->assertNull($data['data']);
+    }
+
+    public function test_json_response_errno_uses_business_code(): void
+    {
+        // HttpException 第四个参数是业务错误码，应映射到响应的 errno 字段
+        $response = $this->handler->render($this->jsonRequest(), new HttpException(403, 'forbidden', 1001));
+        $data     = json_decode($response->content, true);
+
+        $this->assertSame(1001, $data['errno']);
+        $this->assertSame(403, $data['code']);
+    }
+
+    public function test_system_exception_errno_is_zero(): void
+    {
+        // 非 HttpException 的系统异常 getCode() 通常为 0，errno 应为 0
+        $response = $this->handler->render($this->jsonRequest(), new RuntimeException('boom'));
+        $data     = json_decode($response->content, true);
+
+        $this->assertSame(0, $data['errno']);
+        $this->assertSame(500, $data['code']);
     }
 
     public function test_validate_exception_preserves_field_errors(): void
@@ -129,6 +150,7 @@ class ExceptionHandlerTest extends TestCase
         $response = $this->handler->render($this->jsonRequest(), new ValidateException($errors));
         $data     = json_decode($response->content, true);
 
+        $this->assertSame(0, $data['errno']);
         $this->assertSame(400, $data['code']);
         $this->assertArrayHasKey('errors', $data);
         $this->assertSame($errors, $data['errors']);

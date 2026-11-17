@@ -119,6 +119,7 @@ class ExceptionHandler
 
         if ($debug) {
             return new JsonResponse([
+                'errno' => $e->getCode(),
                 'code'  => $status,
                 'msg'   => $e->getMessage(),
                 'data'  => null,
@@ -134,13 +135,17 @@ class ExceptionHandler
 
     /**
      * 构造 JSON 错误响应。
+     *
+     * 信封格式与 {@see \Lychee\http\Controller::success()} 保持一致：{errno, code, msg, data}。
+     * errno 取异常的业务错误码（$e->getCode()），未设置时为 0。
      */
     protected function jsonResponse(int $status, string $msg, ?Throwable $e = null): JsonResponse
     {
         return new JsonResponse([
-            'code' => $status,
-            'msg'  => $msg,
-            'data' => null,
+            'errno' => $e?->getCode() ?? 0,
+            'code'  => $status,
+            'msg'   => $msg,
+            'data'  => null,
         ], $status, $this->exceptionHeaders($e));
     }
 
@@ -153,9 +158,10 @@ class ExceptionHandler
         $msg    = is_array($errors) ? implode('；', $errors) : (string) $errors;
 
         $data = [
-            'code' => $e->getStatusCode(),
-            'msg'  => $msg,
-            'data' => null,
+            'errno' => $e->getCode(),
+            'code'  => $e->getStatusCode(),
+            'msg'   => $msg,
+            'data'  => null,
         ];
 
         if (is_array($errors)) {
