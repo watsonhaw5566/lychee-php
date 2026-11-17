@@ -154,11 +154,8 @@ return $this->paginate($query, $current, $pageSize);
 直接返回对应的响应对象，内核会原样输出：
 
 ```php
-// HTML 视图（返回字符串，内核自动输出）
+// HTML 视图（view() 返回 Response，自动设置 Content-Type: text/html）
 return view('user/index', ['list' => $list]);
-
-// HTML 视图（返回 Response，自动设置 Content-Type: text/html）
-return render('user/index', ['list' => $list]);
 
 // 文件下载
 return download('report.pdf');
