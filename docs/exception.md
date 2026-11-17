@@ -133,10 +133,11 @@ throw new ModelNotFoundException(User::class);   // → 404
 
 ### JSON 响应
 
-非 HTML 请求（`Accept: application/json` 或 `exception_render = 'json'`）返回统一的 JSON 结构：
+非 HTML 请求（`Accept: application/json` 或 `exception_render = 'json'`）返回统一的 JSON 结构，与控制器 `success()`/`fail()` 的信封格式一致：
 
 ```json
 {
+    "errno": 0,
     "code": 404,
     "msg": "用户不存在",
     "data": null
@@ -145,6 +146,7 @@ throw new ModelNotFoundException(User::class);   // → 404
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
+| `errno` | `int` | 业务错误码，取自异常的 `getCode()`；未设置时为 `0` |
 | `code` | `int` | HTTP 状态码 |
 | `msg` | `string` | 错误描述（生产环境受 `show_error_msg` 控制） |
 | `data` | `null` | 统一占位，便于前端解析 |
@@ -155,6 +157,7 @@ throw new ModelNotFoundException(User::class);   // → 404
 
 ```json
 {
+    "errno": 0,
     "code": 404,
     "msg": "用户不存在",
     "data": null,
@@ -171,6 +174,7 @@ throw new ModelNotFoundException(User::class);   // → 404
 
 ```json
 {
+    "errno": 0,
     "code": 400,
     "msg": "用户名必填；邮箱格式不正确",
     "data": null,
