@@ -121,13 +121,20 @@ use Lychee\http\Response;
 
 return new Response('Hello', 200, ['X-Custom' => 'value']);
 
-// JSON 响应
+// JSON 响应（Content-Type: application/json）
 use Lychee\http\JsonResponse;
 return new JsonResponse(['code' => 0, 'data' => $data]);
+
+// HTML 视图响应（Content-Type: text/html）
+use Lychee\http\ViewResponse;
+return new ViewResponse('<h1>Hello</h1>', 200);
 
 // 辅助函数
 return response('content', 200);
 ```
+
+> `JsonResponse` 与 `ViewResponse` 均继承自 `Response`，控制器可声明精确返回类型
+> （如 `: ViewResponse`）以获得更好的静态分析与 IDE 提示。
 
 ## 文件下载 Download
 

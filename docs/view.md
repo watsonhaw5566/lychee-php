@@ -62,7 +62,7 @@ public function index()
 }
 ```
 
-`view()` 返回一个 `Response` 对象，自动设置 `Content-Type: text/html; charset=utf-8`，HTTP 内核会原样输出。
+`view()` 返回一个 `ViewResponse` 对象（继承自 `Response`），自动设置 `Content-Type: text/html; charset=utf-8`，HTTP 内核会原样输出。控制器可声明 `: ViewResponse` 返回类型以获得精确的静态分析与 IDE 提示。
 
 ### 指定状态码
 
@@ -77,7 +77,7 @@ public function notFound()
 
 ### 获取原始 HTML 字符串
 
-`view()` 返回的是 `Response` 对象，如需原始 HTML 字符串（如渲染邮件模板、将片段嵌入变量），可通过 `->content` 属性获取，或直接调用容器中的 View 实例：
+`view()` 返回的是 `ViewResponse` 对象，如需原始 HTML 字符串（如渲染邮件模板、将片段嵌入变量），可通过 `->content` 属性获取，或直接调用容器中的 View 实例：
 
 ```php
 // 通过 content 属性获取渲染后的字符串
