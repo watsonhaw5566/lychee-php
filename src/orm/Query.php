@@ -17,7 +17,8 @@ use Throwable;
  * 查询构造器。
  *
  * 对齐 ThinkPHP Query 的常用链式 API：
- * where / whereIn / whereNull / whereNotNull / whereLike / whereBetween /
+ * where / whereIn / whereNull / whereNotNull / whereLike / whereOrLike /
+ * whereNotLike / whereOrNotLike / whereBetween /
  * whereBetweenTime / whereRaw / whereOr（含闭包嵌套）；
  * field / order / limit / page / group / having / join；
  * count / sum / avg / min / max；
@@ -339,9 +340,19 @@ class Query
         return $this->where($field, 'LIKE', $value);
     }
 
+    public function whereOrLike(string $field, string $value): static
+    {
+        return $this->whereOr($field, 'LIKE', $value);
+    }
+
     public function whereNotLike(string $field, string $value): static
     {
         return $this->where($field, 'NOT LIKE', $value);
+    }
+
+    public function whereOrNotLike(string $field, string $value): static
+    {
+        return $this->whereOr($field, 'NOT LIKE', $value);
     }
 
     public function whereBetween(string $field, mixed $min, mixed $max = null, string $boolean = 'AND'): static
