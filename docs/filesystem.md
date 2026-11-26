@@ -1,6 +1,6 @@
 # 文件系统 Filesystem
 
-基于 Flysystem v3，支持 Local、阿里云 OSS、腾讯云 COS。
+基于 Flysystem v3，支持 Local、阿里云 OSS、腾讯云 COS、七牛云 Kodo。
 
 ## 配置
 
@@ -30,6 +30,13 @@ return [
             'region'     => 'ap-guangzhou',
             'bucket'     => 'your-bucket',
             'cdn'        => '',
+        ],
+        'qiniu' => [
+            'type'       => 'qiniu',
+            'access_key' => 'your-access-key',
+            'secret_key' => 'your-secret-key',
+            'bucket'     => 'your-bucket',
+            'domain'     => 'cdn.example.com',
         ],
     ],
 ];

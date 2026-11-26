@@ -141,4 +141,16 @@ class FilesystemTest extends TestCase
             'bucket'     => 'bucket',
         ]);
     }
+
+    public function test_qiniu_driver_validates_required_config(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Qiniu Kodo driver requires 'access_key'");
+
+        new \Lychee\filesystem\driver\Qiniu([
+            'secret_key' => 'key',
+            'bucket'     => 'bucket',
+            'domain'     => 'cdn.example.com',
+        ]);
+    }
 }
