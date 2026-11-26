@@ -118,6 +118,15 @@ Db::table('users')->whereOr('id', 'in', [1, 2])->select();           // OR 同�
 // 模糊查询
 Db::table('users')->whereLike('name', '%张%')->select();
 
+// OR 模糊查询（多字段关键词搜索，生成 name LIKE ? OR nickname LIKE ?）
+Db::table('users')
+    ->whereLike('name', '%张%')
+    ->whereOrLike('nickname', '%张%')
+    ->select();
+
+// 等价写法：whereOr 支持 LIKE 操作符
+Db::table('users')->whereOr('nickname', 'LIKE', '%张%')->select();
+
 // IN / NOT IN
 Db::table('users')->whereIn('id', [1, 2, 3])->select();
 Db::table('users')->whereNotIn('id', [1, 2])->select();
