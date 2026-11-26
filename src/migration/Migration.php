@@ -36,7 +36,7 @@ abstract class Migration
      */
     protected function table(string $name, array $options = []): Table
     {
-        return new Table($this->prefix . $name, $this->pdo, $options);
+        return new Table($this->prefix . $name, $this->pdo, $options, $this->prefix);
     }
 
     /**

@@ -28,6 +28,7 @@ use Lychee\orm\facade\Db;
 use Lychee\orm\Model as OrmModel;
 use Lychee\plugin\PluginManager;
 use Lychee\migration\command\MigrateRollbackCommand;
+use Lychee\migration\command\MigrateReverseCommand;
 use Lychee\migration\command\MigrateRunCommand;
 use Lychee\migration\command\SeedCreateCommand;
 use Lychee\migration\command\SeedRunCommand;
@@ -541,6 +542,7 @@ class Application
         $console->addCommand(MigrateRunCommand::class);
         $console->addCommand(MigrateRollbackCommand::class);
         $console->addCommand(MigrateCreateCommand::class);
+        $console->addCommand(MigrateReverseCommand::class);
         $console->addCommand(SeedCreateCommand::class);
         $console->addCommand(SeedRunCommand::class);
         $console->addCommand(SeedSqlCommand::class);
