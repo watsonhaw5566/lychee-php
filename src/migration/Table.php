@@ -20,6 +20,11 @@ class Table
     /** @var array<int, array{columns: array<int,string>, options: array<string, mixed>}> */
     private array $indexes = [];
 
+    /**
+     * @var array<int, array{columns: array<int,string>, refTable: string, refColumns: array<int,string>, options: array<string, mixed>}>
+     */
+    private array $foreignKeys = [];
+
     /** @var array<string, string> */
     private array $options = [
         'engine'      => 'InnoDB',
@@ -38,6 +43,7 @@ class Table
         private readonly string $name,
         private readonly PDO    $pdo,
         array                   $options = [],
+        private readonly string $prefix = '',
     ) {
         $this->driverName = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
         $this->options    = array_merge($this->options, $options);
@@ -92,6 +98,11 @@ class Table
             } else {
                 $regularIndexes[] = $idx;
             }
+        }
+
+        // 内联外键约束（MySQL / SQLite 均在 CREATE TABLE 中声明）
+        foreach ($this->foreignKeys as $fk) {
+            $columns[] = $this->buildForeignKeyDefinition($fk);
         }
 
         $sql = sprintf('CREATE TABLE IF NOT EXISTS `%s` (%s)', $this->name, implode(', ', $columns));
@@ -203,6 +214,32 @@ class Table
         $this->indexes[] = [
             'columns' => (array)$columns,
             'options' => $options,
+        ];
+
+        return $this;
+    }
+
+    /**
+     * 添加外键。
+     *
+     * 引用表名会自动应用表前缀（与本表保持一致）。
+     *
+     * @param  array<int, string>|string $columns    本表的外键列
+     * @param  string                    $refTable   被引用的表名（逻辑名，不含前缀）
+     * @param  array<int, string>|string $refColumns 被引用的列
+     * @param  array<string, mixed>      $options    支持 name / onDelete / onUpdate
+     */
+    public function addForeignKey(
+        array|string $columns,
+        string       $refTable,
+        array|string $refColumns,
+        array        $options = [],
+    ): static {
+        $this->foreignKeys[] = [
+            'columns'    => (array)$columns,
+            'refTable'   => $refTable,
+            'refColumns' => (array)$refColumns,
+            'options'    => $options,
         ];
 
         return $this;
@@ -575,6 +612,29 @@ class Table
             'uuid'                     => 'CHAR(36)',
             default                    => strtoupper($type),
         };
+    }
+
+    /**
+     * @param array{columns: array<int,string>, refTable: string, refColumns: array<int,string>, options: array<string, mixed>} $fk
+     */
+    private function buildForeignKeyDefinition(array $fk): string
+    {
+        $cols     = implode(', ', array_map(fn ($c) => "`{$c}`", $fk['columns']));
+        $refTable = $this->prefix . $fk['refTable'];
+        $refCols  = implode(', ', array_map(fn ($c) => "`{$c}`", $fk['refColumns']));
+        $name     = $fk['options']['name'] ?? $fk['columns'][0] . '_foreign';
+
+        $def = "CONSTRAINT `{$name}` FOREIGN KEY ({$cols}) REFERENCES `{$refTable}` ({$refCols})";
+
+        if (!empty($fk['options']['onDelete'])) {
+            $def .= ' ON DELETE ' . strtoupper((string)$fk['options']['onDelete']);
+        }
+
+        if (!empty($fk['options']['onUpdate'])) {
+            $def .= ' ON UPDATE ' . strtoupper((string)$fk['options']['onUpdate']);
+        }
+
+        return $def;
     }
 
     /**

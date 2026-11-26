@@ -288,6 +288,32 @@ class MigrationManager
         return $seeders;
     }
 
+    /**
+     * 将一批迁移标记为已执行（写入 migrations 记录表，归入同一批次）。
+     *
+     * 用于 migrate:reverse --record：从已有数据库反向生成的迁移，标记后
+     * 不会被 migrate:run 重复执行，便于已有项目平滑接管迁移体系。
+     *
+     * @param list<string> $migrationNames 迁移文件名（如 20240101000000_create_users_table.php）
+     */
+    public function markAsRan(array $migrationNames): void
+    {
+        if ($migrationNames === []) {
+            return;
+        }
+
+        $this->ensureMigrationTable();
+
+        $batch = $this->getNextBatch();
+        $stmt  = $this->pdo->prepare(
+            "INSERT INTO `{$this->table()}` (migration, batch) VALUES (?, ?)"
+        );
+
+        foreach ($migrationNames as $name) {
+            $stmt->execute([$name, $batch]);
+        }
+    }
+
     private function instantiateMigration(string $file, string $class): Migration
     {
         require_once $file;
