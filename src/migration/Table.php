@@ -136,6 +136,23 @@ class Table
     }
 
     /**
+     * 重命名表（立即执行，无需调用 update()）。
+     *
+     * 目标表名会自动应用表前缀，与 Migration::table() 保持一致，
+     * 因此传入的应为逻辑表名（不含前缀）。
+     */
+    public function renameTo(string $to): void
+    {
+        $to = $this->prefix . $to;
+
+        if ($this->isSqlite()) {
+            $this->pdo->exec(sprintf('ALTER TABLE `%s` RENAME TO `%s`', $this->name, $to));
+        } else {
+            $this->pdo->exec(sprintf('RENAME TABLE `%s` TO `%s`', $this->name, $to));
+        }
+    }
+
+    /**
      * 判断表是否存在。
      */
     public function exists(): bool

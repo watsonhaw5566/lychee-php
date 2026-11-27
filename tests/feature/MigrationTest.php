@@ -277,4 +277,50 @@ PHP;
 
         $this->assertArrayHasKey('nickname', $columns);
     }
+
+    public function test_rename_to_renames_table_on_sqlite(): void
+    {
+        $table = new Table('test_rename_old', $this->pdo);
+        $table->addColumn('name', 'string');
+        $table->create();
+        $this->pdo->exec("INSERT INTO test_rename_old (name) VALUES ('lychee')");
+
+        $table->renameTo('test_rename_new');
+
+        $this->assertFalse((new Table('test_rename_old', $this->pdo))->exists());
+        $this->assertTrue((new Table('test_rename_new', $this->pdo))->exists());
+
+        $row = $this->pdo->query("SELECT name FROM test_rename_new")->fetch(PDO::FETCH_ASSOC);
+        $this->assertSame('lychee', $row['name']);
+    }
+
+    public function test_rename_to_applies_prefix_to_target(): void
+    {
+        $table = new Table('pf_old', $this->pdo, [], 'pf_');
+        $table->create();
+
+        $table->renameTo('new');
+
+        $this->assertFalse((new Table('pf_old', $this->pdo, [], 'pf_'))->exists());
+        $this->assertTrue((new Table('pf_new', $this->pdo, [], 'pf_'))->exists());
+    }
+
+    public function test_rename_to_generates_mysql_rename_table_sql(): void
+    {
+        $executed = [];
+
+        $pdo = $this->createStub(PDO::class);
+        $pdo->method('getAttribute')->willReturn('mysql');
+        $pdo->method('exec')->willReturnCallback(function (string $sql) use (&$executed): int {
+            $executed[] = $sql;
+
+            return 0;
+        });
+
+        $table = new Table('old_table', $pdo, [], '');
+        $table->renameTo('new_table');
+
+        $this->assertCount(1, $executed);
+        $this->assertSame('RENAME TABLE `old_table` TO `new_table`', $executed[0]);
+    }
 }
